@@ -1,0 +1,46 @@
+# dependencies
+**/node_modules
+**/.pnp
+**/.pnp.*
+
+# Next.js
+**/.next/
+**/out/
+**/build
+
+# env / secrets — never commit
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+
+# IDE / OS
+.DS_Store
+.vscode
+.idea
+*.tsbuildinfo
+**/next-env.d.ts
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+.pnpm-debug.log*
+
+# Vercel
+**/.vercel
+
+# Supabase CLI
+**/.supabase
+supabase/.temp
+supabase/_combined.sql
+
+# Claude session/cache (kept out of source control)
+.claude/
+.cursor/
+
+# Tests
+**/coverage
+**/playwright-report
+**/test-results

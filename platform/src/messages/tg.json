@@ -1,0 +1,56 @@
+{
+  "Common": {
+    "search": "Ҷустуҷӯ",
+    "submit": "Фиристодан",
+    "cancel": "Бекор",
+    "back": "Бозгашт",
+    "next": "Минбаъд",
+    "save": "Захира",
+    "loading": "Боргирӣ...",
+    "tjs": "TJS",
+    "from": "аз",
+    "perM2": "барои м²",
+    "rooms_one": "{count} хона",
+    "rooms_other": "{count} хона"
+  },
+  "Nav": {
+    "buildings": "Биноҳои нав",
+    "apartments": "Хонаҳо",
+    "saved": "Захирашуда",
+    "post": "Нашр кардани эълон",
+    "dashboard": "Кабинет",
+    "login": "Ворид шудан",
+    "diaspora": "Аз хориҷа"
+  },
+  "Source": {
+    "developer": "Аз сохтмонкунанда",
+    "owner": "Соҳиб",
+    "intermediary": "Воситагар"
+  },
+  "Verification": {
+    "tier1": "Телефон тасдиқшуда",
+    "tier2": "Профил санҷидашуда",
+    "tier3": "Объект санҷидашуда",
+    "developer": "Сохтмонкунандаи санҷидашуда"
+  },
+  "Finishing": {
+    "no_finish": "Бе таъмир",
+    "pre_finish": "Таъмири пеш аз нихоӣ",
+    "full_finish": "Бо таъмир",
+    "owner_renovated": "Бо таъмири соҳиб"
+  },
+  "Fairness": {
+    "great": "{percent}% поёнтар аз миёна",
+    "fair": "Нархи бозорӣ",
+    "high": "{percent}% болотар аз миёна",
+    "alert": "{percent}% болотар аз миёна"
+  },
+  "Homepage": {
+    "heroTitle": "Хонаро дар биноҳои нави Душанбе ва Ваҳдат боэътимод пайдо кунед",
+    "heroSubtitle": "Манбаҳои шаффоф, фурӯшандагони санҷидашуда, аксҳои воқеии сохтмон",
+    "searchPlaceholder": "Ҷустуҷӯ аз рӯи ноҳия, бино ё сохтмонкунанда",
+    "browseProjects": "Биноҳоро дидан",
+    "browseApartments": "Хонаҳоро дидан",
+    "guidedFinder": "Ёрӣ дар интихоб"
+  }
+}

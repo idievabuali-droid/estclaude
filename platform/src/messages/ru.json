@@ -1,0 +1,58 @@
+{
+  "Common": {
+    "search": "Найти",
+    "submit": "Отправить",
+    "cancel": "Отмена",
+    "back": "Назад",
+    "next": "Далее",
+    "save": "Сохранить",
+    "loading": "Загрузка...",
+    "tjs": "TJS",
+    "from": "от",
+    "perM2": "за м²",
+    "rooms_one": "{count} комната",
+    "rooms_few": "{count} комнаты",
+    "rooms_many": "{count} комнат",
+    "rooms_other": "{count} комнат"
+  },
+  "Nav": {
+    "buildings": "Новостройки",
+    "apartments": "Квартиры",
+    "saved": "Избранное",
+    "post": "Разместить объявление",
+    "dashboard": "Кабинет",
+    "login": "Войти",
+    "diaspora": "Из-за рубежа"
+  },
+  "Source": {
+    "developer": "От застройщика",
+    "owner": "Собственник",
+    "intermediary": "Посредник"
+  },
+  "Verification": {
+    "tier1": "Телефон подтверждён",
+    "tier2": "Профиль проверен",
+    "tier3": "Объект проверен",
+    "developer": "Проверенный застройщик"
+  },
+  "Finishing": {
+    "no_finish": "Без ремонта",
+    "pre_finish": "Предчистовая",
+    "full_finish": "С ремонтом",
+    "owner_renovated": "Отремонтировано владельцем"
+  },
+  "Fairness": {
+    "great": "{percent}% ниже среднего",
+    "fair": "Цена в рынке",
+    "high": "{percent}% выше среднего",
+    "alert": "{percent}% выше среднего"
+  },
+  "Homepage": {
+    "heroTitle": "Найдите квартиру в новостройке Душанбе и Вахдата с уверенностью",
+    "heroSubtitle": "Прозрачные источники, проверенные продавцы, реальные фото стройки",
+    "searchPlaceholder": "Поиск по району, ЖК или застройщику",
+    "browseProjects": "Смотреть новостройки",
+    "browseApartments": "Смотреть квартиры",
+    "guidedFinder": "Помощь в выборе"
+  }
+}
