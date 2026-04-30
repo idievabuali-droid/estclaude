@@ -10,8 +10,6 @@ import {
   getDistrictById,
   getListingsForBuildingId,
 } from '@/services/buildings';
-import { getExchangeRates } from '@/services/currency';
-import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import type { BuildingStatus } from '@/types/domain';
 
 const STATUS_FILTERS: Array<{ value: BuildingStatus; label: string }> = [
@@ -35,16 +33,16 @@ export default async function NovostroykiPage({
 
   const t = await getTranslations('Nav');
 
-  // Apply filters from URL state (matches nuqs pattern in spec)
-  const [filtered, mockDistricts, currency, rates] = await Promise.all([
+  // Apply filters from URL state (matches nuqs pattern in spec).
+  // Currency is intentionally NOT read here — that's a /diaspora-only
+  // feature so local buyers don't see foreign-currency clutter.
+  const [filtered, mockDistricts] = await Promise.all([
     listBuildings({
       district: sp.district?.split(','),
       status: sp.status?.split(',') as BuildingStatus[] | undefined,
       priceTo: sp.price_to ? BigInt(parseInt(sp.price_to, 10) * 100) : null,
     }),
     listDistricts(),
-    readCurrencyCookie(),
-    getExchangeRates(),
   ]);
 
   // Pre-fetch developer + district + units for each card
@@ -157,8 +155,6 @@ export default async function NovostroykiPage({
                       developer={dev}
                       district={dist}
                       matchingUnits={units}
-                      currency={currency}
-                      rates={rates}
                     />
                   );
                 })}

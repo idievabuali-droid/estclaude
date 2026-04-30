@@ -25,13 +25,10 @@ import {
   computeFairness,
   InstallmentDisplay,
   ListingCard,
-  PriceConversion,
 } from '@/components/blocks';
 import { formatPriceNumber, formatM2, formatFloor } from '@/lib/format';
 import { getListing } from '@/services/listings';
 import { getNearbyPOIs } from '@/services/poi';
-import { getExchangeRates } from '@/services/currency';
-import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { NearbyPois } from '@/components/blocks';
 import { ContactBarWithModal } from './ContactBarWithModal';
 
@@ -74,11 +71,9 @@ export default async function ListingDetailPage({
   const data = await getListing(slug);
   if (!data) notFound();
   const { listing, building, developer, district, median, similar } = data;
-  const [pois, currency, rates] = await Promise.all([
-    getNearbyPOIs(building.latitude, building.longitude),
-    readCurrencyCookie(),
-    getExchangeRates(),
-  ]);
+  // Currency intentionally NOT read here — apartment detail stays in
+  // TJS for local buyers. Currency is a /diaspora-lane-only feature.
+  const pois = await getNearbyPOIs(building.latitude, building.longitude);
   const fairness =
     median != null
       ? computeFairness(Number(listing.price_per_m2_dirams), median.median, median.sample)
@@ -157,19 +152,6 @@ export default async function ListingDetailPage({
               <FairnessIndicator level={fairness.level} deltaPercent={fairness.deltaPercent} />
             ) : null}
           </div>
-          {currency && currency !== 'TJS' ? (
-            <div className="flex flex-col gap-1">
-              <PriceConversion
-                priceDirams={listing.price_total_dirams}
-                target={currency}
-                rates={rates}
-                variant="block"
-              />
-              <span className="text-caption text-stone-400">
-                Курс ориентировочный. Расчёт в сомони.
-              </span>
-            </div>
-          ) : null}
 
           {/* Quick contact (desktop) */}
           <div className="hidden flex-wrap gap-2 pt-2 md:flex">
@@ -305,8 +287,6 @@ export default async function ListingDetailPage({
                   districtMedianPerM2={median?.median ?? null}
                   districtSampleSize={median?.sample ?? 0}
                   hideBuildingName
-                  currency={currency}
-                  rates={rates}
                 />
               ))}
             </div>
