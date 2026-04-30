@@ -8,7 +8,9 @@ import { formatPriceNumber } from '@/lib/format';
 import { VerificationBadge } from './VerificationBadge';
 import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
+import { PriceConversion } from './PriceConversion';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
+import type { ExchangeRates, SupportedCurrency } from '@/services/currency';
 
 const STATUS_LABEL: Record<MockBuilding['status'], string> = {
   announced: 'Анонсирован',
@@ -22,6 +24,10 @@ export interface BuildingCardProps {
   developer: MockDeveloper;
   district: MockDistrict;
   matchingUnits?: MockListing[];
+  /** Diaspora currency (cookie-driven). When set + rates supplied,
+   *  shows foreign-currency equivalent beneath TJS. */
+  currency?: SupportedCurrency | null;
+  rates?: ExchangeRates | null;
   className?: string;
 }
 
@@ -35,8 +41,11 @@ export function BuildingCard({
   developer,
   district,
   matchingUnits = [],
+  currency,
+  rates,
   className,
 }: BuildingCardProps) {
+  const showConversion = currency && currency !== 'TJS' && rates != null;
   const tCommon = useTranslations('Common');
 
   return (
@@ -95,6 +104,13 @@ export function BuildingCard({
               <span className="text-h2 font-semibold tabular-nums text-stone-900">
                 {formatPriceNumber(building.price_from_dirams)} TJS
               </span>
+              {showConversion ? (
+                <PriceConversion
+                  priceDirams={building.price_from_dirams}
+                  target={currency}
+                  rates={rates}
+                />
+              ) : null}
             </div>
           ) : (
             <span className="text-meta text-stone-500">Цены уточняйте</span>

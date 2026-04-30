@@ -7,13 +7,15 @@ import {
   AppCard,
   AppCardContent,
 } from '@/components/primitives';
-import { BuildingCard } from '@/components/blocks';
+import { BuildingCard, CurrencyPicker } from '@/components/blocks';
 import {
   mockBuildings,
   getDeveloper,
   getDistrict,
   getListingsForBuilding,
 } from '@/lib/mock';
+import { getExchangeRates } from '@/services/currency';
+import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 
 /**
  * Page 11 — /diaspora.
@@ -32,6 +34,13 @@ export default async function DiasporaPage({
   // Featured projects for the diaspora segment — projects with installment available
   // are most relevant since families can save monthly from Russia
   const featured = mockBuildings.slice(0, 3);
+
+  // Currency support: read cookie + fetch rates so diaspora visitors
+  // can see prices in their home currency. Both calls fail-soft.
+  const [currency, rates] = await Promise.all([
+    readCurrencyCookie(),
+    getExchangeRates(),
+  ]);
 
   return (
     <>
@@ -63,6 +72,15 @@ export default async function DiasporaPage({
               </AppButton>
             </Link>
           </div>
+        </AppContainer>
+      </section>
+
+      {/* Currency picker — diaspora visitors see prices in their home
+          currency (RUB, USD, EUR, GBP, KZT, TRY). Choice persists in
+          a cookie so it follows them across pages. */}
+      <section className="border-y border-stone-200 bg-white py-5">
+        <AppContainer>
+          <CurrencyPicker initial={currency} sampleRates={rates.rates} />
         </AppContainer>
       </section>
 
@@ -130,6 +148,8 @@ export default async function DiasporaPage({
                   developer={dev}
                   district={dist}
                   matchingUnits={getListingsForBuilding(b.id).slice(0, 2)}
+                  currency={currency}
+                  rates={rates}
                 />
               );
             })}

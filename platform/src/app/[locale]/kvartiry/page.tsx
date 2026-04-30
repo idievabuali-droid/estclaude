@@ -5,6 +5,8 @@ import { ListingCard, MobileFiltersWrapper } from '@/components/blocks';
 import { listListings } from '@/services/listings';
 import { listBuildings, getDeveloperById } from '@/services/buildings';
 import { getDistrictBenchmarks } from '@/services/benchmarks';
+import { getExchangeRates } from '@/services/currency';
+import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import type { SourceType, FinishingType } from '@/types/domain';
 
 const SOURCE_FILTERS: Array<{ value: SourceType; label: string }> = [
@@ -53,9 +55,11 @@ export default async function KvartiryPage({
   const buildingMap = new Map(allBuildings.filter((b) => buildingIds.includes(b.id)).map((b) => [b.id, b]));
   const developerIds = [...new Set([...buildingMap.values()].map((b) => b.developer_id))];
   const districtIds = [...new Set([...buildingMap.values()].map((b) => b.district_id))];
-  const [developerEntries, benchmarkMap] = await Promise.all([
+  const [developerEntries, benchmarkMap, currency, rates] = await Promise.all([
     Promise.all(developerIds.map(async (id) => [id, await getDeveloperById(id)] as const)),
     getDistrictBenchmarks(districtIds),
+    readCurrencyCookie(),
+    getExchangeRates(),
   ]);
   const developerMap = new Map(developerEntries);
 
@@ -151,6 +155,8 @@ export default async function KvartiryPage({
                     developerVerified={dev?.is_verified ?? false}
                     districtMedianPerM2={benchmark ? Number(benchmark.median_per_m2_dirams) : null}
                     districtSampleSize={benchmark?.sample_size ?? 0}
+                    currency={currency}
+                    rates={rates}
                   />
                 );
               })}

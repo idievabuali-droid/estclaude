@@ -9,6 +9,8 @@ import {
   getDistrictById,
   getListingsForBuildingId,
 } from '@/services/buildings';
+import { getExchangeRates } from '@/services/currency';
+import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -19,16 +21,20 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
   // Featured projects from Supabase
   const featured = await listFeaturedBuildings(3);
-  const featuredWithRefs = await Promise.all(
-    featured.map(async (b) => {
-      const [dev, dist, units] = await Promise.all([
-        getDeveloperById(b.developer_id),
-        getDistrictById(b.district_id),
-        getListingsForBuildingId(b.id),
-      ]);
-      return { b, dev, dist, units: units.slice(0, 2) };
-    }),
-  );
+  const [featuredWithRefs, currency, rates] = await Promise.all([
+    Promise.all(
+      featured.map(async (b) => {
+        const [dev, dist, units] = await Promise.all([
+          getDeveloperById(b.developer_id),
+          getDistrictById(b.district_id),
+          getListingsForBuildingId(b.id),
+        ]);
+        return { b, dev, dist, units: units.slice(0, 2) };
+      }),
+    ),
+    readCurrencyCookie(),
+    getExchangeRates(),
+  ]);
 
   return (
     <>
@@ -122,6 +128,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                   developer={dev}
                   district={dist}
                   matchingUnits={units}
+                  currency={currency}
+                  rates={rates}
                 />
               );
             })}

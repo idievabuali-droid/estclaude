@@ -12,7 +12,9 @@ import { FairnessIndicator, computeFairness, type FairnessLevel } from './Fairne
 import { InstallmentDisplay } from './InstallmentDisplay';
 import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
+import { PriceConversion } from './PriceConversion';
 import type { MockListing, MockBuilding } from '@/lib/mock';
+import type { ExchangeRates, SupportedCurrency } from '@/services/currency';
 
 const FINISHING_TONE = {
   no_finish: 'finishing-no-finish',
@@ -28,6 +30,10 @@ export interface ListingCardProps {
   districtMedianPerM2?: number | null;
   districtSampleSize?: number;
   hideBuildingName?: boolean;
+  /** Diaspora currency (cookie-driven). When set + rates supplied,
+   *  shows foreign-currency equivalent beneath TJS price. */
+  currency?: SupportedCurrency | null;
+  rates?: ExchangeRates | null;
   className?: string;
 }
 
@@ -47,8 +53,11 @@ export function ListingCard({
   districtMedianPerM2,
   districtSampleSize = 0,
   hideBuildingName,
+  currency,
+  rates,
   className,
 }: ListingCardProps) {
+  const showConversion = currency && currency !== 'TJS' && rates != null;
   const tCommon = useTranslations('Common');
   const tFinishing = useTranslations('Finishing');
 
@@ -111,6 +120,13 @@ export function ListingCard({
           <span className="text-caption text-stone-500 tabular-nums">
             {formatPriceNumber(listing.price_per_m2_dirams)} TJS / м²
           </span>
+          {showConversion ? (
+            <PriceConversion
+              priceDirams={listing.price_total_dirams}
+              target={currency}
+              rates={rates}
+            />
+          ) : null}
         </div>
 
         {/* Row 2: rooms + size + finishing */}

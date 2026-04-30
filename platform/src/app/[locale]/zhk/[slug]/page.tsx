@@ -14,10 +14,13 @@ import {
   NearbyPois,
   VerifiedDeveloperButton,
   BuildingStageProgress,
+  PriceConversion,
 } from '@/components/blocks';
 import { getBuilding, getDeveloperStats } from '@/services/buildings';
 import { getDistrictBenchmark } from '@/services/benchmarks';
 import { getNearbyPOIs } from '@/services/poi';
+import { getExchangeRates } from '@/services/currency';
+import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { formatPriceNumber } from '@/lib/format';
 import type { BuildingStatus } from '@/types/domain';
 
@@ -40,10 +43,12 @@ export default async function BuildingDetailPage({
   const data = await getBuilding(slug);
   if (!data) notFound();
   const { building, developer, district, listings } = data;
-  const [benchmark, pois, devStats] = await Promise.all([
+  const [benchmark, pois, devStats, currency, rates] = await Promise.all([
     getDistrictBenchmark(district.id),
     getNearbyPOIs(building.latitude, building.longitude),
     getDeveloperStats(developer.id),
+    readCurrencyCookie(),
+    getExchangeRates(),
   ]);
   const median = benchmark
     ? { median: Number(benchmark.median_per_m2_dirams), sample: benchmark.sample_size }
@@ -225,6 +230,13 @@ export default async function BuildingDetailPage({
                 <span className="text-h3 font-semibold tabular-nums text-stone-900">
                   {formatPriceNumber(building.price_from_dirams)} TJS
                 </span>
+                {currency && currency !== 'TJS' ? (
+                  <PriceConversion
+                    priceDirams={building.price_from_dirams}
+                    target={currency}
+                    rates={rates}
+                  />
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -248,6 +260,8 @@ export default async function BuildingDetailPage({
                   districtMedianPerM2={median?.median ?? null}
                   districtSampleSize={median?.sample ?? 0}
                   hideBuildingName
+                  currency={currency}
+                  rates={rates}
                 />
               ))}
             </div>
