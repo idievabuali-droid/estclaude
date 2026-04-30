@@ -230,11 +230,6 @@ export default async function BuildingDetailPage({
                 <span className="text-h3 font-semibold tabular-nums text-stone-900">
                   {formatPriceNumber(building.price_per_m2_from_dirams)} TJS / м²
                 </span>
-                {building.price_from_dirams ? (
-                  <span className="text-caption text-stone-500 tabular-nums">
-                    Квартира от {formatPriceNumber(building.price_from_dirams)} TJS
-                  </span>
-                ) : null}
                 {currency && currency !== 'TJS' ? (
                   <PriceConversion
                     priceDirams={building.price_per_m2_from_dirams}

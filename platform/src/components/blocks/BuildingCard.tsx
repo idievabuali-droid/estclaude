@@ -107,11 +107,6 @@ export function BuildingCard({
               <span className="text-h2 font-semibold tabular-nums text-stone-900">
                 {formatPriceNumber(building.price_per_m2_from_dirams)} TJS / м²
               </span>
-              {building.price_from_dirams ? (
-                <span className="text-caption text-stone-500 tabular-nums">
-                  Квартира от {formatPriceNumber(building.price_from_dirams)} TJS
-                </span>
-              ) : null}
               {showConversion ? (
                 <PriceConversion
                   priceDirams={building.price_per_m2_from_dirams}
