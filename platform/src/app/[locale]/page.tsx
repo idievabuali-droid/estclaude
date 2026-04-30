@@ -1,3 +1,4 @@
+// Auto-deploy webhook test — should trigger Vercel build on push.
 import { Search, Building, Home as HomeIcon, Globe2, ArrowRight } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { AppContainer, AppButton, AppInput } from '@/components/primitives';
