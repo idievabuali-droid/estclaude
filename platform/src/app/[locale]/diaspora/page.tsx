@@ -101,6 +101,23 @@ export default async function DiasporaPage({
               Все →
             </Link>
           </div>
+
+          {/* Quick filters — link out to the main browse page with the
+              preset applied. Keeps diaspora landing focused but lets
+              users drill down by the criteria that matter most for
+              remote purchases. */}
+          <div className="flex flex-col gap-2">
+            <span className="text-caption font-medium uppercase tracking-wide text-stone-500">
+              Быстрый поиск
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <QuickFilter href="/novostroyki?city=dushanbe">Душанбе</QuickFilter>
+              <QuickFilter href="/novostroyki?city=vahdat">Вахдат</QuickFilter>
+              <QuickFilter href="/novostroyki?status=delivered">Сданные</QuickFilter>
+              <QuickFilter href="/novostroyki?status=under_construction">Строится</QuickFilter>
+              <QuickFilter href="/kvartiry?installment=true">С рассрочкой</QuickFilter>
+            </div>
+          </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
             {featured.map((b) => {
               const dev = getDeveloper(b.developer_id);
@@ -154,6 +171,17 @@ export default async function DiasporaPage({
         </AppContainer>
       </section>
     </>
+  );
+}
+
+function QuickFilter({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex h-9 items-center rounded-sm border border-stone-200 bg-white px-3 text-meta font-medium text-stone-700 transition-colors hover:border-stone-300 hover:bg-stone-50"
+    >
+      {children}
+    </Link>
   );
 }
 

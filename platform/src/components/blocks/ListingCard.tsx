@@ -116,7 +116,7 @@ export function ListingCard({
         {/* Row 2: rooms + size + finishing */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-meta font-medium text-stone-700 tabular-nums">
-            {listing.rooms_count}-комн · {formatM2(listing.size_m2)}
+            {listing.rooms_count}-комн · {formatM2(listing.size_m2)} · {formatFloor(listing.floor_number, listing.total_floors)} эт
           </span>
           <AppChip
             asStatic

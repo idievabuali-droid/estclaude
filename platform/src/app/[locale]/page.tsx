@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { Search, Building, Home as HomeIcon, Globe2, Compass, ArrowRight } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { AppContainer, AppButton, AppInput } from '@/components/primitives';
 import { BuildingCard } from '@/components/blocks';
@@ -55,25 +55,44 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </AppButton>
           </form>
 
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/pomoshch-vybora"
-              className="inline-flex h-9 items-center rounded-sm bg-terracotta-100 px-3 text-meta font-medium text-terracotta-800 hover:bg-terracotta-200"
-            >
-              {t('guidedFinder')}
-            </Link>
-            <Link
+        </AppContainer>
+      </section>
+
+      {/* Direction picker — replaces bottom-nav buttons. Four prominent
+          cards so first-time users immediately know the four ways
+          into the platform. JOURNEY-1: home as a wayfinder, not a wall. */}
+      <section className="border-b border-stone-200 bg-white py-6">
+        <AppContainer className="flex flex-col gap-4">
+          <h2 className="text-h2 font-semibold text-stone-900">Куда идём</h2>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+            <DirectionCard
               href="/novostroyki"
-              className="inline-flex h-9 items-center rounded-sm bg-stone-100 px-3 text-meta font-medium text-stone-700 hover:bg-stone-200"
-            >
-              {t('browseProjects')}
-            </Link>
-            <Link
+              Icon={Building}
+              title="Новостройки"
+              subtitle="ЖК, застройщики, ход стройки"
+              tone="terracotta"
+            />
+            <DirectionCard
               href="/kvartiry"
-              className="inline-flex h-9 items-center rounded-sm bg-stone-100 px-3 text-meta font-medium text-stone-700 hover:bg-stone-200"
-            >
-              {t('browseApartments')}
-            </Link>
+              Icon={HomeIcon}
+              title="Квартиры"
+              subtitle="Готовые объявления с фильтрами"
+              tone="stone"
+            />
+            <DirectionCard
+              href="/diaspora"
+              Icon={Globe2}
+              title="Из-за рубежа"
+              subtitle="Покупка удалённо, доверенность"
+              tone="stone"
+            />
+            <DirectionCard
+              href="/pomoshch-vybora"
+              Icon={Compass}
+              title="Помощь в выборе"
+              subtitle="Подберём по 5 ответам"
+              tone="amber"
+            />
           </div>
         </AppContainer>
       </section>
@@ -82,7 +101,10 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       <section className="py-7">
         <AppContainer className="flex flex-col gap-5">
           <div className="flex items-end justify-between gap-3">
-            <h2 className="text-h2 font-semibold text-stone-900">Рекомендуемые проекты</h2>
+            <div className="flex flex-col">
+              <h2 className="text-h2 font-semibold text-stone-900">Рекомендуемые проекты</h2>
+              <span className="text-meta text-stone-500">Проверенные застройщики и активные объявления</span>
+            </div>
             <Link
               href="/novostroyki"
               className="text-meta font-medium text-terracotta-600 hover:text-terracotta-700"
@@ -107,5 +129,58 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </AppContainer>
       </section>
     </>
+  );
+}
+
+type DirectionTone = 'terracotta' | 'stone' | 'amber';
+
+const DIRECTION_TONE: Record<DirectionTone, { card: string; icon: string; iconBg: string }> = {
+  terracotta: {
+    card: 'border-terracotta-200 bg-terracotta-50/60 hover:border-terracotta-300 hover:bg-terracotta-50',
+    icon: 'text-terracotta-700',
+    iconBg: 'bg-terracotta-100',
+  },
+  stone: {
+    card: 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50',
+    icon: 'text-stone-700',
+    iconBg: 'bg-stone-100',
+  },
+  amber: {
+    card: 'border-amber-200 bg-amber-50/60 hover:border-amber-300 hover:bg-amber-50',
+    icon: 'text-[color:var(--color-badge-tier-developer)]',
+    iconBg: 'bg-amber-100',
+  },
+};
+
+function DirectionCard({
+  href,
+  Icon,
+  title,
+  subtitle,
+  tone,
+}: {
+  href: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  subtitle: string;
+  tone: DirectionTone;
+}) {
+  const t = DIRECTION_TONE[tone];
+  return (
+    <Link
+      href={href}
+      className={`group flex flex-col gap-3 rounded-md border p-4 transition-colors ${t.card}`}
+    >
+      <span className={`inline-flex size-10 items-center justify-center rounded-md ${t.iconBg}`}>
+        <Icon className={`size-5 ${t.icon}`} />
+      </span>
+      <div className="flex flex-col gap-1">
+        <span className="text-h3 font-semibold text-stone-900">{title}</span>
+        <span className="text-meta text-stone-600">{subtitle}</span>
+      </div>
+      <span className={`mt-1 inline-flex items-center gap-1 text-meta font-medium ${t.icon}`}>
+        Открыть <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+      </span>
+    </Link>
   );
 }

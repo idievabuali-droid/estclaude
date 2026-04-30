@@ -188,6 +188,42 @@ export async function getBuilding(slug: string): Promise<{
   return { building, developer, district, listings };
 }
 
+export type DeveloperStats = {
+  total: number;
+  delivered: number;
+  underConstruction: number;
+  announced: number;
+};
+
+/**
+ * Counts the developer's published buildings by status. Drives the
+ * "structured stats" card on the building detail page so buyers can
+ * judge the developer at a glance (track record vs. current pipeline).
+ */
+export async function getDeveloperStats(developerId: string): Promise<DeveloperStats> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('buildings')
+    .select('status')
+    .eq('developer_id', developerId)
+    .eq('is_published', true);
+  if (error) throw error;
+  const stats: DeveloperStats = {
+    total: 0,
+    delivered: 0,
+    underConstruction: 0,
+    announced: 0,
+  };
+  for (const row of data ?? []) {
+    stats.total++;
+    const s = (row as { status: BuildingStatus }).status;
+    if (s === 'delivered') stats.delivered++;
+    else if (s === 'under_construction' || s === 'near_completion') stats.underConstruction++;
+    else if (s === 'announced') stats.announced++;
+  }
+  return stats;
+}
+
 export async function getDeveloperById(id: string): Promise<MockDeveloper | null> {
   const supabase = await createClient();
   const { data, error } = await supabase.from('developers').select('*').eq('id', id).maybeSingle();

@@ -30,3 +30,5 @@ export { NearbyPois } from './NearbyPois';
 export type { NearbyPoisProps } from './NearbyPois';
 export { VerifiedDeveloperButton } from './VerifiedDeveloperButton';
 export type { VerifiedDeveloperButtonProps } from './VerifiedDeveloperButton';
+export { BuildingStageProgress } from './BuildingStageProgress';
+export type { BuildingStageProgressProps } from './BuildingStageProgress';

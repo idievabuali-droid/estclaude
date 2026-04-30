@@ -13,8 +13,9 @@ import {
   ListingCard,
   NearbyPois,
   VerifiedDeveloperButton,
+  BuildingStageProgress,
 } from '@/components/blocks';
-import { getBuilding } from '@/services/buildings';
+import { getBuilding, getDeveloperStats } from '@/services/buildings';
 import { getDistrictBenchmark } from '@/services/benchmarks';
 import { getNearbyPOIs } from '@/services/poi';
 import { formatPriceNumber } from '@/lib/format';
@@ -26,11 +27,6 @@ const STATUS_LABEL: Record<BuildingStatus, string> = {
   near_completion: 'Почти готов',
   delivered: 'Сдан',
 };
-
-export async function generateStaticParams() {
-  // For static generation across all locales
-  return [];
-}
 
 export default async function BuildingDetailPage({
   params,
@@ -44,9 +40,10 @@ export default async function BuildingDetailPage({
   const data = await getBuilding(slug);
   if (!data) notFound();
   const { building, developer, district, listings } = data;
-  const [benchmark, pois] = await Promise.all([
+  const [benchmark, pois, devStats] = await Promise.all([
     getDistrictBenchmark(district.id),
     getNearbyPOIs(building.latitude, building.longitude),
+    getDeveloperStats(developer.id),
   ]);
   const median = benchmark
     ? { median: Number(benchmark.median_per_m2_dirams), sample: benchmark.sample_size }
@@ -133,6 +130,17 @@ export default async function BuildingDetailPage({
           </div>
         </AppContainer>
       </nav>
+
+      {/* Stage progress — clear visual timeline so buyers know exactly
+          where the project stands (replaces vague single status chip). */}
+      <section className="border-b border-stone-200 bg-white py-5">
+        <AppContainer>
+          <BuildingStageProgress
+            status={building.status}
+            handoverQuarter={building.handover_estimated_quarter}
+          />
+        </AppContainer>
+      </section>
 
       {/* Identity row + key stats — 3-col on mobile too (BUG-9) */}
       <section className="border-b border-stone-200 bg-white py-5">
@@ -254,28 +262,45 @@ export default async function BuildingDetailPage({
         </AppContainer>
       </section>
 
-      {/* Developer block */}
+      {/* Developer block — structured stats so buyers can judge track
+          record at a glance: years on market, total / delivered / in
+          progress / announced. Replaces the vague single-line summary. */}
       <section id="developer" className="scroll-mt-28 border-t border-stone-200 py-6">
         <AppContainer>
           <AppCard>
             <AppCardContent>
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="flex flex-col gap-1">
-                  <span className="text-caption font-medium text-stone-500">Застройщик</span>
-                  <h3 className="text-h3 font-semibold text-stone-900">
-                    {developer.display_name.ru}
-                  </h3>
-                  {developer.years_active || developer.projects_completed_count ? (
-                    <span className="text-meta text-stone-500 tabular-nums">
-                      {developer.years_active ? `${developer.years_active} лет на рынке` : ''}
-                      {developer.years_active && developer.projects_completed_count ? ' · ' : ''}
-                      {developer.projects_completed_count
-                        ? `${developer.projects_completed_count} сданных проектов`
-                        : ''}
-                    </span>
-                  ) : null}
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-caption font-medium text-stone-500">Застройщик</span>
+                    <h3 className="text-h3 font-semibold text-stone-900">
+                      {developer.display_name.ru}
+                    </h3>
+                    {developer.years_active ? (
+                      <span className="text-meta text-stone-500 tabular-nums">
+                        На рынке {developer.years_active}{' '}
+                        {pluralYears(developer.years_active)}
+                        {developer.years_active
+                          ? ` · с ${new Date().getFullYear() - developer.years_active} года`
+                          : ''}
+                      </span>
+                    ) : null}
+                  </div>
+                  <AppButton variant="secondary">Все проекты застройщика</AppButton>
                 </div>
-                <AppButton variant="secondary">Все проекты застройщика</AppButton>
+
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
+                  <DevStat label="Всего проектов" value={devStats.total} />
+                  <DevStat label="Сдано" value={devStats.delivered} accent="green" />
+                  <DevStat label="Строится" value={devStats.underConstruction} accent="amber" />
+                  <DevStat label="Анонсировано" value={devStats.announced} />
+                </div>
+
+                {devStats.total === 0 ? (
+                  <p className="text-caption text-stone-500">
+                    Данные о других проектах застройщика появятся, как только они будут опубликованы.
+                  </p>
+                ) : null}
               </div>
             </AppCardContent>
           </AppCard>
@@ -324,6 +349,38 @@ function Stat({
       </div>
     </div>
   );
+}
+
+function DevStat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent?: 'green' | 'amber';
+}) {
+  const valueClass =
+    accent === 'green'
+      ? 'text-[color:var(--color-fairness-great)]'
+      : accent === 'amber'
+      ? 'text-[color:var(--color-badge-tier-developer)]'
+      : 'text-stone-900';
+  return (
+    <div className="flex flex-col gap-1 rounded-md border border-stone-200 bg-stone-50 p-3">
+      <span className="text-caption text-stone-500">{label}</span>
+      <span className={`text-h3 font-semibold tabular-nums ${valueClass}`}>{value}</span>
+    </div>
+  );
+}
+
+function pluralYears(n: number): string {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return 'лет';
+  if (last > 1 && last < 5) return 'года';
+  if (last === 1) return 'год';
+  return 'лет';
 }
 
 function amenityLabel(key: string) {
