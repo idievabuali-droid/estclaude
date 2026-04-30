@@ -1,4 +1,4 @@
-import { Search, Building, Home as HomeIcon, Globe2, Compass, ArrowRight } from 'lucide-react';
+import { Search, Building, Home as HomeIcon, Globe2, ArrowRight } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { AppContainer, AppButton, AppInput } from '@/components/primitives';
 import { BuildingCard } from '@/components/blocks';
@@ -60,13 +60,13 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </AppContainer>
       </section>
 
-      {/* Direction picker — replaces bottom-nav buttons. Four prominent
-          cards so first-time users immediately know the four ways
-          into the platform. JOURNEY-1: home as a wayfinder, not a wall. */}
+      {/* Direction picker. Three primary entry points — pomoshch-vybora
+          is hidden until the concierge mode is built (currently it's
+          just a wrapper around filters and not pulling its weight). */}
       <section className="border-b border-stone-200 bg-white py-6">
         <AppContainer className="flex flex-col gap-4">
           <h2 className="text-h2 font-semibold text-stone-900">Куда идём</h2>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4">
             <DirectionCard
               href="/novostroyki"
               Icon={Building}
@@ -87,13 +87,6 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               title="Из-за рубежа"
               subtitle="Покупка удалённо, доверенность"
               tone="stone"
-            />
-            <DirectionCard
-              href="/pomoshch-vybora"
-              Icon={Compass}
-              title="Помощь в выборе"
-              subtitle="Подберём по 5 ответам"
-              tone="amber"
             />
           </div>
         </AppContainer>

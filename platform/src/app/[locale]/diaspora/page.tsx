@@ -66,9 +66,9 @@ export default async function DiasporaPage({
                 {tCommon('search')} новостройку
               </AppButton>
             </Link>
-            <Link href="/pomoshch-vybora">
+            <Link href="/kvartiry">
               <AppButton size="lg" variant="secondary">
-                Помощь в выборе
+                Смотреть квартиры
               </AppButton>
             </Link>
           </div>
