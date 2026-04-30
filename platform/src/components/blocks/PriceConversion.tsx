@@ -6,6 +6,8 @@ export interface PriceConversionProps {
   rates: ExchangeRates;
   /** Visual size — `inline` for cards, `block` for detail pages. */
   variant?: 'inline' | 'block';
+  /** When true, appends " / м²" to the converted amount. */
+  perM2?: boolean;
   className?: string;
 }
 
@@ -22,6 +24,7 @@ export function PriceConversion({
   target,
   rates,
   variant = 'inline',
+  perM2,
   className,
 }: PriceConversionProps) {
   if (target === 'TJS') return null;
@@ -38,7 +41,7 @@ export function PriceConversion({
       }
       title="Курс ориентировочный. Расчёт в сомони."
     >
-      ≈ {formatForeignAmount(converted, target)}
+      ≈ {formatForeignAmount(converted, target)}{perM2 ? ' / м²' : ''}
     </span>
   );
 }

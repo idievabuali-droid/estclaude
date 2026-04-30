@@ -224,17 +224,23 @@ export default async function BuildingDetailPage({
               </h2>
               <p className="text-meta text-stone-500 tabular-nums">{listings.length} объявлений</p>
             </div>
-            {building.price_from_dirams ? (
+            {building.price_per_m2_from_dirams ? (
               <div className="flex flex-col items-end">
                 <span className="text-caption text-stone-500">от</span>
                 <span className="text-h3 font-semibold tabular-nums text-stone-900">
-                  {formatPriceNumber(building.price_from_dirams)} TJS
+                  {formatPriceNumber(building.price_per_m2_from_dirams)} TJS / м²
                 </span>
+                {building.price_from_dirams ? (
+                  <span className="text-caption text-stone-500 tabular-nums">
+                    Квартира от {formatPriceNumber(building.price_from_dirams)} TJS
+                  </span>
+                ) : null}
                 {currency && currency !== 'TJS' ? (
                   <PriceConversion
-                    priceDirams={building.price_from_dirams}
+                    priceDirams={building.price_per_m2_from_dirams}
                     target={currency}
                     rates={rates}
+                    perM2
                   />
                 ) : null}
               </div>
