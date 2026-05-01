@@ -6,8 +6,6 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { formatPriceNumber, formatM2, formatFloor } from '@/lib/format';
 import { AppChip } from '@/components/primitives';
-import { SourceChip } from './SourceChip';
-import { VerificationBadge } from './VerificationBadge';
 import { FairnessIndicator, computeFairness, type FairnessLevel } from './FairnessIndicator';
 import { InstallmentDisplay } from './InstallmentDisplay';
 import { CompareToggle } from './CompareToggle';
@@ -49,6 +47,10 @@ export interface ListingCardProps {
 export function ListingCard({
   listing,
   building,
+  // developerVerified currently unused — was driving the
+  // VerificationBadge that's hidden in V1. Kept in the prop signature
+  // so callers don't need to be touched when the badge returns.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   developerVerified,
   districtMedianPerM2,
   districtSampleSize = 0,
@@ -102,9 +104,10 @@ export function ListingCard({
             {formatM2(listing.size_m2)}
           </span>
         </div>
-        <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-          <SourceChip source={listing.source_type} />
-        </div>
+        {/* Source chip hidden in V1 — every listing currently comes
+            from the founder, so the chip carries no signal. Will return
+            once we have multiple seller types (real builders, owners,
+            brokers) actively posting. */}
         <div className="absolute right-3 top-3 flex flex-col gap-2">
           <SaveToggle type="listing" id={listing.id} />
           <CompareToggle type="listings" id={listing.id} />
@@ -115,15 +118,12 @@ export function ListingCard({
       </div>
 
       <div className="flex flex-1 flex-col gap-3 p-4">
-        {/* Row 1: verification badge above price so long "Проверенный застройщик" doesn't squeeze price */}
-        <div className="flex flex-wrap items-center gap-2">
-          <VerificationBadge
-            tier={listing.verification_tier}
-            developerVerified={listing.source_type === 'developer' && developerVerified}
-          />
-        </div>
+        {/* VerificationBadge hidden in V1 — tier claims are hollow when
+            the founder is the one verifying every listing. The
+            "Проверенный застройщик" badge stays on building cards
+            (BuildingCard), where it's a real, defensible claim. */}
 
-        {/* Row 2: price (full width, no competing badge) */}
+        {/* Row 1: price (full width, no competing badge) */}
         <div className="flex flex-col">
           <span className="text-h2 font-semibold tabular-nums text-stone-900">
             {formatPriceNumber(listing.price_total_dirams)} TJS

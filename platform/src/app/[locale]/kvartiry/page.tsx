@@ -5,13 +5,11 @@ import { ListingCard, MobileFiltersWrapper } from '@/components/blocks';
 import { listListings } from '@/services/listings';
 import { listBuildings, getDeveloperById } from '@/services/buildings';
 import { getDistrictBenchmarks } from '@/services/benchmarks';
-import type { SourceType, FinishingType } from '@/types/domain';
+import type { FinishingType, SourceType } from '@/types/domain';
 
-const SOURCE_FILTERS: Array<{ value: SourceType; label: string }> = [
-  { value: 'developer', label: 'От застройщика' },
-  { value: 'owner', label: 'Собственник' },
-  { value: 'intermediary', label: 'Посредник' },
-];
+// Source filter (developer/owner/intermediary) hidden in V1 — every
+// listing currently comes from the founder, so the filter has nothing
+// to filter. Will return when real seller diversity exists.
 
 const FINISHING_FILTERS: Array<{ value: FinishingType; label: string }> = [
   { value: 'no_finish', label: 'Без ремонта' },
@@ -76,7 +74,6 @@ export default async function KvartiryPage({
           <MobileFiltersWrapper
             activeCount={
               (sp.rooms ? sp.rooms.split(',').length : 0) +
-              (sp.source ? sp.source.split(',').length : 0) +
               (sp.finishing ? sp.finishing.split(',').length : 0)
             }
           >
@@ -93,19 +90,7 @@ export default async function KvartiryPage({
                 );
               })}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <span className="self-center text-caption font-medium text-stone-500">Источник:</span>
-              {SOURCE_FILTERS.map((s) => {
-                const active = sp.source?.split(',').includes(s.value) ?? false;
-                return (
-                  <Link key={s.value} href={active ? '/kvartiry' : `/kvartiry?source=${s.value}`}>
-                    <AppChip asStatic tone={active ? 'terracotta' : 'neutral'} selected={active}>
-                      {s.label}
-                    </AppChip>
-                  </Link>
-                );
-              })}
-            </div>
+            {/* Source filter hidden in V1 — see top of file. */}
             <div className="flex flex-wrap gap-2">
               <span className="self-center text-caption font-medium text-stone-500">Отделка:</span>
               {FINISHING_FILTERS.map((f) => {

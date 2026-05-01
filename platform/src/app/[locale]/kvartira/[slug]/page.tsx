@@ -19,8 +19,6 @@ import {
   AppCardContent,
 } from '@/components/primitives';
 import {
-  SourceChip,
-  VerificationBadge,
   FairnessIndicator,
   computeFairness,
   InstallmentDisplay,
@@ -87,9 +85,7 @@ export default async function ListingDetailPage({
         style={{ backgroundColor: listing.cover_color }}
       >
         <div className="absolute inset-0 bg-gradient-to-t from-stone-900/65 via-stone-900/15 to-transparent" />
-        <div className="absolute left-3 top-3">
-          <SourceChip source={listing.source_type} />
-        </div>
+        {/* SourceChip hidden in V1 — see ListingCard for rationale. */}
         <div className="absolute bottom-0 left-0 right-0">
           <AppContainer className="pb-3 md:pb-4">
             <h1 className="text-h2 font-semibold leading-[var(--leading-h2)] text-white drop-shadow-sm md:text-h1">
@@ -134,10 +130,7 @@ export default async function ListingDetailPage({
               <span className="font-medium text-stone-900">{building.name.ru}</span>
               <span className="text-stone-500">· {district.name.ru}</span>
             </Link>
-            <VerificationBadge
-              tier={listing.verification_tier}
-              developerVerified={listing.source_type === 'developer' && developer.is_verified}
-            />
+            {/* VerificationBadge hidden in V1 — see ListingCard for rationale. */}
           </div>
 
           {/* Price + per-m² + fairness */}
