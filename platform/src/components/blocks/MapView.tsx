@@ -62,13 +62,16 @@ export function MapView({ buildings }: MapViewProps) {
       el.className =
         'flex items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-1 text-caption font-semibold tabular-nums text-stone-900 shadow-md hover:bg-stone-50 transition-colors';
       el.style.cursor = 'pointer';
-      // Marker label: "от 567K TJS" if price computed, otherwise name as fallback.
-      // BUG-6 (clustering) is deferred until inventory density justifies it —
-      // with <50 buildings on a Dushanbe-scale map, manual zoom is fine.
+      // Marker label: per-m² starting price ("от 4.1K TJS/м²"), matching
+      // the building card / detail page convention. Per-m² is the
+      // comparable signal at the building level — total starting price
+      // varies wildly with apartment size mix and misleads the eye.
+      // BUG-6 (clustering) is deferred until inventory density justifies it.
       const shortName = b.name.ru.replace(/^ЖК\s+/i, '');
-      // dirams → TJS = ÷100, then TJS → K = ÷1000, so dirams → K-TJS = ÷100_000
-      el.textContent = b.price_from_dirams
-        ? `от ${Math.round(Number(b.price_from_dirams) / 100_000)}K TJS`
+      // dirams → TJS = ÷100, then TJS → K-TJS = ÷100_000.
+      // For per-m² we keep one decimal because the values are smaller (3-6K).
+      el.textContent = b.price_per_m2_from_dirams
+        ? `от ${(Number(b.price_per_m2_from_dirams) / 100_000).toFixed(1)}K TJS/м²`
         : shortName;
       el.setAttribute('aria-label', `${b.name.ru} — открыть превью`);
       el.addEventListener('click', () => setSelected(b));
@@ -113,9 +116,9 @@ export function MapView({ buildings }: MapViewProps) {
             <div className="flex flex-1 flex-col gap-1 py-3 pr-3">
               <span className="text-h3 font-semibold text-stone-900">{selected.name.ru}</span>
               <span className="text-meta text-stone-500">{selected.address.ru}</span>
-              {selected.price_from_dirams ? (
+              {selected.price_per_m2_from_dirams ? (
                 <span className="mt-auto text-meta font-semibold tabular-nums text-stone-900">
-                  от {formatPriceNumber(selected.price_from_dirams)} TJS
+                  от {formatPriceNumber(selected.price_per_m2_from_dirams)} TJS / м²
                 </span>
               ) : null}
             </div>
