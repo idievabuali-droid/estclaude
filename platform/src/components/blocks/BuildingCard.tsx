@@ -1,6 +1,6 @@
 'use client';
 
-import { MapPin, Building, Calendar } from 'lucide-react';
+import { MapPin, Building, Calendar, ArrowUpRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
@@ -93,15 +93,19 @@ export function BuildingCard({
           <div className="flex items-start gap-2">
             <h3 className="flex-1 text-h3 font-semibold text-stone-900">{building.name.ru}</h3>
           </div>
-          {/* Address — clickable, opens the map with this building's pin
-              pre-selected so users can see where it actually is. */}
+          {/* Address as a clearly-interactive chip that opens the map
+              with this building's pin pre-selected. Border + arrow icon
+              make the affordance obvious — distinct from the surrounding
+              card text so users understand it's a separate action. */}
           <button
             type="button"
             onClick={openMap}
-            className="inline-flex w-fit items-center gap-1 rounded-sm text-left text-meta text-stone-500 hover:text-terracotta-600 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
+            aria-label={`Показать на карте: ${district.name.ru}, ${building.address.ru}`}
+            className="group inline-flex w-fit items-center gap-1.5 rounded-sm border border-stone-200 bg-stone-50 px-2 py-1 text-left text-meta text-stone-700 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50 hover:text-terracotta-700 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
           >
-            <MapPin className="size-3.5 shrink-0" />
+            <MapPin className="size-3.5 shrink-0 text-terracotta-600" />
             <span className="truncate">{district.name.ru} · {building.address.ru}</span>
+            <ArrowUpRight className="size-3 shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
           </button>
           {developer.is_verified ? (
             <span className="inline-flex w-fit">

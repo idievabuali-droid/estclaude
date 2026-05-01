@@ -1,6 +1,6 @@
 'use client';
 
-import { Layers, MapPin } from 'lucide-react';
+import { Layers, MapPin, ArrowUpRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
@@ -153,16 +153,20 @@ export function ListingCard({
           </AppChip>
         </div>
 
-        {/* Row 3: building name + address — clickable, opens the map
-            with this building's pin pre-selected */}
+        {/* Row 3: building name + address as a clearly-interactive chip
+            that opens the map with this building's pin pre-selected.
+            Border + arrow icon make the affordance obvious — without
+            them, users read it as static gray label and miss the map. */}
         {!hideBuildingName ? (
           <button
             type="button"
             onClick={openMap}
-            className="inline-flex w-fit items-center gap-1 rounded-sm text-left text-meta text-stone-500 hover:text-terracotta-600 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
+            aria-label={`Показать на карте: ${building.name.ru}, ${building.address.ru}`}
+            className="group inline-flex w-fit items-center gap-1.5 rounded-sm border border-stone-200 bg-stone-50 px-2 py-1 text-left text-meta text-stone-700 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50 hover:text-terracotta-700 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
           >
-            <MapPin className="size-3.5 shrink-0" />
-            <span>{building.name.ru} · {building.address.ru}</span>
+            <MapPin className="size-3.5 shrink-0 text-terracotta-600" />
+            <span className="truncate">{building.name.ru} · {building.address.ru}</span>
+            <ArrowUpRight className="size-3 shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
           </button>
         ) : null}
 
