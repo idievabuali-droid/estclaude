@@ -2,7 +2,7 @@
 
 import { MapPin, Building, Calendar } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { formatPriceNumber } from '@/lib/format';
 import { VerificationBadge } from './VerificationBadge';
@@ -46,6 +46,14 @@ export function BuildingCard({
   className,
 }: BuildingCardProps) {
   const showConversion = currency && currency !== 'TJS' && rates != null;
+  const router = useRouter();
+
+  /** Address row navigates to the map with this building's pin selected. */
+  function openMap(e: React.MouseEvent) {
+    e.stopPropagation();
+    e.preventDefault();
+    router.push(`/novostroyki?view=karta&selected=${building.slug}`);
+  }
   const tCommon = useTranslations('Common');
 
   return (
@@ -85,10 +93,16 @@ export function BuildingCard({
           <div className="flex items-start gap-2">
             <h3 className="flex-1 text-h3 font-semibold text-stone-900">{building.name.ru}</h3>
           </div>
-          <span className="inline-flex items-center gap-1 text-meta text-stone-500">
+          {/* Address — clickable, opens the map with this building's pin
+              pre-selected so users can see where it actually is. */}
+          <button
+            type="button"
+            onClick={openMap}
+            className="inline-flex w-fit items-center gap-1 rounded-sm text-left text-meta text-stone-500 hover:text-terracotta-600 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
+          >
             <MapPin className="size-3.5 shrink-0" />
             <span className="truncate">{district.name.ru} · {building.address.ru}</span>
-          </span>
+          </button>
           {developer.is_verified ? (
             <span className="inline-flex w-fit">
               <VerificationBadge tier="phone_verified" developerVerified />

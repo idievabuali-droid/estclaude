@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import maplibregl, { type Map as MaplibreMap, type Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Link } from '@/i18n/navigation';
@@ -11,8 +12,8 @@ export interface MapViewProps {
   buildings: MockBuilding[];
 }
 
-// Dushanbe center per Tech Spec §7.1
-const DUSHANBE_CENTER: [number, number] = [68.787, 38.5598];
+// Vahdat town center (V1 launch scope; was Dushanbe pre-Vahdat-only)
+const VAHDAT_CENTER: [number, number] = [69.0214, 38.5511];
 
 /**
  * MapView — Layer 7 spatial component.
@@ -23,6 +24,10 @@ export function MapView({ buildings }: MapViewProps) {
   const mapRef = useRef<MaplibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const [selected, setSelected] = useState<MockBuilding | null>(null);
+  // ?selected=<slug> deep-link from a card's address row. The marker
+  // sync effect picks this up and pre-opens the popup + flies to it.
+  const searchParams = useSearchParams();
+  const selectedSlug = searchParams.get('selected');
 
   // Initialise the map once
   useEffect(() => {
@@ -31,8 +36,8 @@ export function MapView({ buildings }: MapViewProps) {
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: 'https://tiles.openfreemap.org/styles/liberty',
-      center: DUSHANBE_CENTER,
-      zoom: 11,
+      center: VAHDAT_CENTER,
+      zoom: 13,
       attributionControl: { compact: true },
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
@@ -83,13 +88,29 @@ export function MapView({ buildings }: MapViewProps) {
       bounds.extend([b.longitude, b.latitude]);
     }
 
-    if (buildings.length > 1) {
+    // If a building was deep-linked via ?selected=<slug>, open its popup
+    // and centre on it. Otherwise fit all pins in view.
+    const deepLinked = selectedSlug
+      ? buildings.find((b) => b.slug === selectedSlug)
+      : null;
+    if (deepLinked) {
+      // Syncing internal `selected` state to the URL param is an
+      // explicit external-system sync — exactly what useEffect+setState
+      // is for, even though the lint rule warns generically.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelected(deepLinked);
+      map.flyTo({
+        center: [deepLinked.longitude, deepLinked.latitude],
+        zoom: 15,
+        duration: 600,
+      });
+    } else if (buildings.length > 1) {
       map.fitBounds(bounds, { padding: 60, maxZoom: 13, duration: 600 });
     } else {
       const only = buildings[0]!;
       map.flyTo({ center: [only.longitude, only.latitude], zoom: 14, duration: 600 });
     }
-  }, [buildings]);
+  }, [buildings, selectedSlug]);
 
   return (
     <div
@@ -101,9 +122,11 @@ export function MapView({ buildings }: MapViewProps) {
         style={{ height: '100%', width: '100%' }}
       />
 
-      {/* Floating preview card */}
+      {/* Floating preview card. Fixed-positioned (not absolute) so it
+          sits above the mobile bottom-nav (z-30) and stays visible
+          regardless of how much content is above the map. */}
       {selected ? (
-        <div className="absolute inset-x-3 bottom-4 z-10 mx-auto max-w-md md:left-4 md:right-auto md:bottom-4">
+        <div className="fixed inset-x-3 bottom-20 z-40 mx-auto max-w-md md:absolute md:left-4 md:right-auto md:bottom-4">
           <Link
             href={`/zhk/${selected.slug}`}
             className="flex items-stretch gap-3 overflow-hidden rounded-md border border-stone-200 bg-white shadow-md hover:shadow-md focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"

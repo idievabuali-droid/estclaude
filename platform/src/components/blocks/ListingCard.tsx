@@ -1,8 +1,8 @@
 'use client';
 
-import { Layers } from 'lucide-react';
+import { Layers, MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { formatPriceNumber, formatM2, formatFloor } from '@/lib/format';
 import { AppChip } from '@/components/primitives';
@@ -60,6 +60,17 @@ export function ListingCard({
   const showConversion = currency && currency !== 'TJS' && rates != null;
   const tCommon = useTranslations('Common');
   const tFinishing = useTranslations('Finishing');
+  const router = useRouter();
+
+  /** Address row navigates to the map with this building's pin pre-selected,
+   *  so users can see where the place actually is and pivot to nearby
+   *  buildings without losing their browse position. stopPropagation
+   *  prevents the parent card-Link from also firing. */
+  function openMap(e: React.MouseEvent) {
+    e.stopPropagation();
+    e.preventDefault();
+    router.push(`/novostroyki?view=karta&selected=${building.slug}`);
+  }
 
   const fairness =
     districtMedianPerM2 != null
@@ -142,11 +153,17 @@ export function ListingCard({
           </AppChip>
         </div>
 
-        {/* Row 3: building name (linked context) */}
+        {/* Row 3: building name + address — clickable, opens the map
+            with this building's pin pre-selected */}
         {!hideBuildingName ? (
-          <span className="text-meta text-stone-500">
-            {building.name.ru} · {building.address.ru}
-          </span>
+          <button
+            type="button"
+            onClick={openMap}
+            className="inline-flex w-fit items-center gap-1 rounded-sm text-left text-meta text-stone-500 hover:text-terracotta-600 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
+          >
+            <MapPin className="size-3.5 shrink-0" />
+            <span>{building.name.ru} · {building.address.ru}</span>
+          </button>
         ) : null}
 
         {/* Row 4: fairness */}
