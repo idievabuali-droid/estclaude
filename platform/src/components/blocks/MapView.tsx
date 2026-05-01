@@ -18,11 +18,42 @@ const VAHDAT_CENTER: [number, number] = [69.0214, 38.5511];
 /**
  * MapView — Layer 7 spatial component.
  * Uses MapLibre GL JS + OpenFreeMap (free, OSM-based, no API key).
+ *
+ * Pin design choices (after iteration with the user):
+ * - Each pin is a pill (price text) + a small triangular tip that
+ *   points to the exact lat/lng. Without the tip, a wide pill makes
+ *   the location ambiguous — you can't tell which side of the road
+ *   the building is on.
+ * - Selected state changes COLOUR ONLY (white→terracotta) + lifts
+ *   z-index. No scale, no ring offset — anything that resizes the
+ *   element visually shifts its perceived position, which makes the
+ *   map feel jumpy.
+ * - Selected pin's z-index is set on the marker element itself
+ *   (maplibre uses the element you pass as the marker root, so
+ *   parentElement is the shared canvas container — setting zIndex
+ *   there would affect every marker).
  */
+const PIN_WRAPPER_CLASS = 'flex flex-col items-center cursor-pointer';
+const PILL_BASE =
+  'rounded-full border px-3 py-1 text-caption font-semibold tabular-nums shadow-md whitespace-nowrap transition-colors';
+const PILL_DEFAULT = 'border-stone-200 bg-white text-stone-900 hover:bg-stone-50';
+const PILL_SELECTED = 'border-terracotta-700 bg-terracotta-600 text-white';
+// Triangular tip via CSS clip-path. Width 12, height 8 — same dims
+// in both states; only the fill colour swaps so the apparent
+// position of the pin's anchor (the tip's bottom point) never moves.
+const TIP_STYLE_BASE = 'width:12px;height:8px;clip-path:polygon(50% 100%,0 0,100% 0);margin-top:-1px;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.1));transition:background-color 200ms';
+const TIP_BG_DEFAULT = 'background:#fff';
+const TIP_BG_SELECTED = 'background:var(--color-terracotta-600)';
+
 export function MapView({ buildings }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
+  // Track the marker DOM (wrapper, pill, tip) by building slug so the
+  // selection-restyle effect can look them up without recreating markers.
+  const markerElementsRef = useRef<
+    Map<string, { root: HTMLDivElement; pill: HTMLDivElement; tip: HTMLDivElement }>
+  >(new Map());
   const [selected, setSelected] = useState<MockBuilding | null>(null);
   // ?selected=<slug> deep-link from a card's address row. The marker
   // sync effect picks this up and pre-opens the popup + flies to it.
@@ -54,37 +85,53 @@ export function MapView({ buildings }: MapViewProps) {
     const map = mapRef.current;
     if (!map) return;
 
-    // Clear old markers
+    // Clear old markers + element-by-slug map
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
+    markerElementsRef.current.clear();
 
     if (buildings.length === 0) return;
 
     const bounds = new maplibregl.LngLatBounds();
     for (const b of buildings) {
-      const el = document.createElement('button');
-      el.type = 'button';
-      el.className =
-        'flex items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-1 text-caption font-semibold tabular-nums text-stone-900 shadow-md hover:bg-stone-50 transition-colors';
-      el.style.cursor = 'pointer';
-      // Marker label: per-m² starting price ("от 4.1K TJS/м²"), matching
-      // the building card / detail page convention. Per-m² is the
-      // comparable signal at the building level — total starting price
-      // varies wildly with apartment size mix and misleads the eye.
-      // BUG-6 (clustering) is deferred until inventory density justifies it.
+      // Wrapper holds pill + tip in a flex column. Anchor: 'bottom'
+      // means the bottom-center of this element aligns with lat/lng,
+      // and since the tip is at the bottom of the wrapper, the tip's
+      // point is exactly where the building is.
+      const root = document.createElement('div');
+      root.className = PIN_WRAPPER_CLASS;
+      root.setAttribute('role', 'button');
+      root.setAttribute('tabindex', '0');
+      root.setAttribute('aria-label', `${b.name.ru} — открыть превью`);
+      root.addEventListener('click', () => setSelected(b));
+      // Keyboard activation for accessibility
+      root.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setSelected(b);
+        }
+      });
+
+      // Pill: per-m² starting price, matching card convention.
+      const pill = document.createElement('div');
+      pill.className = `${PILL_BASE} ${PILL_DEFAULT}`;
       const shortName = b.name.ru.replace(/^ЖК\s+/i, '');
-      // dirams → TJS = ÷100, then TJS → K-TJS = ÷100_000.
-      // For per-m² we keep one decimal because the values are smaller (3-6K).
-      el.textContent = b.price_per_m2_from_dirams
+      pill.textContent = b.price_per_m2_from_dirams
         ? `от ${(Number(b.price_per_m2_from_dirams) / 100_000).toFixed(1)}K TJS/м²`
         : shortName;
-      el.setAttribute('aria-label', `${b.name.ru} — открыть превью`);
-      el.addEventListener('click', () => setSelected(b));
+      root.appendChild(pill);
 
-      const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+      // Tip: small downward-pointing triangle via clip-path.
+      const tip = document.createElement('div');
+      tip.setAttribute('aria-hidden', 'true');
+      tip.style.cssText = `${TIP_STYLE_BASE};${TIP_BG_DEFAULT}`;
+      root.appendChild(tip);
+
+      const marker = new maplibregl.Marker({ element: root, anchor: 'bottom' })
         .setLngLat([b.longitude, b.latitude])
         .addTo(map);
       markersRef.current.push(marker);
+      markerElementsRef.current.set(b.slug, { root, pill, tip });
       bounds.extend([b.longitude, b.latitude]);
     }
 
@@ -111,6 +158,24 @@ export function MapView({ buildings }: MapViewProps) {
       map.flyTo({ center: [only.longitude, only.latitude], zoom: 14, duration: 600 });
     }
   }, [buildings, selectedSlug]);
+
+  // Restyle pins when selection changes. ONLY colours + z-index move —
+  // never size or position — so the pin's tip stays glued to its lat/lng.
+  // Direct DOM mutation is required: maplibre owns these elements
+  // outside of React's render tree.
+  /* eslint-disable react-hooks/immutability */
+  useEffect(() => {
+    for (const [slug, { root, pill, tip }] of markerElementsRef.current) {
+      const isSel = selected?.slug === slug;
+      pill.className = `${PILL_BASE} ${isSel ? PILL_SELECTED : PILL_DEFAULT}`;
+      tip.style.cssText = `${TIP_STYLE_BASE};${isSel ? TIP_BG_SELECTED : TIP_BG_DEFAULT}`;
+      // root IS the maplibre marker element (parent is the shared
+      // canvas container, so setting zIndex there would affect every
+      // marker). Lift the selected pin above any clustered neighbours.
+      root.style.zIndex = isSel ? '100' : '1';
+    }
+  }, [selected]);
+  /* eslint-enable react-hooks/immutability */
 
   return (
     <div
