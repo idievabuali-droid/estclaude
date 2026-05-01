@@ -33,7 +33,7 @@ export type SavedChange = {
   building_id: string | null;
   /** Slug of the linked listing or building so the badge can render as a Link (JOURNEY-6). */
   href: string | null;
-  /** Short label of the linked item ("ЖК Sitora Hills · 2-комн") for display. */
+  /** Short label of the linked item ("ЖК Vahdat Park · 2-комн") for display. */
   context: string | null;
   created_at: string;
 };

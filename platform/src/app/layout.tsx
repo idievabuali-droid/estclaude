@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     default: 'Real Estate Platform',
     template: '%s — Real Estate Platform',
   },
-  description: 'New-build apartments in Dushanbe and Vahdat',
+  description: 'New-build apartments in Vahdat',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

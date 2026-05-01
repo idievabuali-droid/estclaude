@@ -2,12 +2,17 @@
  * Listings service — Supabase queries with the trust-weighted ranking
  * applied client-side after fetch (we'll move to a SQL view in a later
  * iteration once we benchmark performance).
+ *
+ * V1 LAUNCH SCOPE: filtered to Vahdat only via the parent building's
+ * city. See services/buildings.ts ACTIVE_CITY for the master switch.
  */
 import { createClient } from '@/lib/supabase/server';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import { mapListing } from './buildings';
 import { getDistrictBenchmark } from './benchmarks';
 import type { FinishingType, SourceType } from '@/types/domain';
+
+const ACTIVE_CITY = 'vahdat';
 
 export type ListingFilters = {
   rooms?: number[];
@@ -25,7 +30,14 @@ const TIER_RANK: Record<string, number> = {
 
 export async function listListings(filters: ListingFilters = {}): Promise<MockListing[]> {
   const supabase = await createClient();
-  let q = supabase.from('listings').select('*').eq('status', 'active');
+  // Inner-join to buildings so we can filter listings by parent city.
+  // The selected `buildings(city)` field is just for the join; we don't
+  // use it downstream (mapListing ignores it).
+  let q = supabase
+    .from('listings')
+    .select('*, buildings!inner(city)')
+    .eq('status', 'active')
+    .eq('buildings.city', ACTIVE_CITY);
   if (filters.rooms?.length) q = q.in('rooms_count', filters.rooms);
   if (filters.source?.length) q = q.in('source_type', filters.source);
   if (filters.finishing?.length) q = q.in('finishing_type', filters.finishing);

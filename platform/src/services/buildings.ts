@@ -1,10 +1,17 @@
 /**
  * Buildings service — queries Supabase directly via the server SDK.
  * Returns the same shape as the old mock so consumer pages don't change.
+ *
+ * V1 LAUNCH SCOPE: filtered to Vahdat only. The `ACTIVE_CITY` constant
+ * is the single switch — flip to 'dushanbe' or remove entirely when we
+ * expand. Every public-facing query passes through this filter so a
+ * stray Dushanbe row in Supabase can never leak into the UI.
  */
 import { createClient } from '@/lib/supabase/server';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import type { BuildingStatus } from '@/types/domain';
+
+const ACTIVE_CITY = 'vahdat';
 
 export type BuildingFilters = {
   district?: string[];
@@ -69,9 +76,10 @@ type BuildingRowWithJoins = {
 
 export async function listBuildings(filters: BuildingFilters = {}): Promise<MockBuilding[]> {
   const supabase = await createClient();
-  let q = supabase.from('buildings').select('*').eq('is_published', true);
+  // ACTIVE_CITY is enforced on every query — caller-supplied `city`
+  // filter is ignored to keep the V1 launch lane pure.
+  let q = supabase.from('buildings').select('*').eq('is_published', true).eq('city', ACTIVE_CITY);
   if (filters.status?.length) q = q.in('status', filters.status);
-  if (filters.city) q = q.eq('city', filters.city);
   if (filters.q) q = q.ilike('name->>ru', `%${filters.q}%`);
 
   if (filters.district?.length) {
@@ -109,6 +117,7 @@ export async function listFeaturedBuildings(limit = 3): Promise<MockBuilding[]> 
     .from('buildings')
     .select('*')
     .eq('is_published', true)
+    .eq('city', ACTIVE_CITY)
     .eq('is_featured', true)
     .order('featured_rank', { ascending: true })
     .limit(limit);
@@ -243,6 +252,7 @@ export async function listDistricts(): Promise<MockDistrict[]> {
   const { data, error } = await supabase
     .from('districts')
     .select('*')
+    .eq('city', ACTIVE_CITY)
     .order('display_order', { ascending: true });
   if (error) throw error;
   return (data ?? []).map(mapDistrict);

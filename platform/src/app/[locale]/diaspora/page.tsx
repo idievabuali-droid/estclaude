@@ -52,7 +52,7 @@ export default async function DiasporaPage({
             Для покупателей из России и других стран
           </span>
           <h1 className="text-display font-semibold leading-[var(--leading-display)] text-stone-900">
-            Купите квартиру в Душанбе или Вахдате — не выходя из дома
+            Купите квартиру в Вахдате — не выходя из дома
           </h1>
           <p className="text-body text-stone-700">
             Все объявления подтверждены источником: застройщик, собственник или посредник.
@@ -129,10 +129,9 @@ export default async function DiasporaPage({
               Быстрый поиск
             </span>
             <div className="flex flex-wrap gap-2">
-              <QuickFilter href="/novostroyki?city=dushanbe">Душанбе</QuickFilter>
-              <QuickFilter href="/novostroyki?city=vahdat">Вахдат</QuickFilter>
               <QuickFilter href="/novostroyki?status=delivered">Сданные</QuickFilter>
               <QuickFilter href="/novostroyki?status=under_construction">Строится</QuickFilter>
+              <QuickFilter href="/novostroyki?status=announced">Анонсированы</QuickFilter>
               <QuickFilter href="/kvartiry?installment=true">С рассрочкой</QuickFilter>
             </div>
           </div>

@@ -38,14 +38,14 @@ export default function PostReviewStep() {
             <div className="flex flex-col gap-3">
               <h2 className="text-h3 font-semibold text-stone-900">Сводка</h2>
               <dl className="grid grid-cols-1 gap-2 text-meta md:grid-cols-2">
-                <Row label="ЖК">ЖК Sitora Hills</Row>
+                <Row label="ЖК">ЖК Vahdat Park</Row>
                 <Row label="Источник">Собственник</Row>
                 <Row label="Комнаты">2</Row>
-                <Row label="Площадь">64,5 м²</Row>
-                <Row label="Этаж">5/16</Row>
+                <Row label="Площадь">62 м²</Row>
+                <Row label="Этаж">4/10</Row>
                 <Row label="Отделка">Предчистовая</Row>
-                <Row label="Цена">742 000 TJS</Row>
-                <Row label="Рассрочка">8 750 TJS / мес · 30% · 84 мес</Row>
+                <Row label="Цена">285 000 TJS</Row>
+                <Row label="Рассрочка">3 400 TJS / мес · 30% · 84 мес</Row>
                 <Row label="Фото">5 загружено</Row>
               </dl>
             </div>

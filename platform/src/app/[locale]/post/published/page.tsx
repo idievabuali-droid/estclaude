@@ -37,7 +37,7 @@ export default async function PostPublishedStep({
                     <LayoutDashboard className="size-4" /> Перейти в кабинет
                   </AppButton>
                 </Link>
-                <Link href="/kvartira/b-sitora-hills-sh-2k-a">
+                <Link href="/kvartira/b-vahdat-park-vp-2k-a">
                   <AppButton variant="secondary">Открыть моё объявление</AppButton>
                 </Link>
               </div>
