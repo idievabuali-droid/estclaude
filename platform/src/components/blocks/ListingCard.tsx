@@ -110,7 +110,7 @@ export function ListingCard({
             (first-payment %, monthly amount, term) still live at the
             bottom of the card body for buyers who want the numbers. */}
         {listing.installment_available ? (
-          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-sm bg-white/95 px-2 py-1 text-caption font-medium text-terracotta-700 shadow-sm">
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-sm bg-white/95 px-2 py-1 text-caption font-medium text-[color:var(--color-fairness-great)] shadow-sm">
             <CreditCard className="size-3" />
             Рассрочка
           </span>
