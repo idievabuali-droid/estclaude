@@ -60,7 +60,6 @@ export function ListingCard({
   className,
 }: ListingCardProps) {
   const showConversion = currency && currency !== 'TJS' && rates != null;
-  const tCommon = useTranslations('Common');
   const tFinishing = useTranslations('Finishing');
   const router = useRouter();
 
@@ -175,7 +174,10 @@ export function ListingCard({
           <FairnessIndicator level={fairness.level as FairnessLevel} deltaPercent={fairness.deltaPercent} />
         ) : null}
 
-        {/* Row 5: installment */}
+        {/* Installment terms — shown only when the seller offers
+            financing. Listings without installment simply omit the
+            row (was previously rendering the 'save' translation key
+            as a stub, which displayed as an out-of-context "Сохранить"). */}
         {listing.installment_available && listing.installment_monthly_amount_dirams ? (
           <InstallmentDisplay
             variant="inline"
@@ -184,9 +186,7 @@ export function ListingCard({
             termMonths={listing.installment_term_months ?? 84}
             totalPriceDirams={listing.price_total_dirams}
           />
-        ) : (
-          <span className="text-meta text-stone-400">{tCommon('save')}</span>
-        )}
+        ) : null}
       </div>
     </Link>
   );
