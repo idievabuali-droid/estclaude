@@ -1,6 +1,6 @@
 'use client';
 
-import { Layers, MapPin, ArrowUpRight } from 'lucide-react';
+import { Layers, MapPin, ArrowUpRight, CreditCard } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
@@ -103,10 +103,18 @@ export function ListingCard({
             {formatM2(listing.size_m2)}
           </span>
         </div>
-        {/* Source chip hidden in V1 — every listing currently comes
-            from the founder, so the chip carries no signal. Will return
-            once we have multiple seller types (real builders, owners,
-            brokers) actively posting. */}
+        {/* Installment badge — only for listings that offer financing.
+            Top-left placement makes it scannable while flipping through
+            cards: buyers shopping by monthly budget can spot eligible
+            apartments without reading each card. The detailed terms
+            (first-payment %, monthly amount, term) still live at the
+            bottom of the card body for buyers who want the numbers. */}
+        {listing.installment_available ? (
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-sm bg-white/95 px-2 py-1 text-caption font-medium text-terracotta-700 shadow-sm">
+            <CreditCard className="size-3" />
+            Рассрочка
+          </span>
+        ) : null}
         <div className="absolute right-3 top-3 flex flex-col gap-2">
           <SaveToggle type="listing" id={listing.id} />
           <CompareToggle type="listings" id={listing.id} />
