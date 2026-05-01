@@ -5,14 +5,27 @@ import { cn } from '@/lib/utils';
 export type FairnessLevel = 'great' | 'fair' | 'high' | 'alert';
 
 /**
+ * V1 LAUNCH FLAG. The fairness signal is disabled until we have enough
+ * real listings per microdistrict for the comparison to be honest.
+ * With seed-only data (1-2 listings per microdistrict), the chip would
+ * unfairly stigmatize developers in genuinely premium areas as
+ * "expensive" and reward developers in weak locations as "cheap" —
+ * both misleading. Flip to `true` once we have ~20+ active listings
+ * per district and the benchmarks reflect real comps.
+ */
+const FAIRNESS_ENABLED = false;
+
+/**
  * Compute fairness from a listing's price-per-m² vs district benchmark.
- * Returns null when sample is too small (per Data Model §5.14 — hidden when sample_size < 5).
+ * Returns null when fairness is disabled (V1) or when sample is too
+ * small (per Data Model §5.14 — hidden when sample_size < 5).
  */
 export function computeFairness(
   pricePerM2: number,
   districtMedian: number | null,
   sampleSize: number,
 ): { level: FairnessLevel; deltaPercent: number } | null {
+  if (!FAIRNESS_ENABLED) return null;
   if (!districtMedian || sampleSize < 5) return null;
   const delta = ((pricePerM2 - districtMedian) / districtMedian) * 100;
   let level: FairnessLevel;
