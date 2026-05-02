@@ -266,6 +266,12 @@ const buildings = [
 // Listings
 function mkListing(seed) {
   const id = `55555555-5555-5555-5555-${seed.suffix.padStart(12, '0')}`;
+  // Deterministic published_at spread across the past month so the
+  // demo shows realistic "today / yesterday / N days ago" variety
+  // instead of every listing reading "сегодня" right after re-seeding.
+  // Hash from the suffix gives a stable 0-29 days-ago per listing.
+  const ageDays = (parseInt(seed.suffix, 10) * 7 + 3) % 30;
+  const publishedAt = new Date(Date.now() - ageDays * 86_400_000).toISOString();
   return {
     id,
     slug: `${seed.building_id.slice(-6)}-${seed.suffix}`,
@@ -288,7 +294,7 @@ function mkListing(seed) {
     balcony: seed.balcony ?? null,
     ceiling_height_cm: seed.ceiling ?? null,
     unit_description: { ru: seed.desc ?? 'Просторная квартира с хорошей планировкой и видом во двор.', tg: 'Хонаи васеъ.' },
-    published_at: new Date().toISOString(),
+    published_at: publishedAt,
   };
 }
 // Listings — pricing tuned for the Vahdat market: roughly 3,500–5,500

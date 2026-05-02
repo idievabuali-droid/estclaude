@@ -315,6 +315,24 @@ export async function getDeveloperStats(developerId: string): Promise<DeveloperS
   return stats;
 }
 
+/**
+ * Lightweight building lookup by slug — returns just the building row,
+ * no developer/district/listings joins. Used by /kvartiry when scoped
+ * to a single building so we can show the building name + breadcrumb
+ * without paying for the full getBuilding() join cost.
+ */
+export async function getBuildingBySlug(slug: string): Promise<MockBuilding | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('buildings')
+    .select('*')
+    .eq('slug', slug)
+    .eq('city', ACTIVE_CITY)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? rowToBuilding(data as BuildingRowWithJoins) : null;
+}
+
 export async function getDeveloperById(id: string): Promise<MockDeveloper | null> {
   const supabase = await createClient();
   const { data, error } = await supabase.from('developers').select('*').eq('id', id).maybeSingle();

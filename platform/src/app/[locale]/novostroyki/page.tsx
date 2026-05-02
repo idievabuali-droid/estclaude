@@ -24,7 +24,10 @@ import { PriceRangeFilter } from './PriceRangeFilter';
 import { AdvancedFiltersToggle } from './AdvancedFiltersToggle';
 
 const STATUS_FILTERS: Array<{ value: BuildingStatus; label: string }> = [
-  { value: 'announced', label: 'Анонсирован' },
+  // Labels mirror STAGE_INFO from @/lib/building-stages — first stage
+  // is "Котлован" (foundation pit), not "Анонс", per Tajik construction
+  // legal reality (developers can't sell pre-construction).
+  { value: 'announced', label: 'Котлован' },
   { value: 'under_construction', label: 'Строится' },
   { value: 'near_completion', label: 'Почти готов' },
   { value: 'delivered', label: 'Сдан' },

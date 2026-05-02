@@ -131,7 +131,7 @@ export default async function DiasporaPage({
             <div className="flex flex-wrap gap-2">
               <QuickFilter href="/novostroyki?status=delivered">Сданные</QuickFilter>
               <QuickFilter href="/novostroyki?status=under_construction">Строится</QuickFilter>
-              <QuickFilter href="/novostroyki?status=announced">Анонсированы</QuickFilter>
+              <QuickFilter href="/novostroyki?status=announced">Котлован</QuickFilter>
               <QuickFilter href="/kvartiry?installment=true">С рассрочкой</QuickFilter>
             </div>
           </div>

@@ -1,10 +1,12 @@
+import { ChevronLeft } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton, AppChip } from '@/components/primitives';
 import { ListingCard, MobileFiltersWrapper } from '@/components/blocks';
 import { listListings } from '@/services/listings';
-import { listBuildings, getDeveloperById } from '@/services/buildings';
+import { listBuildings, getDeveloperById, getBuildingBySlug } from '@/services/buildings';
 import { getDistrictBenchmarks } from '@/services/benchmarks';
+import { pluralRu } from '@/lib/format';
 import type { FinishingType, SourceType } from '@/types/domain';
 
 // Source filter (developer/owner/intermediary) hidden in V1 — every
@@ -20,22 +22,47 @@ const FINISHING_FILTERS: Array<{ value: FinishingType; label: string }> = [
 
 const ROOM_FILTERS = ['1', '2', '3', '4'];
 
+type SearchParams = {
+  rooms?: string;
+  source?: string;
+  finishing?: string;
+  price_to?: string;
+  /** Building scope — when set, /kvartiry shows only this building's
+   *  apartments. Used by the "Посмотреть все N квартир" CTA on the
+   *  building detail page. The header changes to "Квартиры в ЖК X"
+   *  and a breadcrumb back to /zhk/<slug> appears. */
+  building?: string;
+};
+
+/** Build a /kvartiry URL preserving every other filter, used so chip
+ *  toggles don't accidentally lose the building scope or other active
+ *  filters. */
+function buildHref(current: SearchParams, override: Partial<SearchParams>): string {
+  const next = { ...current, ...override };
+  const search = new URLSearchParams();
+  for (const [k, v] of Object.entries(next)) {
+    if (v && v.length > 0) search.set(k, v);
+  }
+  const s = search.toString();
+  return `/kvartiry${s ? `?${s}` : ''}`;
+}
+
 export default async function KvartiryPage({
   params,
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{
-    rooms?: string;
-    source?: string;
-    finishing?: string;
-    price_to?: string;
-  }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
   const sp = await searchParams;
   const t = await getTranslations('Nav');
+
+  // Building scope — when ?building=<slug> is set we look up the
+  // building by slug so we can (a) pass its UUID into listListings as
+  // a building filter and (b) render the building name in the header.
+  const scopedBuilding = sp.building ? await getBuildingBySlug(sp.building) : null;
 
   // listListings already applies trust-weighted ranking per Tech Spec §9.4
   const filtered = await listListings({
@@ -43,6 +70,7 @@ export default async function KvartiryPage({
     source: sp.source?.split(',') as SourceType[] | undefined,
     finishing: sp.finishing?.split(',') as FinishingType[] | undefined,
     priceTo: sp.price_to ? BigInt(parseInt(sp.price_to, 10) * 100) : null,
+    buildingId: scopedBuilding?.id,
   });
 
   // Pre-fetch building + developer + benchmark for each card
@@ -59,18 +87,44 @@ export default async function KvartiryPage({
   ]);
   const developerMap = new Map(developerEntries);
 
+  // Reset URL preserves building scope so "Сбросить фильтры" inside a
+  // building scope returns to "all apartments in this building" rather
+  // than the global apartments list.
+  const resetHref = scopedBuilding ? `/kvartiry?building=${scopedBuilding.slug}` : '/kvartiry';
+
   return (
     <>
       <section className="border-b border-stone-200 bg-white">
         <AppContainer className="flex flex-col gap-4 py-5">
+          {/* Breadcrumb back to the building detail page — only shown
+              when the page is scoped to a single building. Lets buyers
+              return to the project context after browsing apartments. */}
+          {scopedBuilding ? (
+            <Link
+              href={`/zhk/${scopedBuilding.slug}`}
+              className="inline-flex w-fit items-center gap-1 text-meta text-stone-500 hover:text-terracotta-600"
+            >
+              <ChevronLeft className="size-4" />
+              Назад к {scopedBuilding.name.ru}
+            </Link>
+          ) : null}
+
           <div className="flex flex-col gap-1">
-            <h1 className="text-h1 font-semibold text-stone-900">{t('apartments')}</h1>
+            <h1 className="text-h1 font-semibold text-stone-900">
+              {scopedBuilding
+                ? `Квартиры в ${scopedBuilding.name.ru}`
+                : t('apartments')}
+            </h1>
             <p className="text-meta text-stone-500 tabular-nums">
-              {filtered.length} объявлений
+              {filtered.length}{' '}
+              {pluralRu(filtered.length, ['объявление', 'объявления', 'объявлений'])}
             </p>
           </div>
 
-          {/* Filter chips — collapse to bottom-sheet on mobile */}
+          {/* Filter chips — collapse to bottom-sheet on mobile.
+              Building scope is sticky across chip toggles via
+              buildHref, so tapping "1 комн" inside a building scope
+              keeps the building filter active. */}
           <MobileFiltersWrapper
             activeCount={
               (sp.rooms ? sp.rooms.split(',').length : 0) +
@@ -82,7 +136,10 @@ export default async function KvartiryPage({
               {ROOM_FILTERS.map((r) => {
                 const active = sp.rooms?.split(',').includes(r) ?? false;
                 return (
-                  <Link key={r} href={active ? '/kvartiry' : `/kvartiry?rooms=${r}`}>
+                  <Link
+                    key={r}
+                    href={buildHref(sp, { rooms: active ? undefined : r })}
+                  >
                     <AppChip asStatic tone={active ? 'terracotta' : 'neutral'} selected={active}>
                       {r}
                     </AppChip>
@@ -98,7 +155,7 @@ export default async function KvartiryPage({
                 return (
                   <Link
                     key={f.value}
-                    href={active ? '/kvartiry' : `/kvartiry?finishing=${f.value}`}
+                    href={buildHref(sp, { finishing: active ? undefined : f.value })}
                   >
                     <AppChip asStatic tone={active ? 'terracotta' : 'neutral'} selected={active}>
                       {f.label}
@@ -119,7 +176,7 @@ export default async function KvartiryPage({
               <p className="text-meta text-stone-500">
                 Попробуйте изменить фильтры или сбросить их.
               </p>
-              <Link href="/kvartiry">
+              <Link href={resetHref}>
                 <AppButton variant="secondary">Сбросить фильтры</AppButton>
               </Link>
             </div>

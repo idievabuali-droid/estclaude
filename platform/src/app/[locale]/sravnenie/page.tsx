@@ -365,7 +365,7 @@ function BuildingsCompare({
   districtMap: Map<string, Awaited<ReturnType<typeof getDistrictById>>>;
 }) {
   const STATUS: Record<string, string> = {
-    announced: 'Анонсирован',
+    announced: 'Котлован',
     under_construction: 'Строится',
     near_completion: 'Почти готов',
     delivered: 'Сдан',

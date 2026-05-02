@@ -32,6 +32,8 @@ export { VerifiedDeveloperButton } from './VerifiedDeveloperButton';
 export type { VerifiedDeveloperButtonProps } from './VerifiedDeveloperButton';
 export { BuildingStageProgress } from './BuildingStageProgress';
 export type { BuildingStageProgressProps } from './BuildingStageProgress';
+export { StageInfoPopover } from './StageInfoPopover';
+export type { StageInfoPopoverProps } from './StageInfoPopover';
 export { CurrencyPicker } from './CurrencyPicker';
 export type { CurrencyPickerProps } from './CurrencyPicker';
 export { PriceConversion } from './PriceConversion';

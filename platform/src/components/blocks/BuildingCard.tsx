@@ -5,19 +5,14 @@ import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { formatPriceNumber, pluralRu } from '@/lib/format';
+import { STAGE_INFO } from '@/lib/building-stages';
 import { VerificationBadge } from './VerificationBadge';
 import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
 import { PriceConversion } from './PriceConversion';
+import { StageInfoPopover } from './StageInfoPopover';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import type { ExchangeRates, SupportedCurrency } from '@/services/currency';
-
-const STATUS_LABEL: Record<MockBuilding['status'], string> = {
-  announced: 'Анонсирован',
-  under_construction: 'Строится',
-  near_completion: 'Почти готов',
-  delivered: 'Сдан',
-};
 
 export interface BuildingCardProps {
   building: MockBuilding;
@@ -85,8 +80,13 @@ export function BuildingCard({
           <Building className="size-8 text-white/70" aria-hidden />
           <span className="text-h3 font-semibold text-white drop-shadow-sm">{building.name.ru}</span>
         </div>
+        {/* Stage chip + help popover. The "?" lets buyers learn what
+            the stage means and how long it usually takes without
+            leaving the card. stopParentClick prevents the help-button
+            click from also triggering the parent card Link. */}
         <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-sm bg-white/90 px-2 py-1 text-caption font-medium text-stone-900">
-          {STATUS_LABEL[building.status]}
+          {STAGE_INFO[building.status].label}
+          <StageInfoPopover status={building.status} stopParentClick />
         </div>
         <div className="absolute right-3 top-3 flex flex-col gap-2">
           <SaveToggle type="building" id={building.id} />
@@ -152,14 +152,18 @@ export function BuildingCard({
           ) : null}
         </div>
 
-        {/* Available units preview — show up to 3 unit previews. If more
-            apartments are available than shown, append "+ ещё N квартир"
-            so buyers see at a glance there's more inside without
-            duplicating a count up in the header. */}
+        {/* Available units preview. Header shows the total count
+            ("Доступные квартиры · 8") so buyers can see project size
+            at a glance. Up to 3 unit previews follow. If more exist,
+            "+ ещё N" hints there's more inside (the parent card link
+            already takes them to the building detail). */}
         {matchingUnits.length > 0 ? (
           <div className="flex flex-col gap-2 border-t border-stone-200 pt-3">
             <span className="text-caption font-medium text-stone-500">
               Доступные квартиры
+              {activeListingsCount != null ? (
+                <span className="tabular-nums"> · {activeListingsCount}</span>
+              ) : null}
             </span>
             {matchingUnits.slice(0, 3).map((u) => (
               <div

@@ -7,28 +7,15 @@ import {
   ArrowUp,
   ArrowUpRight,
   Eye,
-  HelpCircle,
 } from 'lucide-react';
 import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
-import {
-  AppContainer,
-  AppButton,
-  AppChip,
-  AppCard,
-  AppCardContent,
-} from '@/components/primitives';
-import {
-  FairnessIndicator,
-  computeFairness,
-  InstallmentDisplay,
-  ListingCard,
-} from '@/components/blocks';
+import { AppContainer, AppChip } from '@/components/primitives';
+import { InstallmentDisplay, ListingCard } from '@/components/blocks';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo } from '@/lib/format';
 import { getListing } from '@/services/listings';
-import { getNearbyPOIs } from '@/services/poi';
-import { NearbyPois } from '@/components/blocks';
+import { getNearbyPOIs, POI_LABELS, type PoiCategory } from '@/services/poi';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { ContactBarWithModal } from './ContactBarWithModal';
 
@@ -38,6 +25,17 @@ const FINISHING_TONE = {
   full_finish: 'finishing-full-finish',
   owner_renovated: 'finishing-owner-renovated',
 } as const;
+
+/** Categories shown in the compact nearby preview on the apartment
+ *  page. The full 8-category list lives on the building detail page —
+ *  buyers reach it via the "Все рядом" link. These four cover what
+ *  family buyers ask about first. */
+const COMPACT_POI_CATEGORIES: PoiCategory[] = [
+  'mosque',
+  'school',
+  'supermarket',
+  'hospital',
+];
 
 export async function generateMetadata({
   params,
@@ -52,13 +50,37 @@ export async function generateMetadata({
   return {
     title,
     description: listing.unit_description.ru,
-    openGraph: {
-      title,
-      description: listing.unit_description.ru,
-    },
+    openGraph: { title, description: listing.unit_description.ru },
   };
 }
 
+/**
+ * Apartment detail page (/kvartira/[slug]).
+ *
+ * Section order follows the convergent pattern across Avito, Cian,
+ * Krisha, Bayut, Zillow:
+ *
+ *   1. Hero (cover + rooms·m² overlay)
+ *   2. Breadcrumbs
+ *   3. Title + price + posted-ago + contact bar (the "what is this and
+ *      how do I reach the seller" zone — everything above the fold)
+ *   4. Specs grid + finishing (the "stats" zone — Площадь, Этаж,
+ *      Санузлов, Потолок, Балкон + finishing chip with 1-line note)
+ *   5. Installment (if available) — placed adjacent to price because
+ *      it modifies affordability
+ *   6. Description — seller's free-text
+ *   7. Building summary card — link to the parent /zhk page
+ *   8. Compact nearby (4 POIs + "Все рядом" link to building's full POI list)
+ *   9. Similar listings in the same building
+ *
+ * Removed from the previous structure:
+ *   - Standalone "Отделка" section (folded into the specs zone)
+ *   - Dead help button next to the finishing chip (had no behaviour)
+ *   - Always-null fairness indicator conditional (the signal is
+ *     globally disabled in V1, so the JSX block was dead code)
+ *   - Full nearby POI list (replaced with a compact 4-chip preview;
+ *     the building page is the source of truth for the full list)
+ */
 export default async function ListingDetailPage({
   params,
 }: {
@@ -70,29 +92,28 @@ export default async function ListingDetailPage({
 
   const data = await getListing(slug);
   if (!data) notFound();
-  const { listing, building, developer, district, median, similar, sellerPhone } = data;
+  const { listing, building, developer, district, similar, sellerPhone } = data;
   // Diaspora context: when the buyer has set a foreign currency on
-  // /diaspora, the intent CTA switches from physical visit to online
-  // showing. Same listing, contextual action.
+  // /diaspora, the contact-bar intent CTA switches from physical visit
+  // to online showing.
   const currency = await readCurrencyCookie();
   const isDiaspora = currency != null && currency !== 'TJS';
-  // Currency intentionally NOT read here — apartment detail stays in
-  // TJS for local buyers. Currency is a /diaspora-lane-only feature.
   const pois = await getNearbyPOIs(building.latitude, building.longitude);
-  const fairness =
-    median != null
-      ? computeFairness(Number(listing.price_per_m2_dirams), median.median, median.sample)
-      : null;
+
+  // Pre-compute the compact nearby rows so the JSX stays readable.
+  const compactNearby = COMPACT_POI_CATEGORIES.map((cat) => ({
+    cat,
+    item: pois[cat][0] ?? null,
+  })).filter((x) => x.item != null);
 
   return (
     <>
-      {/* Hero — compact 16:9 on mobile (BUG-2). Source chip top-left, room+m² title overlaid. */}
+      {/* ─── 1. HERO ────────────────────────────────────────────── */}
       <div
         className="relative aspect-[16/9] w-full md:aspect-[21/9]"
         style={{ backgroundColor: listing.cover_color }}
       >
         <div className="absolute inset-0 bg-gradient-to-t from-stone-900/65 via-stone-900/15 to-transparent" />
-        {/* SourceChip hidden in V1 — see ListingCard for rationale. */}
         <div className="absolute bottom-0 left-0 right-0">
           <AppContainer className="pb-3 md:pb-4">
             <h1 className="text-h2 font-semibold leading-[var(--leading-h2)] text-white drop-shadow-sm md:text-h1">
@@ -102,7 +123,7 @@ export default async function ListingDetailPage({
         </div>
       </div>
 
-      {/* JOURNEY-9: breadcrumbs so users can re-orient on long detail pages */}
+      {/* ─── 2. BREADCRUMBS ─────────────────────────────────────── */}
       <nav aria-label="Хлебные крошки" className="border-b border-stone-200 bg-stone-50">
         <AppContainer>
           <ol className="flex items-center gap-1 overflow-x-auto py-2 text-caption text-stone-500 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -125,13 +146,16 @@ export default async function ListingDetailPage({
         </AppContainer>
       </nav>
 
-      {/* Title context block (BUG-3: dropped redundant h1; building+district as primary identity now) */}
+      {/* ─── 3. TITLE + PRICE + CONTACT (the "above the fold" zone) ─ */}
       <section className="border-b border-stone-200 bg-white py-4">
         <AppContainer className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          {/* Building name link → /zhk; small "На карте" pill → map.
+              Developer name added on a second line so the building
+              summary card lower on the page can be dropped (was
+              effectively re-stating the same building + developer
+              info with a redundant CTA). */}
+          <div className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              {/* Building name + district link → goes to the building's
-                  detail page (where buyers see all units, dev info, etc). */}
               <Link
                 href={`/zhk/${building.slug}`}
                 className="inline-flex items-center gap-1 text-meta text-stone-700 hover:text-terracotta-600"
@@ -140,9 +164,6 @@ export default async function ListingDetailPage({
                 <span className="font-medium text-stone-900">{building.name.ru}</span>
                 <span className="text-stone-500">· {district.name.ru}</span>
               </Link>
-              {/* Separate map link — distinct action: see exactly where
-                  this building sits on the map. Two clear options instead
-                  of overloading the building-name link. */}
               <Link
                 href={`/novostroyki?view=karta&selected=${building.slug}`}
                 className="group inline-flex items-center gap-1 rounded-sm border border-stone-200 bg-stone-50 px-2 py-0.5 text-caption font-medium text-stone-700 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50 hover:text-terracotta-700"
@@ -153,37 +174,29 @@ export default async function ListingDetailPage({
                 <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
               </Link>
             </div>
-            {/* VerificationBadge hidden in V1 — see ListingCard for rationale. */}
+            <span className="text-caption text-stone-500">
+              Застройщик: {developer.display_name.ru}
+            </span>
           </div>
 
-          {/* Price + per-m² + fairness */}
-          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <span className="text-display font-semibold tabular-nums text-stone-900">
               {formatPriceNumber(listing.price_total_dirams)} TJS
             </span>
             <span className="text-meta text-stone-500 tabular-nums">
               {formatPriceNumber(listing.price_per_m2_dirams)} TJS / м²
             </span>
-            {fairness ? (
-              <FairnessIndicator level={fairness.level} deltaPercent={fairness.deltaPercent} />
-            ) : null}
           </div>
 
-          {/* Posted-ago — freshness signal placed near the contact CTAs
-              so buyers verifying a listing before contacting can see
-              when it went up. Hybrid format: time-of-day for fresh
-              posts, absolute date for older. */}
-          <span className="text-meta text-stone-500">
+          {/* Tertiary signal — small + muted so it doesn't compete with
+              price or building info above. */}
+          <span className="text-caption text-stone-400">
             Опубликовано {formatPostedAgo(listing.published_at)}
           </span>
 
-          {/* Contact section — channels + intent in two grouped rows.
-              Lives inside ContactBarWithModal (which also renders the
-              mobile sticky bar + visit modal). One client component
-              owns the whole contact UI so layout/state stay consistent.
-              Bottom-of-file render is hidden because the desktop layout
-              is rendered here near the price; the sticky bar floats
-              regardless. */}
+          {/* Contact bar: 4 channels + 1 intent CTA. Same client
+              component renders the desktop layout here AND the mobile
+              sticky bar at the bottom of the viewport. */}
           <ContactBarWithModal
             listingTitle={`${listing.rooms_count}-комн в ${building.name.ru}`}
             sellerPhone={sellerPhone}
@@ -192,64 +205,62 @@ export default async function ListingDetailPage({
         </AppContainer>
       </section>
 
-      {/* Key facts grid */}
+      {/* ─── 4. SPECS + FINISHING (the "stats" zone) ────────────── */}
       <section className="bg-stone-50 py-5">
-        <AppContainer className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Fact icon={<Ruler className="size-4 text-stone-500" />} label="Площадь" value={formatM2(listing.size_m2)} />
-          <Fact
-            icon={<Layers className="size-4 text-stone-500" />}
-            label="Этаж"
-            value={formatFloor(listing.floor_number, listing.total_floors)}
-          />
-          {listing.bathroom_count != null ? (
+        <AppContainer className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
             <Fact
-              icon={<Bath className="size-4 text-stone-500" />}
-              label="Санузлов"
-              value={String(listing.bathroom_count)}
+              icon={<Ruler className="size-4 text-stone-500" />}
+              label="Площадь"
+              value={formatM2(listing.size_m2)}
             />
-          ) : null}
-          {listing.ceiling_height_cm ? (
             <Fact
-              icon={<ArrowUp className="size-4 text-stone-500" />}
-              label="Потолок"
-              value={`${(listing.ceiling_height_cm / 100).toFixed(1)} м`}
+              icon={<Layers className="size-4 text-stone-500" />}
+              label="Этаж"
+              value={formatFloor(listing.floor_number, listing.total_floors)}
             />
-          ) : null}
-          {listing.balcony != null ? (
-            <Fact
-              icon={<Eye className="size-4 text-stone-500" />}
-              label="Балкон"
-              value={listing.balcony ? 'есть' : 'нет'}
-            />
-          ) : null}
-        </AppContainer>
-      </section>
+            {listing.bathroom_count != null ? (
+              <Fact
+                icon={<Bath className="size-4 text-stone-500" />}
+                label="Санузлов"
+                value={String(listing.bathroom_count)}
+              />
+            ) : null}
+            {listing.ceiling_height_cm ? (
+              <Fact
+                icon={<ArrowUp className="size-4 text-stone-500" />}
+                label="Потолок"
+                value={`${(listing.ceiling_height_cm / 100).toFixed(1)} м`}
+              />
+            ) : null}
+            {listing.balcony != null ? (
+              <Fact
+                icon={<Eye className="size-4 text-stone-500" />}
+                label="Балкон"
+                value={listing.balcony ? 'есть' : 'нет'}
+              />
+            ) : null}
+          </div>
 
-      {/* Finishing chip with description */}
-      <section className="border-t border-stone-200 py-6">
-        <AppContainer className="flex flex-col gap-3">
-          <h2 className="text-h2 font-semibold text-stone-900">Отделка</h2>
-          <div className="flex items-start gap-3">
-            <AppChip asStatic tone={FINISHING_TONE[listing.finishing_type]}>
+          {/* Finishing — chip is self-explanatory (its semantic colour
+              IS the signal); a small caption underneath spells out
+              what the buyer actually gets. No "Отделка:" prefix
+              needed — the chip text says "Без ремонта" / "С ремонтом"
+              etc., which already names the attribute. */}
+          <div className="flex flex-col gap-1">
+            <AppChip asStatic tone={FINISHING_TONE[listing.finishing_type]} className="w-fit">
               {tFinishing(listing.finishing_type)}
             </AppChip>
-            <button
-              type="button"
-              aria-label="Подробнее об отделке"
-              className="inline-flex size-7 items-center justify-center rounded-md text-stone-500 hover:bg-stone-100"
-            >
-              <HelpCircle className="size-4" />
-            </button>
+            <span className="text-caption text-stone-500">
+              {finishingDescription(listing.finishing_type)}
+            </span>
           </div>
-          <p className="text-body text-stone-700">
-            {finishingDescription(listing.finishing_type)}
-          </p>
         </AppContainer>
       </section>
 
-      {/* Installment */}
+      {/* ─── 5. INSTALLMENT (only when offered) ─────────────────── */}
       {listing.installment_available && listing.installment_monthly_amount_dirams ? (
-        <section className="border-t border-stone-200 bg-stone-50 py-6">
+        <section className="border-t border-stone-200 bg-white py-6">
           <AppContainer className="flex flex-col gap-3">
             <h2 className="text-h2 font-semibold text-stone-900">Рассрочка от застройщика</h2>
             <InstallmentDisplay
@@ -265,7 +276,7 @@ export default async function ListingDetailPage({
         </section>
       ) : null}
 
-      {/* Description */}
+      {/* ─── 6. DESCRIPTION (seller's free-text) ────────────────── */}
       <section className="border-t border-stone-200 py-6">
         <AppContainer className="flex flex-col gap-3">
           <h2 className="text-h2 font-semibold text-stone-900">Описание</h2>
@@ -273,38 +284,42 @@ export default async function ListingDetailPage({
         </AppContainer>
       </section>
 
-      {/* WEDGE-2: "Что рядом" — POI distances (mosque, school, hospital, etc.) */}
-      <section className="border-t border-stone-200 py-6">
-        <AppContainer>
-          <NearbyPois pois={pois} />
-        </AppContainer>
-      </section>
+      {/* Building summary card removed — the title block at the top
+          already has the building name (clickable to /zhk), the "На
+          карте" pill, AND the developer name. A repeat card here was
+          duplicate visual real estate. */}
 
-      {/* Building summary block */}
-      <section className="border-t border-stone-200 bg-stone-50 py-6">
-        <AppContainer>
-          <AppCard>
-            <AppCardContent>
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="flex flex-col gap-1">
-                  <span className="text-caption font-medium text-stone-500">Жилой комплекс</span>
-                  <h3 className="text-h3 font-semibold text-stone-900">{building.name.ru}</h3>
-                  <span className="text-meta text-stone-500">
-                    Застройщик: {developer.display_name.ru}
-                  </span>
-                </div>
-                <Link href={`/zhk/${building.slug}`}>
-                  <AppButton variant="secondary">Открыть ЖК</AppButton>
-                </Link>
-              </div>
-            </AppCardContent>
-          </AppCard>
-        </AppContainer>
-      </section>
+      {/* ─── 7. COMPACT NEARBY (4 chips + link to full list) ────── */}
+      {compactNearby.length > 0 ? (
+        <section className="border-t border-stone-200 py-6">
+          <AppContainer className="flex flex-col gap-3">
+            <h3 className="text-h3 font-semibold text-stone-900">Что рядом</h3>
+            <div className="flex flex-wrap gap-2">
+              {compactNearby.map(({ cat, item }) => (
+                <span
+                  key={cat}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-stone-50 px-2 py-1 text-meta"
+                >
+                  <span aria-hidden>{POI_LABELS[cat].emoji}</span>
+                  <span className="font-medium text-stone-700">{POI_LABELS[cat].ru}</span>
+                  <span className="text-stone-500 tabular-nums">· {item!.distanceM} м</span>
+                </span>
+              ))}
+            </div>
+            <Link
+              href={`/zhk/${building.slug}#nearby`}
+              className="inline-flex w-fit items-center gap-1 self-start text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+            >
+              Все рядом
+              <ArrowUpRight className="size-3.5" />
+            </Link>
+          </AppContainer>
+        </section>
+      ) : null}
 
-      {/* Similar */}
+      {/* ─── 9. SIMILAR IN THIS BUILDING ────────────────────────── */}
       {similar.length > 0 ? (
-        <section className="border-t border-stone-200 py-6 pb-24 md:pb-7">
+        <section className="border-t border-stone-200 bg-stone-50 py-6 pb-24 md:pb-7">
           <AppContainer className="flex flex-col gap-5">
             <h2 className="text-h2 font-semibold text-stone-900">Похожие в этом ЖК</h2>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
@@ -314,8 +329,6 @@ export default async function ListingDetailPage({
                   listing={l}
                   building={building}
                   developerVerified={developer.is_verified}
-                  districtMedianPerM2={median?.median ?? null}
-                  districtSampleSize={median?.sample ?? 0}
                   hideBuildingName
                 />
               ))}
@@ -324,8 +337,8 @@ export default async function ListingDetailPage({
         </section>
       ) : null}
 
-      {/* Mobile sticky bar is rendered by the ContactBarWithModal
-          higher in the tree (near the price). One instance does both. */}
+      {/* Mobile sticky contact bar is rendered by ContactBarWithModal
+          in section 3 — it floats fixed regardless of scroll position. */}
     </>
   );
 }
@@ -350,16 +363,16 @@ function Fact({
   );
 }
 
-function finishingDescription(t: string) {
+function finishingDescription(t: string): string {
   switch (t) {
     case 'no_finish':
-      return 'Квартира без отделки — готова для вашего ремонта.';
+      return 'квартира без отделки, готова для вашего ремонта';
     case 'pre_finish':
-      return 'Базовая отделка — готова к завершающему ремонту.';
+      return 'базовая отделка, готова к завершающему ремонту';
     case 'full_finish':
-      return 'Полная отделка от застройщика — готова к заселению.';
+      return 'полная отделка от застройщика, готова к заселению';
     case 'owner_renovated':
-      return 'Квартира отремонтирована владельцем — осмотрите лично, чтобы оценить качество.';
+      return 'отремонтировано владельцем, осмотрите лично';
     default:
       return '';
   }
