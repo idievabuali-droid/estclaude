@@ -1,17 +1,30 @@
 /**
  * Telegram Bot webhook. Receives every update Telegram sends about
- * our bot — for auth we only care about two flows:
+ * our bot — for auth we only care about a few flows:
  *
  *   1. /start <token>  →  user opened the bot via our QR/deep-link.
- *      Reply with the "Поделиться номером" Share Contact prompt and
- *      remember which auth_session this chat is bound to.
+ *      Persist the chat_id on the auth_session so we remember it
+ *      across serverless cold starts. Reply with the "Поделиться
+ *      номером" Share Contact prompt.
  *
  *   2. message.contact  →  user tapped Share Contact.
  *      Verify the contact actually belongs to the sender (Telegram
- *      will set contact.user_id to the sender's id when they share
- *      their OWN number — if it's missing or different, the user
- *      shared someone ELSE's contact and we reject), then create or
- *      update the user, link the auth_session, and confirm.
+ *      sets contact.user_id to the sender's id when they share their
+ *      OWN number — if missing or different, the user shared someone
+ *      ELSE's contact and we reject), look up the pending session by
+ *      chat_id, then create or update the user, link the auth_session,
+ *      and confirm.
+ *
+ *   3. text message during pending session  →  user typed instead of
+ *      tapping the Share Contact button (the button can be hidden by
+ *      Telegram on some clients, or accidentally dismissed). Re-show
+ *      the keyboard with a polite nudge — DON'T accept the typed
+ *      number, because it can't be cryptographically tied to the
+ *      sender (Share Contact's user_id field is the only verified
+ *      bridge between phone and Telegram identity).
+ *
+ *   4. Anything else with no pending session  →  generic "I'm the bot"
+ *      orientation reply.
  *
  * Webhook security: Telegram includes the secret_token we registered
  * with /setWebhook in the X-Telegram-Bot-Api-Secret-Token header. We
@@ -22,29 +35,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMessage } from '@/lib/telegram/bot';
 import type { TgUpdate, TgMessage, TgContact } from '@/lib/telegram/types';
-
-// In-memory map of chat_id → pending auth_session token, populated
-// when the user starts the bot via /start <token> and consumed when
-// they share their contact. Lives only for the duration of the
-// serverless function instance — but the bot interaction is fast (a
-// few seconds at most), so cold-start churn is acceptable. For higher
-// reliability we'd persist this in Redis or a chat_state table; V1
-// keeps it in-memory until that's actually needed.
-const chatPendingToken = new Map<number, string>();
-
-/** Maps the chat → token in memory AND, defensively, in the DB so
- *  cold starts between /start and contact share don't lose the link.
- *  We store it on auth_sessions itself by writing the chat_id into a
- *  pending state — completed when contact arrives. */
-async function rememberPendingChat(chatId: number, token: string): Promise<void> {
-  chatPendingToken.set(chatId, token);
-}
-
-function consumePendingChat(chatId: number): string | undefined {
-  const token = chatPendingToken.get(chatId);
-  if (token) chatPendingToken.delete(chatId);
-  return token;
-}
 
 export async function POST(req: NextRequest) {
   // ─── 1. Verify the request really came from Telegram ────────
@@ -78,7 +68,7 @@ export async function POST(req: NextRequest) {
     } else if (message.contact) {
       await handleContactShare(message, message.contact);
     } else {
-      await handleUnrecognized(message);
+      await handleNonContactInput(message);
     }
   } catch (err) {
     console.error('Telegram webhook handler error:', err);
@@ -90,9 +80,30 @@ export async function POST(req: NextRequest) {
 }
 
 /**
+ * Show the Share Contact keyboard. Extracted because we also re-show
+ * it when the user types text instead of tapping the button.
+ */
+async function promptShareContact(chatId: number): Promise<void> {
+  await sendMessage(
+    chatId,
+    'Нажмите кнопку ниже, чтобы поделиться номером телефона. Это нужно для входа на ЖК.tj и уведомлений по сохранённым квартирам.\n\n⚠️ Не печатайте номер вручную — Telegram не сможет проверить, что он ваш. Используйте кнопку.',
+    {
+      replyMarkup: {
+        keyboard: [
+          [{ text: '📱 Поделиться номером', request_contact: true }],
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: false,
+      },
+    },
+  );
+}
+
+/**
  * /start [token]
- *   - With token: this is the QR/deep-link flow from /voyti. Save the
- *     pending session and ask for the user's phone via Share Contact.
+ *   - With token: this is the QR/deep-link flow from /voyti. Persist
+ *     the chat_id on the auth_session and ask for the user's phone
+ *     via Share Contact.
  *   - Without token: somebody opened the bot directly. Send a friendly
  *     orientation message — we can't auth them without a session.
  */
@@ -110,9 +121,9 @@ async function handleStartCommand(message: TgMessage): Promise<void> {
     return;
   }
 
-  // Validate the token exists and is still pending (not expired,
-  // not already completed). If invalid, tell the user — don't leak
-  // why specifically, but make it clear they need a fresh link.
+  // Validate the token exists and is still pending. If invalid, tell
+  // the user — don't leak why specifically, but make it clear they
+  // need a fresh link.
   const supabase = createAdminClient();
   const { data: session } = await supabase
     .from('auth_sessions')
@@ -132,25 +143,15 @@ async function handleStartCommand(message: TgMessage): Promise<void> {
     return;
   }
 
-  await rememberPendingChat(chatId, token);
+  // Persist chat_id on the session so the next message from this chat
+  // (the contact share) can find its way back to this token without
+  // needing in-memory state.
+  await supabase
+    .from('auth_sessions')
+    .update({ tg_chat_id: chatId })
+    .eq('id', session.id);
 
-  // Ask for the phone via the native Share Contact button. Setting
-  // request_contact=true gives the user a one-tap share — much
-  // better UX than typing a number. one_time_keyboard hides the
-  // keyboard after they tap.
-  await sendMessage(
-    chatId,
-    'Поделитесь своим номером телефона, чтобы войти на ЖК.tj. Это нужно для входа и уведомлений по сохранённым квартирам.',
-    {
-      replyMarkup: {
-        keyboard: [
-          [{ text: '📱 Поделиться номером', request_contact: true }],
-        ],
-        resize_keyboard: true,
-        one_time_keyboard: true,
-      },
-    },
-  );
+  await promptShareContact(chatId);
 }
 
 /**
@@ -164,21 +165,41 @@ async function handleContactShare(message: TgMessage, contact: TgContact): Promi
   // Critical: contact.user_id is set by Telegram when the user shares
   // their OWN number via the Share Contact button. If it's missing or
   // doesn't match the sender, they shared someone else's contact card
-  // — refuse the auth so attackers can't impersonate by forwarding a
-  // contact they have for the target.
+  // — refuse so attackers can't impersonate by forwarding a contact
+  // they have for the target.
   if (!contact.user_id || contact.user_id !== senderId) {
     await sendMessage(
       chatId,
-      'Поделитесь своим номером телефона через кнопку «Поделиться номером» — другой контакт нельзя.',
+      'Поделитесь СВОИМ номером через кнопку «📱 Поделиться номером» — другой контакт нельзя.',
     );
     return;
   }
 
-  const token = consumePendingChat(chatId);
-  if (!token) {
+  const supabase = createAdminClient();
+
+  // Find the pending session for this chat (set when the user did
+  // /start <token>). DB-backed instead of in-memory so cold starts
+  // don't lose the link.
+  const { data: session } = await supabase
+    .from('auth_sessions')
+    .select('id, status, expires_at, token')
+    .eq('tg_chat_id', chatId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!session) {
     await sendMessage(
       chatId,
       'Сначала нажмите «Войти через Telegram» на сайте ЖК.tj и откройте бота по ссылке.',
+    );
+    return;
+  }
+  if (new Date(session.expires_at as string) < new Date()) {
+    await sendMessage(
+      chatId,
+      'Сессия истекла. Откройте сайт и снова нажмите «Войти через Telegram».',
     );
     return;
   }
@@ -188,28 +209,6 @@ async function handleContactShare(message: TgMessage, contact: TgContact): Promi
   // other phone in our DB.
   const phoneRaw = contact.phone_number.replace(/[^0-9]/g, '');
   const phone = phoneRaw.startsWith('+') ? phoneRaw : `+${phoneRaw}`;
-
-  const supabase = createAdminClient();
-
-  // Re-verify session is still alive (could have expired during the
-  // user's tap delay).
-  const { data: session } = await supabase
-    .from('auth_sessions')
-    .select('id, status, expires_at')
-    .eq('token', token)
-    .maybeSingle();
-
-  if (
-    !session ||
-    session.status !== 'pending' ||
-    new Date(session.expires_at as string) < new Date()
-  ) {
-    await sendMessage(
-      chatId,
-      'Сессия истекла. Откройте сайт и снова нажмите «Войти через Telegram».',
-    );
-    return;
-  }
 
   // Find existing user by Telegram id (most reliable) OR by phone
   // (catches users who signed up before via SMS in some future
@@ -232,8 +231,6 @@ async function handleContactShare(message: TgMessage, contact: TgContact): Promi
   let userId: string;
 
   if (byTgId) {
-    // Existing Telegram-linked user — update their phone in case it
-    // changed and refresh their last-known display fields.
     userId = byTgId.id as string;
     await supabase
       .from('users')
@@ -247,7 +244,6 @@ async function handleContactShare(message: TgMessage, contact: TgContact): Promi
       })
       .eq('id', userId);
   } else if (byPhone) {
-    // Existing phone-only user — link Telegram identity to them.
     userId = byPhone.id as string;
     await supabase
       .from('users')
@@ -262,7 +258,6 @@ async function handleContactShare(message: TgMessage, contact: TgContact): Promi
       })
       .eq('id', userId);
   } else {
-    // First time we've seen this person — create the user.
     const { data: newUser, error: insertErr } = await supabase
       .from('users')
       .insert({
@@ -287,7 +282,6 @@ async function handleContactShare(message: TgMessage, contact: TgContact): Promi
     userId = newUser.id as string;
   }
 
-  // Mark the auth session completed so the polling web tab picks it up.
   await supabase
     .from('auth_sessions')
     .update({
@@ -297,7 +291,6 @@ async function handleContactShare(message: TgMessage, contact: TgContact): Promi
     })
     .eq('id', session.id);
 
-  // Confirm to the user; remove the keyboard so the chat looks clean.
   await sendMessage(
     chatId,
     `✓ Вы вошли как ${phone}. Вернитесь в браузер — страница откроется автоматически.`,
@@ -307,10 +300,40 @@ async function handleContactShare(message: TgMessage, contact: TgContact): Promi
   );
 }
 
-/** Catch-all for messages we don't understand — gentle hint, never angry. */
-async function handleUnrecognized(message: TgMessage): Promise<void> {
+/**
+ * Anything that's not /start and not a contact share. Two cases:
+ *
+ *   - Chat IS mid-handshake (has a pending auth_session) — the user
+ *     probably typed their number instead of tapping the Share
+ *     Contact button. Re-show the keyboard with a clear nudge.
+ *
+ *   - Chat is NOT mid-handshake — orientation message.
+ */
+async function handleNonContactInput(message: TgMessage): Promise<void> {
+  const chatId = message.chat.id;
+  const supabase = createAdminClient();
+
+  const { data: pending } = await supabase
+    .from('auth_sessions')
+    .select('id, expires_at')
+    .eq('tg_chat_id', chatId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (pending && new Date(pending.expires_at as string) > new Date()) {
+    // Mid-handshake — re-show the Share Contact button. This is the
+    // exact scenario your test case hit: user typed "935563306" as
+    // text and the bot fell through to a generic message that lost
+    // them the session. Now we re-prompt instead.
+    await promptShareContact(chatId);
+    return;
+  }
+
+  // Generic orientation — no pending session.
   await sendMessage(
-    message.chat.id,
-    'Я бот ЖК.tj — помогаю войти на сайт и присылаю уведомления по сохранённым квартирам. Откройте /start чтобы начать.',
+    chatId,
+    'Я бот ЖК.tj — помогаю войти на сайт и присылаю уведомления по сохранённым квартирам. Откройте сайт ЖК.tj и нажмите «Войти через Telegram», чтобы начать.',
   );
 }
