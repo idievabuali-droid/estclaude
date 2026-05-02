@@ -54,7 +54,7 @@ export function BuildingCard({
   function openMap(e: React.MouseEvent) {
     e.stopPropagation();
     e.preventDefault();
-    router.push(`/novostroyki?view=karta&selected=${building.slug}`);
+    router.push(`/novostroyki?view=karta&focus=${building.slug}`);
   }
   const tCommon = useTranslations('Common');
 
@@ -129,17 +129,22 @@ export function BuildingCard({
           {building.price_per_m2_from_dirams ? (
             <div className="flex flex-col">
               <span className="text-caption text-stone-500">{tCommon('from')}</span>
-              <span className="text-h2 font-semibold tabular-nums text-stone-900">
-                {formatPriceNumber(building.price_per_m2_from_dirams)} TJS / м²
-              </span>
-              {showConversion ? (
-                <PriceConversion
-                  priceDirams={building.price_per_m2_from_dirams}
-                  target={currency}
-                  rates={rates}
-                  perM2
-                />
-              ) : null}
+              {/* Inline pair: TJS price + foreign-currency
+                  conversion on the same baseline. flex-wrap drops
+                  the conversion to a new line on narrow cards. */}
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-h2 font-semibold tabular-nums text-stone-900">
+                  {formatPriceNumber(building.price_per_m2_from_dirams)} TJS / м²
+                </span>
+                {showConversion ? (
+                  <PriceConversion
+                    priceDirams={building.price_per_m2_from_dirams}
+                    target={currency}
+                    rates={rates}
+                    perM2
+                  />
+                ) : null}
+              </div>
             </div>
           ) : (
             <span className="text-meta text-stone-500">Цены уточняйте</span>

@@ -1,6 +1,8 @@
 'use client';
 
+import { Suspense } from 'react';
 import { Home, Bookmark, User } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { Link, usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 
@@ -16,12 +18,40 @@ const ITEMS = [
   { href: '/kabinet', Icon: User, label: 'Кабинет' },
 ] as const;
 
+/**
+ * Outer wrapper — splits search-param reading into a Suspense child so
+ * static prerendering doesn't bail out. Next.js requires
+ * `useSearchParams()` consumers to live inside a Suspense boundary
+ * during static export; pages like /post/phone are statically built
+ * but include this nav globally via the locale layout.
+ */
 export function MobileBottomNav() {
+  return (
+    <Suspense fallback={null}>
+      <MobileBottomNavInner />
+    </Suspense>
+  );
+}
+
+function MobileBottomNavInner() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   // Hide on flow pages where the sticky bottom is reserved for actions
   const isFlow = pathname.startsWith('/post') || pathname.startsWith('/verifikatsiya');
   if (isFlow) return null;
+
+  // Hide on the focus-mode map view (/novostroyki?view=karta&focus=...).
+  // The buyer arrived from a specific building's page wanting to study
+  // its surroundings; a global nav row at the bottom would pull them
+  // away from that focus AND compete with the POI category chip bar
+  // that lives in the same screen real estate. The "← Назад в <ЖК>"
+  // link in the page header is the explicit way out.
+  const isFocusMap =
+    pathname.startsWith('/novostroyki') &&
+    searchParams.get('view') === 'karta' &&
+    searchParams.get('focus') != null;
+  if (isFocusMap) return null;
 
   return (
     <nav

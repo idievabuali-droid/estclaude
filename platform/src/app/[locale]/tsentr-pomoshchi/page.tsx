@@ -1,54 +1,91 @@
 import { setRequestLocale } from 'next-intl/server';
-import { ChevronRight } from 'lucide-react';
-import { Link } from '@/i18n/navigation';
-import {
-  AppContainer,
-  AppCard,
-  AppCardContent,
-} from '@/components/primitives';
+import { ChevronDown } from 'lucide-react';
+import { AppContainer } from '@/components/primitives';
 
-const ARTICLES = [
+/**
+ * Help center — V1 simplified version.
+ *
+ * Why <details> accordion instead of separate /tsentr-pomoshchi/[slug]
+ * pages: the previous version listed 8 article tiles all linking to
+ * routes that didn't exist (no [slug]/page.tsx, every click → 404).
+ * Inlining short Q+A here means there's no possible broken link, no
+ * extra routes to maintain, and the buyer reads the answer with one
+ * tap instead of a route navigation. Native <details> is server-
+ * rendered, accessible, and needs zero client JS — perfect for V1.
+ *
+ * What was removed in this V1 pass (article was for a feature that
+ * isn't visible in V1, would just confuse buyers):
+ *   - "fairness" — indicator is globally disabled in V1
+ *   - "sources" — source filter is hidden in V1 (every listing is
+ *     posted by the founder right now, so the developer/owner/
+ *     intermediary distinction has no surface to attach to)
+ *   - "become-verified" — V1 has no real sellers, only the founder
+ *     posts; explaining the seller verification flow serves nobody
+ *
+ * What stays + was rewritten:
+ *   - "verification-tiers" → narrowed to just "Проверенный застройщик"
+ *     since that's the only verification badge V1 actually shows
+ */
+const FAQ = [
   {
-    slug: 'verification-tiers',
-    title: 'Что означают значки проверки?',
-    summary: 'Tier 1, Tier 2, Tier 3 и значок проверенного застройщика — что они значат и как их получить.',
+    q: 'Что означает «Проверенный застройщик»?',
+    a: [
+      'Значок появляется на карточках ЖК, когда наша команда подтвердила застройщика по телефону его офиса.',
+      'Что мы проверяем:',
+      '— Регистрацию компании и лицензию.',
+      '— Реальный офис и контактный телефон.',
+      '— Историю проектов: построенные дома, сданные в срок.',
+      'Значок не гарантирует качество ремонта или сроков сдачи нового проекта и не заменяет личной проверки документов перед покупкой.',
+    ],
   },
   {
-    slug: 'finishing-types',
-    title: 'Без ремонта, предчистовая, с ремонтом — в чём разница?',
-    summary: 'Четыре типа отделки в Tajik market context, с примерами, чего ожидать.',
+    q: 'Без ремонта, предчистовая, с ремонтом — в чём разница?',
+    a: [
+      'Четыре типа отделки в новостройках Таджикистана:',
+      '— Без ремонта (черновая): голые стены, чёрный пол, нет сантехники. Готова под ваш ремонт «с нуля». Дешевле всего, но плюс расходы на ремонт.',
+      '— Предчистовая: стяжка пола, штукатурка стен, разводка коммуникаций. Готова под чистовую отделку — обои, плитку, двери выбираете сами.',
+      '— С ремонтом (от застройщика): полностью готова к заселению. Полы, обои, сантехника. Можно сразу жить.',
+      '— Отремонтировано владельцем: продавец сделал ремонт сам. Состояние смотрите лично.',
+    ],
   },
   {
-    slug: 'fairness',
-    title: 'Что означает «12% ниже среднего» в карточке?',
-    summary: 'Платформа сравнивает цену за м² со средней по району. Не реклама, не давление.',
+    q: 'Что такое рассрочка и как она работает?',
+    a: [
+      'Рассрочка от застройщика — это покупка квартиры в платежах напрямую застройщику, без банка и без процентов.',
+      'Как работает:',
+      '— Первый взнос (обычно 30%) при подписании договора.',
+      '— Остаток в равных платежах в течение 5–7 лет (60–84 месяцев).',
+      '— Без процентов и без проверки кредитной истории.',
+      'Платёж считается так: (общая цена − первый взнос) ÷ количество месяцев. Рассрочка действует до сдачи дома; после сдачи остаток нужно погасить.',
+    ],
   },
   {
-    slug: 'sources',
-    title: 'От застройщика, собственник, посредник — кто кто?',
-    summary: 'Три источника объявлений, как их отличить и почему это важно.',
+    q: 'Как безопасно покупать новостройку?',
+    a: [
+      'Что проверить перед сделкой:',
+      '— Документы застройщика: разрешение на строительство, право на земельный участок.',
+      '— Договор: должен быть зарегистрирован в БТИ. Никаких «расписок» или «предварительных договоров».',
+      '— Поэтапная оплата: платите по мере готовности дома, не всю сумму сразу.',
+      '— История застройщика: сданы ли его другие проекты в срок.',
+      'Признаки риска:',
+      '— Цена сильно ниже рынка (на 20%+ дешевле похожих).',
+      '— Застройщик торопит с предоплатой.',
+      '— Нет официального офиса или сайта.',
+      '— Просят полную сумму до начала строительства.',
+    ],
   },
   {
-    slug: 'installments',
-    title: 'Что такое рассрочка и как она работает?',
-    summary: 'Рассрочка от застройщика без процентов: первый взнос, месячный платёж, срок.',
+    q: 'Покупаю из России — как это работает?',
+    a: [
+      'Если вы за границей — Россия, Казахстан, Турция и другие страны — покупка возможна без поездки в Таджикистан.',
+      'Как мы помогаем:',
+      '— Видеообзор квартиры: команда выезжает на объект и снимает живое видео.',
+      '— Проверка документов застройщика онлайн: разрешения, право на участок, история сданных проектов.',
+      '— Оформление доверенности: на родственника или знакомого в Таджикистане для подписания договора.',
+      'Цены сразу в вашей валюте — выберите валюту в верхней части страницы /diaspora и все суммы пересчитаются автоматически.',
+    ],
   },
-  {
-    slug: 'safety',
-    title: 'Как безопасно покупать новостройку?',
-    summary: 'Документы, проверка застройщика, договор долевого участия, поэтапная оплата.',
-  },
-  {
-    slug: 'become-verified',
-    title: 'Как стать проверенным продавцом?',
-    summary: 'Шаги от Tier 1 (телефон) до Tier 3 (выезд команды). Что требуется и сколько занимает.',
-  },
-  {
-    slug: 'diaspora',
-    title: 'Покупаю из России — как это работает?',
-    summary: 'Удалённый просмотр, видео-обзор, проверка документов, перевод задатка.',
-  },
-];
+] as const;
 
 export default async function HelpCenterPage({
   params,
@@ -64,30 +101,35 @@ export default async function HelpCenterPage({
         <AppContainer className="flex flex-col gap-2">
           <h1 className="text-h1 font-semibold text-stone-900">Центр помощи</h1>
           <p className="text-meta text-stone-500">
-            Ответы на главные вопросы. Если не нашли своё — напишите нам через WhatsApp в подвале страницы.
+            Ответы на главные вопросы.
           </p>
         </AppContainer>
       </section>
 
       <section className="py-6 pb-9">
-        <AppContainer className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {ARTICLES.map((a) => (
-            <AppCard key={a.slug}>
-              <AppCardContent>
-                <Link
-                  href={`/tsentr-pomoshchi/${a.slug}`}
-                  className="group flex items-start justify-between gap-3"
-                >
-                  <div className="flex flex-col gap-1">
-                    <span className="text-h3 font-semibold text-stone-900 group-hover:text-terracotta-600">
-                      {a.title}
-                    </span>
-                    <span className="text-meta text-stone-500">{a.summary}</span>
-                  </div>
-                  <ChevronRight className="mt-1 size-5 shrink-0 text-stone-400 group-hover:text-terracotta-600" />
-                </Link>
-              </AppCardContent>
-            </AppCard>
+        <AppContainer className="flex flex-col gap-3">
+          {FAQ.map((item) => (
+            // Native <details> for server-rendered, JS-free accordion.
+            // Tailwind's `group/details` modifier + open: variant
+            // would let us animate the chevron, but a simple rotation
+            // via the open attribute is enough here.
+            <details
+              key={item.q}
+              className="group rounded-md border border-stone-200 bg-white open:bg-stone-50"
+            >
+              <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-h3 font-semibold text-stone-900 marker:hidden [&::-webkit-details-marker]:hidden">
+                <span>{item.q}</span>
+                <ChevronDown
+                  aria-hidden
+                  className="size-5 shrink-0 text-stone-500 transition-transform group-open:rotate-180"
+                />
+              </summary>
+              <div className="flex flex-col gap-2 border-t border-stone-200 px-4 py-4 text-body text-stone-700">
+                {item.a.map((para, i) => (
+                  <p key={i}>{para}</p>
+                ))}
+              </div>
+            </details>
           ))}
         </AppContainer>
       </section>

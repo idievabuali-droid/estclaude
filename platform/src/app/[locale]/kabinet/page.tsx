@@ -9,6 +9,7 @@ import {
   Bell,
   ShieldCheck,
 } from 'lucide-react';
+import { redirect } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import {
@@ -22,7 +23,9 @@ import { SourceChip, VerificationBadge } from '@/components/blocks';
 import { listMyListings, getMyDashboardStats, getMyNotifications } from '@/services/seller';
 import { getDeveloperById } from '@/services/buildings';
 import { formatPriceNumber, formatM2, formatFloor } from '@/lib/format';
+import { getCurrentUser } from '@/lib/auth/session';
 import type { ListingStatus, NotificationType } from '@/types/domain';
+import { AccountSettings } from './AccountSettings';
 
 const STATUS_BADGE: Record<
   ListingStatus,
@@ -38,19 +41,38 @@ const STATUS_BADGE: Record<
 };
 
 /**
- * Page 13 — /kabinet (Seller dashboard).
- * V1: shows seller's listings, summary stats, notifications inbox per UI Spec
- * Page 13 §13.4 Block E (notifications table from Data Model §5.16).
+ * /kabinet — user account + seller dashboard.
+ *
+ * V1 update (Telegram auth landed): page now requires login; redirects
+ * unauthenticated visitors to /voyti. Two layered concerns:
+ *
+ *   - ACCOUNT SETTINGS (every user): identity row, notifications
+ *     toggle, logout. Lives at the top of the page, always present.
+ *
+ *   - SELLER DASHBOARD (only users who have posted listings): stats,
+ *     listings table, internal notifications inbox. Conditionally
+ *     rendered — buyers won't see an empty seller pane.
+ *
+ * The "Новое объявление" CTA in the header stays — V1 only the founder
+ * posts, but the affordance is part of the platform we're building
+ * toward and shouldn't disappear just because most visitors are buyers.
  */
 export default async function KabinetPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
 
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect(`/voyti?redirect=${encodeURIComponent('/kabinet')}`);
+  }
+
   const [myListings, stats, notifications] = await Promise.all([
-    listMyListings(),
+    listMyListings(user.id),
     getMyDashboardStats(),
-    getMyNotifications(),
+    getMyNotifications(user.id),
   ]);
+
+  const isSeller = myListings.length > 0;
 
   const developerIds = [
     ...new Set(myListings.map((l) => l.building?.developer_id).filter(Boolean)),
@@ -66,18 +88,34 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
         <AppContainer className="flex flex-col gap-4 py-5">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="flex flex-col gap-1">
-              <h1 className="text-h1 font-semibold text-stone-900">Кабинет продавца</h1>
-              <p className="text-meta text-stone-500">
-                Управление вашими объявлениями и заявками
-              </p>
+              <h1 className="text-h1 font-semibold text-stone-900">Кабинет</h1>
             </div>
-            <Link href="/post">
-              <AppButton variant="primary" size="md">
-                <Plus className="size-4" />
-                Новое объявление
-              </AppButton>
-            </Link>
+            {isSeller ? (
+              <Link href="/post">
+                <AppButton variant="primary" size="md">
+                  <Plus className="size-4" />
+                  Новое объявление
+                </AppButton>
+              </Link>
+            ) : null}
           </div>
+        </AppContainer>
+      </section>
+
+      {/* Account settings — identity, notifications, logout. Available
+          to every authenticated user regardless of seller status. */}
+      <section className="bg-stone-50 py-5">
+        <AppContainer>
+          <AppCard>
+            <AppCardContent>
+              <AccountSettings
+                initialNotificationsEnabled={user.notifications_enabled}
+                phone={user.phone}
+                tgFirstName={user.tg_first_name}
+                tgUsername={user.tg_username}
+              />
+            </AppCardContent>
+          </AppCard>
         </AppContainer>
       </section>
 

@@ -1,4 +1,4 @@
-import { BookmarkPlus } from 'lucide-react';
+import { BookmarkPlus, MessageCircle } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import {
@@ -7,18 +7,33 @@ import {
   AppCard,
   AppCardContent,
 } from '@/components/primitives';
-import { ListingCard, BuildingCard, ChangeBadge } from '@/components/blocks';
-import { getMySavedItems, getRecentChangeEvents } from '@/services/saved';
+import { ListingCard, BuildingCard } from '@/components/blocks';
+import { getMySavedItems } from '@/services/saved';
 import { getDistrictBenchmarks } from '@/services/benchmarks';
-import type { ChangeEventType } from '@/types/domain';
+import { getCurrentUser } from '@/lib/auth/session';
+import { readCurrencyCookie } from '@/lib/currency-cookie-server';
+import { getExchangeRates } from '@/services/currency';
 
 /**
- * Page 9 — /izbrannoe (Saved).
- * Per UI Spec Page 9: shows buildings + listings the user saved, with
- * ChangeBadge strip showing what's changed since their last visit.
+ * /izbrannoe — saved buildings + listings.
  *
- * V1: this page uses mock data (no auth yet). Once Telegram OTP is
- * wired the access guard kicks in (per Architecture: redirect to /voyti).
+ * V1 update: switched from MOCK_FOUNDER_USER_ID to the real
+ * getCurrentUser(). Three states:
+ *
+ *   1. Not logged in → friendly prompt with "Войти через Telegram"
+ *      CTA. Used to silently render the founder's saves to every
+ *      visitor — strictly worse than an honest empty state.
+ *
+ *   2. Logged in, no saves → empty state per tab (Квартиры / ЖК)
+ *      with CTA back to the catalog.
+ *
+ *   3. Logged in with saves → grid of cards.
+ *
+ * Removed: the "Что изменилось" change-events strip. Was reading
+ * GLOBAL events (not user-specific), and the Telegram notification
+ * channel will surface real per-user changes properly via the bot
+ * once dispatch is wired in Phase 5. Putting an unfocused fake-
+ * retention strip on the page would compete with the real channel.
  */
 export default async function IzbrannoePage({
   params,
@@ -33,9 +48,53 @@ export default async function IzbrannoePage({
   const tNav = await getTranslations('Nav');
   const tab = sp.tab ?? 'listings';
 
-  const [{ listings: savedListings, buildings: savedBuildings }, changes] = await Promise.all([
-    getMySavedItems(),
-    getRecentChangeEvents(),
+  const user = await getCurrentUser();
+
+  // Not logged in — show the prompt; don't fetch anything else.
+  if (!user) {
+    return (
+      <>
+        <section className="border-b border-stone-200 bg-white">
+          <AppContainer className="py-5">
+            <h1 className="text-h1 font-semibold text-stone-900">{tNav('saved')}</h1>
+          </AppContainer>
+        </section>
+        <section className="py-6">
+          <AppContainer>
+            <AppCard>
+              <AppCardContent>
+                <div className="flex flex-col items-center gap-4 py-8 text-center">
+                  <BookmarkPlus className="size-10 text-stone-400" aria-hidden />
+                  <div className="flex max-w-md flex-col gap-2">
+                    <h2 className="text-h2 font-semibold text-stone-900">
+                      Войдите, чтобы видеть сохранённое
+                    </h2>
+                    <p className="text-meta text-stone-600">
+                      Сохраняйте квартиры и ЖК, которые вам интересны. Мы пришлём
+                      сообщение в Telegram, когда у них изменится цена или появятся
+                      новые квартиры.
+                    </p>
+                  </div>
+                  <Link href="/voyti?redirect=/izbrannoe">
+                    <AppButton variant="primary" size="lg">
+                      <MessageCircle className="size-4" /> Войти через Telegram
+                    </AppButton>
+                  </Link>
+                </div>
+              </AppCardContent>
+            </AppCard>
+          </AppContainer>
+        </section>
+      </>
+    );
+  }
+
+  // Logged in — fetch saves + benchmarks + currency in parallel.
+  const currency = await readCurrencyCookie();
+  const isDiaspora = currency != null && currency !== 'TJS';
+  const [{ listings: savedListings, buildings: savedBuildings }, rates] = await Promise.all([
+    getMySavedItems(user.id),
+    isDiaspora ? getExchangeRates() : Promise.resolve(null),
   ]);
 
   const districtIds = [...new Set(savedListings.map((s) => s.building.district_id))];
@@ -52,7 +111,6 @@ export default async function IzbrannoePage({
             </p>
           </div>
 
-          {/* Tabs */}
           <div className="inline-flex w-fit items-center rounded-md border border-stone-200 bg-white p-1">
             <Link
               href="/izbrannoe?tab=listings"
@@ -74,30 +132,6 @@ export default async function IzbrannoePage({
         </AppContainer>
       </section>
 
-      {/* Что изменилось strip — Page 9 §9.4. JOURNEY-6: each badge links to its source. */}
-      {changes.length > 0 ? (
-        <section className="bg-stone-50 py-5">
-          <AppContainer>
-            <div className="flex flex-col gap-3">
-              <h2 className="text-h3 font-semibold text-stone-900">Что изменилось</h2>
-              <div className="flex flex-wrap gap-2">
-                {changes.map((c, i) => {
-                  const label = `${labelForChange(c.type, c.payload)}${c.context ? ' · ' + c.context : ''}`;
-                  return c.href ? (
-                    <Link key={i} href={c.href} className="hover:opacity-80">
-                      <ChangeBadge type={c.type} label={label} />
-                    </Link>
-                  ) : (
-                    <ChangeBadge key={i} type={c.type} label={label} />
-                  );
-                })}
-              </div>
-            </div>
-          </AppContainer>
-        </section>
-      ) : null}
-
-      {/* Body */}
       <section className="py-6">
         <AppContainer>
           {tab === 'listings' ? (
@@ -118,6 +152,8 @@ export default async function IzbrannoePage({
                       listing={s.listing}
                       building={s.building}
                       developerVerified={s.developer?.is_verified ?? false}
+                      currency={currency}
+                      rates={rates}
                       districtMedianPerM2={
                         benchmark ? Number(benchmark.median_per_m2_dirams) : null
                       }
@@ -145,6 +181,8 @@ export default async function IzbrannoePage({
                     developer={s.developer}
                     district={s.district}
                     matchingUnits={s.matchingUnits}
+                    currency={currency}
+                    rates={rates}
                   />
                 );
               })}
@@ -183,27 +221,4 @@ function EmptyState({
       </AppCardContent>
     </AppCard>
   );
-}
-
-function labelForChange(type: ChangeEventType, payload: Record<string, unknown>): string {
-  switch (type) {
-    case 'price_changed': {
-      const oldP = Number(payload.old_price_dirams ?? 0) / 100;
-      const newP = Number(payload.new_price_dirams ?? 0) / 100;
-      const sign = newP < oldP ? 'снижена' : 'выросла';
-      return `Цена ${sign} · ${newP.toLocaleString('ru-RU')} TJS`;
-    }
-    case 'status_changed':
-      return `Статус: ${String(payload.to ?? '')}`;
-    case 'new_unit_added':
-      return 'Появились новые квартиры';
-    case 'construction_photo_added': {
-      const c = Number(payload.count ?? 1);
-      return `Новые фото стройки (${c})`;
-    }
-    case 'seller_slow_response':
-      return 'Продавец отвечает медленно';
-    default:
-      return 'Что-то изменилось';
-  }
 }

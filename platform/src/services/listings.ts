@@ -18,7 +18,14 @@ export type ListingFilters = {
   rooms?: number[];
   source?: SourceType[];
   finishing?: FinishingType[];
+  /** Min total price in dirams (1 TJS = 100 dirams). */
+  priceFrom?: bigint | null;
+  /** Max total price in dirams. */
   priceTo?: bigint | null;
+  /** Min apartment size in m² (decimal allowed). */
+  sizeFrom?: number | null;
+  /** Max apartment size in m². */
+  sizeTo?: number | null;
   buildingId?: string;
 };
 
@@ -41,7 +48,10 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
   if (filters.rooms?.length) q = q.in('rooms_count', filters.rooms);
   if (filters.source?.length) q = q.in('source_type', filters.source);
   if (filters.finishing?.length) q = q.in('finishing_type', filters.finishing);
+  if (filters.priceFrom) q = q.gte('price_total_dirams', Number(filters.priceFrom));
   if (filters.priceTo) q = q.lte('price_total_dirams', Number(filters.priceTo));
+  if (filters.sizeFrom != null) q = q.gte('size_m2', filters.sizeFrom);
+  if (filters.sizeTo != null) q = q.lte('size_m2', filters.sizeTo);
   if (filters.buildingId) q = q.eq('building_id', filters.buildingId);
 
   const { data, error } = await q;

@@ -1,12 +1,12 @@
 /**
- * Saved-items service. Per Data Model §5.7, registration is required to save
- * (user_id NOT NULL). Until Telegram OTP auth is wired, we hard-code the
- * founder user — replace with `auth.uid()` when auth lands.
+ * Saved-items service. Per Data Model §5.7, registration is required to
+ * save (user_id NOT NULL). Telegram-based auth landed in 0008; pass
+ * the current user's id from `getCurrentUser()` — never default to a
+ * mock id, that previously leaked the founder's saves to every visitor.
  */
 import { createClient } from '@/lib/supabase/server';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import { mapListing } from './buildings';
-import { MOCK_FOUNDER_USER_ID } from './seller';
 import type { ChangeEventType } from '@/types/domain';
 
 export type SavedListing = {
@@ -97,7 +97,7 @@ function mapDistrict(r: {
   };
 }
 
-export async function getMySavedItems(userId = MOCK_FOUNDER_USER_ID): Promise<{
+export async function getMySavedItems(userId: string): Promise<{
   listings: SavedListing[];
   buildings: SavedBuilding[];
 }> {

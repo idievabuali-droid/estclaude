@@ -24,6 +24,8 @@ export { CompareToggle } from './CompareToggle';
 export type { CompareToggleProps } from './CompareToggle';
 export { MobileFiltersWrapper } from './MobileFiltersWrapper';
 export type { MobileFiltersWrapperProps } from './MobileFiltersWrapper';
+export { FilterChipSheet } from './FilterChipSheet';
+export type { FilterChipSheetProps } from './FilterChipSheet';
 export { SaveToggle } from './SaveToggle';
 export type { SaveToggleProps } from './SaveToggle';
 export { NearbyPois } from './NearbyPois';

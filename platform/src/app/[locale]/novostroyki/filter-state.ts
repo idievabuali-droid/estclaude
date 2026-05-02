@@ -20,6 +20,21 @@ export type FilterParams = {
   /** Nearby POI categories — comma-separated, e.g. "school,supermarket". */
   nearby?: string;
   view?: string;
+  /** Focus mode — when set with view=karta, the map renders only this
+   *  one building's pin plus its nearby POI markers. Set by the "На
+   *  карте" links on apartment / building / card pages so buyers
+   *  arriving from inside a listing don't see all 50 buildings. */
+  focus?: string;
+  /** Where the buyer came from when opening focus mode. Drives the
+   *  "← Назад" link in the focus-mode header so we send them back to
+   *  the surface they tapped from (apartment vs. building) rather
+   *  than always to the building card.
+   *
+   *  Values: 'kvartira' (apartment detail or apartment card) — paired
+   *  with fromSlug=<apartment-slug>. Anything else (or unset) →
+   *  default back-link goes to the building itself. */
+  from?: string;
+  fromSlug?: string;
 };
 
 /** Read a CSV param as a Set for membership checks + toggling. */

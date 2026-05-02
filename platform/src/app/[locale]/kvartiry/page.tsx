@@ -1,13 +1,18 @@
 import { ChevronLeft } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
-import { AppContainer, AppButton, AppChip } from '@/components/primitives';
-import { ListingCard, MobileFiltersWrapper } from '@/components/blocks';
+import { AppContainer, AppButton } from '@/components/primitives';
+import { ListingCard } from '@/components/blocks';
+import { readCurrencyCookie } from '@/lib/currency-cookie-server';
+import { getExchangeRates } from '@/services/currency';
 import { listListings } from '@/services/listings';
 import { listBuildings, getDeveloperById, getBuildingBySlug } from '@/services/buildings';
 import { getDistrictBenchmarks } from '@/services/benchmarks';
 import { pluralRu } from '@/lib/format';
 import type { FinishingType, SourceType } from '@/types/domain';
+import { PriceChip } from './PriceChip';
+import { SizeChip } from './SizeChip';
+import { MultiSelectChip } from './MultiSelectChip';
 
 // Source filter (developer/owner/intermediary) hidden in V1 — every
 // listing currently comes from the founder, so the filter has nothing
@@ -26,26 +31,20 @@ type SearchParams = {
   rooms?: string;
   source?: string;
   finishing?: string;
+  /** Min total price in TJS (no decimals). */
+  price_from?: string;
+  /** Max total price in TJS. */
   price_to?: string;
+  /** Min apartment size in m² (decimals allowed, e.g. "45.5"). */
+  size_from?: string;
+  /** Max apartment size in m². */
+  size_to?: string;
   /** Building scope — when set, /kvartiry shows only this building's
    *  apartments. Used by the "Посмотреть все N квартир" CTA on the
    *  building detail page. The header changes to "Квартиры в ЖК X"
    *  and a breadcrumb back to /zhk/<slug> appears. */
   building?: string;
 };
-
-/** Build a /kvartiry URL preserving every other filter, used so chip
- *  toggles don't accidentally lose the building scope or other active
- *  filters. */
-function buildHref(current: SearchParams, override: Partial<SearchParams>): string {
-  const next = { ...current, ...override };
-  const search = new URLSearchParams();
-  for (const [k, v] of Object.entries(next)) {
-    if (v && v.length > 0) search.set(k, v);
-  }
-  const s = search.toString();
-  return `/kvartiry${s ? `?${s}` : ''}`;
-}
 
 export default async function KvartiryPage({
   params,
@@ -69,7 +68,12 @@ export default async function KvartiryPage({
     rooms: sp.rooms?.split(',').map((r) => parseInt(r, 10)),
     source: sp.source?.split(',') as SourceType[] | undefined,
     finishing: sp.finishing?.split(',') as FinishingType[] | undefined,
+    // Price params arrive as TJS strings ("800000"); convert to dirams
+    // (1 TJS = 100 dirams) before handing to the service.
+    priceFrom: sp.price_from ? BigInt(parseInt(sp.price_from, 10) * 100) : null,
     priceTo: sp.price_to ? BigInt(parseInt(sp.price_to, 10) * 100) : null,
+    sizeFrom: sp.size_from ? parseFloat(sp.size_from) : null,
+    sizeTo: sp.size_to ? parseFloat(sp.size_to) : null,
     buildingId: scopedBuilding?.id,
   });
 
@@ -79,11 +83,16 @@ export default async function KvartiryPage({
   const buildingMap = new Map(allBuildings.filter((b) => buildingIds.includes(b.id)).map((b) => [b.id, b]));
   const developerIds = [...new Set([...buildingMap.values()].map((b) => b.developer_id))];
   const districtIds = [...new Set([...buildingMap.values()].map((b) => b.district_id))];
-  // Currency intentionally NOT read here — /diaspora-only feature
-  // so local buyers don't see foreign-currency clutter on /kvartiry.
-  const [developerEntries, benchmarkMap] = await Promise.all([
+  // Currency cookie + rates flow through to ListingCard so a diaspora
+  // visitor sees prices in their own currency on this list too. Local
+  // buyers (cookie unset or TJS) see no extra noise — PriceConversion
+  // returns null for TJS or missing rate.
+  const currency = await readCurrencyCookie();
+  const isDiaspora = currency != null && currency !== 'TJS';
+  const [developerEntries, benchmarkMap, rates] = await Promise.all([
     Promise.all(developerIds.map(async (id) => [id, await getDeveloperById(id)] as const)),
     getDistrictBenchmarks(districtIds),
+    isDiaspora ? getExchangeRates() : Promise.resolve(null),
   ]);
   const developerMap = new Map(developerEntries);
 
@@ -121,50 +130,34 @@ export default async function KvartiryPage({
             </p>
           </div>
 
-          {/* Filter chips — collapse to bottom-sheet on mobile.
-              Building scope is sticky across chip toggles via
-              buildHref, so tapping "1 комн" inside a building scope
-              keeps the building filter active. */}
-          <MobileFiltersWrapper
-            activeCount={
-              (sp.rooms ? sp.rooms.split(',').length : 0) +
-              (sp.finishing ? sp.finishing.split(',').length : 0)
-            }
-          >
-            <div className="flex flex-wrap gap-2">
-              <span className="self-center text-caption font-medium text-stone-500">Комнат:</span>
-              {ROOM_FILTERS.map((r) => {
-                const active = sp.rooms?.split(',').includes(r) ?? false;
-                return (
-                  <Link
-                    key={r}
-                    href={buildHref(sp, { rooms: active ? undefined : r })}
-                  >
-                    <AppChip asStatic tone={active ? 'terracotta' : 'neutral'} selected={active}>
-                      {r}
-                    </AppChip>
-                  </Link>
-                );
-              })}
+          {/* Cian-style category chip bar. One chip per filter category
+              (Комнат / Цена / Отделка); each chip shows its current
+              value summary inline and opens a bottom sheet with the
+              options + an Apply button. Building scope is preserved
+              across applies because each chip rebuilds the URL with
+              the full param set (see PriceChip / MultiSelectChip).
+
+              Source filter hidden in V1 — every listing currently
+              comes from the founder so the filter has nothing to
+              filter. Returns when real seller diversity exists. */}
+          <div className="-mx-4 md:-mx-5 lg:-mx-6">
+            <div className="flex items-center gap-2 overflow-x-auto px-4 py-1 md:px-5 lg:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <MultiSelectChip
+                label="Комнат"
+                paramKey="rooms"
+                options={ROOM_FILTERS.map((r) => ({ value: r, label: r }))}
+                current={sp}
+              />
+              <PriceChip current={sp} />
+              <SizeChip current={sp} />
+              <MultiSelectChip
+                label="Отделка"
+                paramKey="finishing"
+                options={FINISHING_FILTERS}
+                current={sp}
+              />
             </div>
-            {/* Source filter hidden in V1 — see top of file. */}
-            <div className="flex flex-wrap gap-2">
-              <span className="self-center text-caption font-medium text-stone-500">Отделка:</span>
-              {FINISHING_FILTERS.map((f) => {
-                const active = sp.finishing?.split(',').includes(f.value) ?? false;
-                return (
-                  <Link
-                    key={f.value}
-                    href={buildHref(sp, { finishing: active ? undefined : f.value })}
-                  >
-                    <AppChip asStatic tone={active ? 'terracotta' : 'neutral'} selected={active}>
-                      {f.label}
-                    </AppChip>
-                  </Link>
-                );
-              })}
-            </div>
-          </MobileFiltersWrapper>
+          </div>
         </AppContainer>
       </section>
 
@@ -193,6 +186,8 @@ export default async function KvartiryPage({
                     listing={l}
                     building={building}
                     developerVerified={dev?.is_verified ?? false}
+                    currency={currency}
+                    rates={rates}
                     districtMedianPerM2={benchmark ? Number(benchmark.median_per_m2_dirams) : null}
                     districtSampleSize={benchmark?.sample_size ?? 0}
                   />
@@ -205,3 +200,4 @@ export default async function KvartiryPage({
     </>
   );
 }
+

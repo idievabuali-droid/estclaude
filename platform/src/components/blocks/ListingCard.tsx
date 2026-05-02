@@ -70,7 +70,7 @@ export function ListingCard({
   function openMap(e: React.MouseEvent) {
     e.stopPropagation();
     e.preventDefault();
-    router.push(`/novostroyki?view=karta&selected=${building.slug}`);
+    router.push(`/novostroyki?view=karta&focus=${building.slug}&from=kvartira&fromSlug=${listing.slug}`);
   }
 
   const fairness =
@@ -130,21 +130,39 @@ export function ListingCard({
             "Проверенный застройщик" badge stays on building cards
             (BuildingCard), where it's a real, defensible claim. */}
 
-        {/* Row 1: price (full width, no competing badge) */}
-        <div className="flex flex-col">
-          <span className="text-h2 font-semibold tabular-nums text-stone-900">
-            {formatPriceNumber(listing.price_total_dirams)} TJS
-          </span>
-          <span className="text-caption text-stone-500 tabular-nums">
-            {formatPriceNumber(listing.price_per_m2_dirams)} TJS / м²
-          </span>
-          {showConversion ? (
-            <PriceConversion
-              priceDirams={listing.price_total_dirams}
-              target={currency}
-              rates={rates}
-            />
-          ) : null}
+        {/* Row 1: price (full width, no competing badge). When the
+            visitor has set a foreign currency, each TJS amount is
+            paired with its ≈ equivalent INLINE on the same baseline,
+            so the buyer reads "180 000 TJS  ≈ 1 800 000 ₽" as one
+            unit. flex-wrap means narrow cards (mobile) drop the
+            conversion to the next line rather than overflow — but
+            the pair stays semantically grouped either way. */}
+        <div className="flex flex-col gap-0.5">
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <span className="text-h2 font-semibold tabular-nums text-stone-900">
+              {formatPriceNumber(listing.price_total_dirams)} TJS
+            </span>
+            {showConversion ? (
+              <PriceConversion
+                priceDirams={listing.price_total_dirams}
+                target={currency}
+                rates={rates}
+              />
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <span className="text-caption text-stone-500 tabular-nums">
+              {formatPriceNumber(listing.price_per_m2_dirams)} TJS / м²
+            </span>
+            {showConversion ? (
+              <PriceConversion
+                priceDirams={listing.price_per_m2_dirams}
+                target={currency}
+                rates={rates}
+                perM2
+              />
+            ) : null}
+          </div>
         </div>
 
         {/* Row 2: rooms + size + finishing */}

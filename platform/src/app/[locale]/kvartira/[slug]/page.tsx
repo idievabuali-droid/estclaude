@@ -12,11 +12,12 @@ import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppChip } from '@/components/primitives';
-import { InstallmentDisplay, ListingCard } from '@/components/blocks';
+import { InstallmentDisplay, ListingCard, PriceConversion } from '@/components/blocks';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo } from '@/lib/format';
 import { getListing } from '@/services/listings';
 import { getNearbyPOIs, POI_LABELS, type PoiCategory } from '@/services/poi';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
+import { getExchangeRates } from '@/services/currency';
 import { ContactBarWithModal } from './ContactBarWithModal';
 
 const FINISHING_TONE = {
@@ -98,6 +99,10 @@ export default async function ListingDetailPage({
   // to online showing.
   const currency = await readCurrencyCookie();
   const isDiaspora = currency != null && currency !== 'TJS';
+  // Exchange rates only fetched when the visitor has set a foreign
+  // currency — local buyers don't need them and the call (cached
+  // 24h, fail-soft) is wasted work otherwise.
+  const rates = isDiaspora ? await getExchangeRates() : null;
   const pois = await getNearbyPOIs(building.latitude, building.longitude);
 
   // Pre-compute the compact nearby rows so the JSX stays readable.
@@ -165,7 +170,7 @@ export default async function ListingDetailPage({
                 <span className="text-stone-500">· {district.name.ru}</span>
               </Link>
               <Link
-                href={`/novostroyki?view=karta&selected=${building.slug}`}
+                href={`/novostroyki?view=karta&focus=${building.slug}&from=kvartira&fromSlug=${slug}`}
                 className="group inline-flex items-center gap-1 rounded-sm border border-stone-200 bg-stone-50 px-2 py-0.5 text-caption font-medium text-stone-700 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50 hover:text-terracotta-700"
                 aria-label="Показать на карте"
               >
@@ -179,13 +184,41 @@ export default async function ListingDetailPage({
             </span>
           </div>
 
-          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <span className="text-display font-semibold tabular-nums text-stone-900">
-              {formatPriceNumber(listing.price_total_dirams)} TJS
-            </span>
-            <span className="text-meta text-stone-500 tabular-nums">
-              {formatPriceNumber(listing.price_per_m2_dirams)} TJS / м²
-            </span>
+          {/* Price block. Each TJS amount is paired with its ≈
+              foreign equivalent INLINE on the same baseline — buyer
+              reads "180 000 TJS  ≈ 1 800 000 ₽" as one unit, no
+              ambiguity about which conversion goes with which price.
+              flex-wrap drops the conversion to the next line on
+              narrow viewports rather than overflow. Local buyers
+              (currency=TJS or no cookie) see only the TJS amounts,
+              no clutter. */}
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-baseline gap-x-3">
+              <span className="text-display font-semibold tabular-nums text-stone-900">
+                {formatPriceNumber(listing.price_total_dirams)} TJS
+              </span>
+              {isDiaspora && rates ? (
+                <PriceConversion
+                  priceDirams={listing.price_total_dirams}
+                  target={currency}
+                  rates={rates}
+                  variant="block"
+                />
+              ) : null}
+            </div>
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <span className="text-meta text-stone-500 tabular-nums">
+                {formatPriceNumber(listing.price_per_m2_dirams)} TJS / м²
+              </span>
+              {isDiaspora && rates ? (
+                <PriceConversion
+                  priceDirams={listing.price_per_m2_dirams}
+                  target={currency}
+                  rates={rates}
+                  perM2
+                />
+              ) : null}
+            </div>
           </div>
 
           {/* Tertiary signal — small + muted so it doesn't compete with
@@ -268,6 +301,8 @@ export default async function ListingDetailPage({
               firstPaymentPercent={listing.installment_first_payment_percent ?? 30}
               termMonths={listing.installment_term_months ?? 84}
               totalPriceDirams={listing.price_total_dirams}
+              currency={currency}
+              rates={rates}
             />
             <p className="text-meta text-stone-500">
               Без скрытых процентов. Условия фиксируются в договоре.
@@ -329,6 +364,8 @@ export default async function ListingDetailPage({
                   listing={l}
                   building={building}
                   developerVerified={developer.is_verified}
+                  currency={currency}
+                  rates={rates}
                   hideBuildingName
                 />
               ))}

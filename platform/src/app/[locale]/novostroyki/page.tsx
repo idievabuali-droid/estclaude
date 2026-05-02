@@ -1,27 +1,23 @@
-import { Map as MapIcon, List, X } from 'lucide-react';
+import { Map as MapIcon, List, ArrowLeft } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
-import { AppContainer, AppButton, AppChip } from '@/components/primitives';
-import { BuildingCard, MapView, MobileFiltersWrapper } from '@/components/blocks';
+import { AppContainer, AppButton } from '@/components/primitives';
+import { BuildingCard, MapView } from '@/components/blocks';
 import {
   listBuildings,
+  getBuildingBySlug,
   getDeveloperById,
   getDistrictById,
   getListingsForBuildingId,
 } from '@/services/buildings';
+import { getNearbyPOIs } from '@/services/poi';
 import type { BuildingStatus } from '@/types/domain';
 import type { PoiCategory } from '@/services/poi';
-import {
-  buildQuery,
-  countActive,
-  csvSet,
-  hasAdvancedActive,
-  removeHref,
-  toggleHref,
-  type FilterParams,
-} from './filter-state';
-import { PriceRangeFilter } from './PriceRangeFilter';
-import { AdvancedFiltersToggle } from './AdvancedFiltersToggle';
+import { buildQuery, type FilterParams } from './filter-state';
+import { PriceChip } from './PriceChip';
+import { MultiSelectChip } from './MultiSelectChip';
+import { readCurrencyCookie } from '@/lib/currency-cookie-server';
+import { getExchangeRates } from '@/services/currency';
 
 const STATUS_FILTERS: Array<{ value: BuildingStatus; label: string }> = [
   // Labels mirror STAGE_INFO from @/lib/building-stages — first stage
@@ -76,6 +72,65 @@ export default async function NovostroykiPage({
 
   const t = await getTranslations('Nav');
 
+  // ─── Focus mode early branch ─────────────────────────────────
+  // When "На карте" is clicked from an apartment / building / card,
+  // we land here with ?view=karta&focus=<slug>. In that case we skip
+  // the filter sheet entirely and render a minimal "you arrived from
+  // <X>, here's what's around it" map. The full browse map is one
+  // click away via the back link.
+  if (isMap && sp.focus) {
+    const focused = await getBuildingBySlug(sp.focus);
+    if (focused) {
+      const pois = await getNearbyPOIs(focused.latitude, focused.longitude);
+      // Send the buyer back to the surface they tapped "На карте" from.
+      // From an apartment card / detail page → back to that apartment.
+      // From a building card / detail page (or unknown source) → back
+      // to the building. We DON'T render "Все ЖК на карте" when the
+      // source is an apartment because that's a different intent
+      // (browsing buildings vs. studying one apartment) and showing
+      // it next to the back link makes the user wonder if it's the
+      // primary way out.
+      const cameFromApartment = sp.from === 'kvartira' && sp.fromSlug;
+      const backHref = cameFromApartment
+        ? `/kvartira/${sp.fromSlug}`
+        : `/zhk/${focused.slug}`;
+      const backLabel = cameFromApartment
+        ? 'Назад к квартире'
+        : `Назад в ${focused.name.ru}`;
+      return (
+        <>
+          <section className="border-b border-stone-200 bg-white">
+            <AppContainer className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <Link
+                href={backHref}
+                className="inline-flex items-center gap-1.5 text-meta font-medium text-stone-700 hover:text-terracotta-700"
+              >
+                <ArrowLeft className="size-4" />
+                <span>{backLabel}</span>
+              </Link>
+              {!cameFromApartment ? (
+                <Link
+                  href="/novostroyki?view=karta"
+                  className="inline-flex items-center gap-1.5 text-meta font-medium text-stone-700 hover:text-terracotta-700"
+                >
+                  Все ЖК на карте
+                </Link>
+              ) : null}
+            </AppContainer>
+          </section>
+          <MapView
+            buildings={[]}
+            focusedBuilding={focused}
+            focusPois={pois}
+          />
+        </>
+      );
+    }
+    // If the slug doesn't resolve (deleted / typo), fall through to
+    // browse mode rather than 404 — the buyer can still find what
+    // they were looking for in the list.
+  }
+
   // District filter is hidden in V1 (see filter sheet comment below) but
   // the URL param is still honoured at the service layer so old bookmarks
   // still narrow the result. listDistricts() is no longer needed for
@@ -106,14 +161,13 @@ export default async function NovostroykiPage({
     }),
   );
 
-  // Lookup maps for active-filter pills' display labels.
-  const statusLabelByValue = new Map(STATUS_FILTERS.map((s) => [s.value, s.label]));
-  const amenityLabelByValue = new Map(AMENITIES_FILTERS.map((a) => [a.value, a.label]));
-  const nearbyLabelByValue = new Map(NEARBY_FILTERS.map((n) => [n.value, n.label]));
-
-  const activeCount = countActive(sp);
-  const advancedActiveCount =
-    csvSet(sp.amenities).size + csvSet(sp.nearby).size;
+  // Currency cookie + rates flow into BuildingCard so a diaspora
+  // visitor sees per-m² prices in their own currency on the browse
+  // list. Rates fetch is skipped for local buyers — fail-soft for
+  // the diaspora case (cookie set but rates unavailable).
+  const currency = await readCurrencyCookie();
+  const isDiaspora = currency != null && currency !== 'TJS';
+  const rates = isDiaspora ? await getExchangeRates() : null;
 
   return (
     <>
@@ -145,149 +199,58 @@ export default async function NovostroykiPage({
             </div>
           </div>
 
-          {/* Filter sheet — grouped sections inside MobileFiltersWrapper.
-              Same component renders inline on desktop, bottom-sheet on
-              mobile. activeCount drives the badge on the trigger button.
+          {/* Cian-style horizontal filter bar. Single scrollable row with
+              all filters as toggleable chips — no sheet, no "Фильтры"
+              button, no vertical sections. Inline labels mark each
+              group (Стадия / Сдача / Удобства / Что рядом) so buyers
+              can scan groups while scrolling.
 
-              РАЙОН filter is hidden in V1 — Vahdat is small enough that
-              splitting 6 buildings across 5 microdistricts means each
-              district filter narrows the result to 1-2 projects, which
-              feels broken. District info still shows on every building
-              card (address chip), so buyers can see where each project
-              is without needing the filter. Re-enable when we have ~30+
-              buildings and per-district volume justifies it. */}
-          <MobileFiltersWrapper activeCount={activeCount}>
-            <FilterSection title="Цена за м²">
-              <PriceRangeFilter current={sp} />
-            </FilterSection>
+              Negative horizontal margins + matching inner padding let
+              the bar bleed to the screen edge so chips can scroll
+              flush with the viewport — important on mobile where the
+              scroll affordance is the chip cut off at the right.
 
-            <FilterSection title="Стадия">
-              <ChipRow>
-                {STATUS_FILTERS.map((s) => {
-                  const active = csvSet(sp.status).has(s.value);
-                  return (
-                    <Link key={s.value} href={toggleHref(sp, 'status', s.value)}>
-                      <AppChip asStatic tone={active ? 'terracotta' : 'neutral'} selected={active}>
-                        {s.label}
-                      </AppChip>
-                    </Link>
-                  );
-                })}
-              </ChipRow>
-            </FilterSection>
-
-            <FilterSection title="Срок сдачи">
-              <ChipRow>
-                {HANDOVER_FILTERS.map((h) => {
-                  const active = csvSet(sp.handover).has(h.value);
-                  return (
-                    <Link key={h.value} href={toggleHref(sp, 'handover', h.value)}>
-                      <AppChip asStatic tone={active ? 'terracotta' : 'neutral'} selected={active}>
-                        {h.label}
-                      </AppChip>
-                    </Link>
-                  );
-                })}
-              </ChipRow>
-            </FilterSection>
-
-            {/* Advanced filters — collapsed by default, opens with one tap.
-                Auto-opens when the user landed with any advanced filter
-                already active so they always see what's filtering. */}
-            <AdvancedFiltersToggle
-              defaultOpen={hasAdvancedActive(sp)}
-              activeCount={advancedActiveCount}
-            >
-              <FilterSection title="Удобства дома">
-                <ChipRow>
-                  {AMENITIES_FILTERS.map((a) => {
-                    const active = csvSet(sp.amenities).has(a.value);
-                    return (
-                      <Link key={a.value} href={toggleHref(sp, 'amenities', a.value)}>
-                        <AppChip asStatic tone={active ? 'terracotta' : 'neutral'} selected={active}>
-                          {a.label}
-                        </AppChip>
-                      </Link>
-                    );
-                  })}
-                </ChipRow>
-              </FilterSection>
-
-              <FilterSection title="Что рядом (≤ 1 км)">
-                <ChipRow>
-                  {NEARBY_FILTERS.map((n) => {
-                    const active = csvSet(sp.nearby).has(n.value);
-                    return (
-                      <Link key={n.value} href={toggleHref(sp, 'nearby', n.value)}>
-                        <AppChip asStatic tone={active ? 'terracotta' : 'neutral'} selected={active}>
-                          <span className="mr-1" aria-hidden>{n.emoji}</span>
-                          {n.label}
-                        </AppChip>
-                      </Link>
-                    );
-                  })}
-                </ChipRow>
-              </FilterSection>
-            </AdvancedFiltersToggle>
-          </MobileFiltersWrapper>
-
-          {/* Active-filter pill row — visible above results so buyers
-              always know what's filtering, with one-tap remove per pill
-              and an 'Очистить всё' fallback. */}
-          {activeCount > 0 ? (
-            <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
-              <span className="text-caption font-medium text-stone-500">Активно:</span>
-              {/* District pills hidden in V1 — filter UI is gone, see
-                  filter sheet comment. URL param still narrows the
-                  result for old links but isn't surfaced visually. */}
-              {Array.from(csvSet(sp.status)).map((value) => (
-                <ActivePill
-                  key={`s-${value}`}
-                  label={statusLabelByValue.get(value as BuildingStatus) ?? value}
-                  href={removeHref(sp, 'status', value)}
-                />
-              ))}
-              {sp.price_per_m2_from || sp.price_per_m2_to ? (
-                <ActivePill
-                  label={priceRangeLabel(sp.price_per_m2_from, sp.price_per_m2_to)}
-                  href={`/novostroyki${buildQuery({
-                    ...sp,
-                    price_per_m2_from: undefined,
-                    price_per_m2_to: undefined,
-                  })}`}
-                />
-              ) : null}
-              {Array.from(csvSet(sp.handover)).map((value) => (
-                <ActivePill
-                  key={`h-${value}`}
-                  label={
-                    HANDOVER_FILTERS.find((h) => h.value === value)?.label ?? value
-                  }
-                  href={removeHref(sp, 'handover', value)}
-                />
-              ))}
-              {Array.from(csvSet(sp.amenities)).map((value) => (
-                <ActivePill
-                  key={`a-${value}`}
-                  label={amenityLabelByValue.get(value) ?? value}
-                  href={removeHref(sp, 'amenities', value)}
-                />
-              ))}
-              {Array.from(csvSet(sp.nearby)).map((value) => (
-                <ActivePill
-                  key={`n-${value}`}
-                  label={(nearbyLabelByValue.get(value as PoiCategory) ?? value) + ' рядом'}
-                  href={removeHref(sp, 'nearby', value)}
-                />
-              ))}
-              <Link
-                href="/novostroyki"
-                className="ml-auto text-caption font-medium text-terracotta-700 hover:text-terracotta-800"
-              >
-                Очистить всё
-              </Link>
+              РАЙОН filter is hidden in V1 — Vahdat is small enough
+              that splitting 6 buildings across 5 microdistricts makes
+              each district filter narrow the result to 1-2 projects,
+              which feels broken. District info still shows on every
+              building card (address chip), so buyers can see where
+              each project is without needing the filter. */}
+          {/* Cian-style category chip bar. One chip per filter category
+              (Цена / Стадия / Сдача / Удобства / Что рядом). Each chip
+              shows its current value summary inline and opens a bottom
+              sheet with the full set of options + an Apply button. The
+              bar scrolls horizontally on narrow viewports — chips are
+              shrink-0 so they keep their natural width. */}
+          <div className="-mx-4 md:-mx-5 lg:-mx-6">
+            <div className="flex items-center gap-2 overflow-x-auto px-4 py-1 md:px-5 lg:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <PriceChip current={sp} />
+              <MultiSelectChip
+                label="Стадия"
+                paramKey="status"
+                options={STATUS_FILTERS}
+                current={sp}
+              />
+              <MultiSelectChip
+                label="Сдача"
+                paramKey="handover"
+                options={HANDOVER_FILTERS}
+                current={sp}
+              />
+              <MultiSelectChip
+                label="Удобства"
+                paramKey="amenities"
+                options={AMENITIES_FILTERS}
+                current={sp}
+              />
+              <MultiSelectChip
+                label="Что рядом"
+                paramKey="nearby"
+                options={NEARBY_FILTERS}
+                current={sp}
+              />
             </div>
-          ) : null}
+          </div>
         </AppContainer>
       </section>
 
@@ -317,6 +280,8 @@ export default async function NovostroykiPage({
                       district={dist}
                       matchingUnits={units}
                       activeListingsCount={unitsTotal}
+                      currency={currency}
+                      rates={rates}
                     />
                   );
                 })}
@@ -329,42 +294,3 @@ export default async function NovostroykiPage({
   );
 }
 
-/** Section wrapper for the filter sheet — gives every filter group a
- *  consistent label + spacing. */
-function FilterSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="text-caption font-medium uppercase tracking-wide text-stone-500">
-        {title}
-      </span>
-      {children}
-    </div>
-  );
-}
-
-function ChipRow({ children }: { children: React.ReactNode }) {
-  return <div className="flex flex-wrap gap-2">{children}</div>;
-}
-
-/** One active-filter pill with an X. Tap removes that single value
- *  while keeping every other filter intact. */
-function ActivePill({ label, href }: { label: string; href: string }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-1 rounded-sm border border-terracotta-200 bg-terracotta-50 px-2 py-1 text-caption font-medium text-terracotta-800 hover:bg-terracotta-100"
-      aria-label={`Убрать фильтр: ${label}`}
-    >
-      {label}
-      <X className="size-3" aria-hidden />
-    </Link>
-  );
-}
-
-/** Compact human label for the price-range pill. */
-function priceRangeLabel(from?: string, to?: string): string {
-  if (from && to) return `${from} – ${to} TJS / м²`;
-  if (from) return `от ${from} TJS / м²`;
-  if (to) return `до ${to} TJS / м²`;
-  return '';
-}

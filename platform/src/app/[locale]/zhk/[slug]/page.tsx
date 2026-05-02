@@ -13,10 +13,13 @@ import {
   ListingCard,
   NearbyPois,
   BuildingStageProgress,
+  PriceConversion,
 } from '@/components/blocks';
 import { getBuilding, getDeveloperStats } from '@/services/buildings';
 import { getDistrictBenchmark } from '@/services/benchmarks';
 import { getNearbyPOIs } from '@/services/poi';
+import { getExchangeRates } from '@/services/currency';
+import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { formatPriceNumber, pluralRu } from '@/lib/format';
 import { STAGE_INFO } from '@/lib/building-stages';
 
@@ -70,6 +73,12 @@ export default async function BuildingDetailPage({
   const median = benchmark
     ? { median: Number(benchmark.median_per_m2_dirams), sample: benchmark.sample_size }
     : null;
+  // Currency conversion for diaspora visitors. Skip the rates fetch
+  // entirely for local buyers (cookie unset or TJS) so we don't pay
+  // for an HTTP roundtrip nobody will see.
+  const currency = await readCurrencyCookie();
+  const isDiaspora = currency != null && currency !== 'TJS';
+  const rates = isDiaspora ? await getExchangeRates() : null;
 
   return (
     <>
@@ -94,7 +103,7 @@ export default async function BuildingDetailPage({
                 {/* Address opens the map with this building's pin
                     pre-selected — same affordance as cards. */}
                 <Link
-                  href={`/novostroyki?view=karta&selected=${building.slug}`}
+                  href={`/novostroyki?view=karta&focus=${building.slug}`}
                   className="group inline-flex items-center gap-1 rounded-sm text-meta text-white/90 transition-colors hover:text-white"
                   aria-label={`Показать на карте: ${building.name.ru}`}
                 >
@@ -220,9 +229,22 @@ export default async function BuildingDetailPage({
             {building.price_per_m2_from_dirams ? (
               <div className="flex flex-col items-end">
                 <span className="text-caption text-stone-500">от</span>
-                <span className="text-h3 font-semibold tabular-nums text-stone-900">
-                  {formatPriceNumber(building.price_per_m2_from_dirams)} TJS / м²
-                </span>
+                {/* Inline pair: TJS price + foreign-currency
+                    conversion on the same baseline, right-aligned to
+                    match the parent column's alignment. */}
+                <div className="flex flex-wrap items-baseline justify-end gap-x-2">
+                  <span className="text-h3 font-semibold tabular-nums text-stone-900">
+                    {formatPriceNumber(building.price_per_m2_from_dirams)} TJS / м²
+                  </span>
+                  {isDiaspora && rates ? (
+                    <PriceConversion
+                      priceDirams={building.price_per_m2_from_dirams}
+                      target={currency}
+                      rates={rates}
+                      perM2
+                    />
+                  ) : null}
+                </div>
               </div>
             ) : null}
           </div>
@@ -251,6 +273,8 @@ export default async function BuildingDetailPage({
                     developerVerified={developer.is_verified}
                     districtMedianPerM2={median?.median ?? null}
                     districtSampleSize={median?.sample ?? 0}
+                    currency={currency}
+                    rates={rates}
                     hideBuildingName
                   />
                 ))}

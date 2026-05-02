@@ -44,3 +44,5 @@ supabase/_combined.sql
 **/coverage
 **/playwright-report
 **/test-results
+
+.vercel
