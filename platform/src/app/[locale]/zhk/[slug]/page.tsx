@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { MapPin, Calendar, Layers, Users, Shield, Camera } from 'lucide-react';
+import { MapPin, Calendar, Layers, Users, Shield, Camera, ArrowUpRight } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import {
@@ -73,10 +73,18 @@ export default async function BuildingDetailPage({
                 <h1 className="text-h1 font-semibold leading-[var(--leading-h1)] text-white md:text-display">
                   {building.name.ru}
                 </h1>
-                <span className="inline-flex items-center gap-1 text-meta text-white/90">
+                {/* Address opens the map with this building's pin
+                    pre-selected — same affordance as the cards, so
+                    behaviour stays consistent throughout the platform. */}
+                <Link
+                  href={`/novostroyki?view=karta&selected=${building.slug}`}
+                  className="group inline-flex w-fit items-center gap-1 rounded-sm text-meta text-white/90 transition-colors hover:text-white"
+                  aria-label={`Показать на карте: ${building.name.ru}`}
+                >
                   <MapPin className="size-3.5" />
-                  {district.name.ru} · {building.address.ru}
-                </span>
+                  <span>{district.name.ru} · {building.address.ru}</span>
+                  <ArrowUpRight className="size-3 opacity-70 transition-opacity group-hover:opacity-100" />
+                </Link>
               </div>
               {developer.is_verified ? (
                 <VerifiedDeveloperButton

@@ -140,13 +140,15 @@ export default async function DiasporaPage({
               const dev = getDeveloper(b.developer_id);
               const dist = getDistrict(b.district_id);
               if (!dev || !dist) return null;
+              const allUnits = getListingsForBuilding(b.id);
               return (
                 <BuildingCard
                   key={b.id}
                   building={b}
                   developer={dev}
                   district={dist}
-                  matchingUnits={getListingsForBuilding(b.id).slice(0, 2)}
+                  matchingUnits={allUnits.slice(0, 2)}
+                  activeListingsCount={allUnits.length}
                   currency={currency}
                   rates={rates}
                 />

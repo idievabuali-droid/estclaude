@@ -90,6 +90,9 @@ export async function getListing(slug: string): Promise<{
   district: MockDistrict;
   median: { median: number; sample: number } | null;
   similar: MockListing[];
+  /** Seller's verified phone — drives all four contact channels
+   *  (WhatsApp, Telegram, IMO, direct call). Single number for all. */
+  sellerPhone: string;
 } | null> {
   const supabase = await createClient();
   const { data: lRow, error } = await supabase
@@ -108,7 +111,7 @@ export async function getListing(slug: string): Promise<{
     .single();
   if (bErr) throw bErr;
 
-  const [devRes, distRes, similarRes] = await Promise.all([
+  const [devRes, distRes, similarRes, sellerRes] = await Promise.all([
     supabase.from('developers').select('*').eq('id', bRow.developer_id).single(),
     supabase.from('districts').select('*').eq('id', bRow.district_id).single(),
     supabase
@@ -118,6 +121,7 @@ export async function getListing(slug: string): Promise<{
       .eq('status', 'active')
       .neq('id', listing.id)
       .limit(3),
+    supabase.from('users').select('phone').eq('id', lRow.seller_user_id).maybeSingle(),
   ]);
 
   const building: MockBuilding = {
@@ -166,8 +170,12 @@ export async function getListing(slug: string): Promise<{
     : null;
 
   const similar = (similarRes.data ?? []).map(mapListing);
+  // Seller phone — falls back to a placeholder only if the user row is
+  // missing (which shouldn't happen in production but keeps the page
+  // renderable in degraded states).
+  const sellerPhone = sellerRes.data?.phone ?? '+992935563306';
 
-  return { listing, building, developer, district, median, similar };
+  return { listing, building, developer, district, median, similar, sellerPhone };
 }
 
 /**

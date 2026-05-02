@@ -10,13 +10,36 @@
 import { createClient } from '@/lib/supabase/server';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import type { BuildingStatus } from '@/types/domain';
+import { getNearbyPOIs, type PoiCategory } from './poi';
+
+/** A building is considered "near" a POI category when the closest
+ *  result of that category is within this many metres. ~12 minute walk
+ *  at the 80 m/min average we use elsewhere. Generous on purpose so
+ *  buyers don't filter to zero results. */
+const NEARBY_THRESHOLD_M = 1000;
 
 const ACTIVE_CITY = 'vahdat';
 
 export type BuildingFilters = {
   district?: string[];
   status?: BuildingStatus[];
+  /** Total-price ceiling in dirams. Legacy filter, still respected. */
   priceTo?: bigint | null;
+  /** Per-m² price floor in dirams. New in V1 filter pass. */
+  pricePerM2From?: bigint | null;
+  /** Per-m² price ceiling in dirams. */
+  pricePerM2To?: bigint | null;
+  /** Handover years to include — e.g. ['2026', '2027']. The literal
+   *  '2028+' includes any year >= 2028. The literal 'delivered' includes
+   *  buildings with status='delivered' (no handover quarter set). */
+  handoverYears?: string[];
+  /** Required amenities — building must have ALL of these in its
+   *  amenities array (intersection, not union). */
+  amenities?: string[];
+  /** Required nearby POI categories — building must have at least one
+   *  POI of EACH category within NEARBY_THRESHOLD_M. Uses the live
+   *  Overpass data (same source as the "Что рядом" section). */
+  nearbyCategories?: PoiCategory[];
   city?: 'dushanbe' | 'vahdat';
   q?: string;
 };
@@ -103,11 +126,70 @@ export async function listBuildings(filters: BuildingFilters = {}): Promise<Mock
   // The denormalised column is nullable until a Postgres trigger is added.
   await fillPriceFrom(supabase, buildings);
 
-  // Apply price filter after we have the computed numbers
+  // Total-price ceiling (legacy)
   if (filters.priceTo) {
     const cap = filters.priceTo;
     buildings = buildings.filter((b) => b.price_from_dirams != null && b.price_from_dirams <= cap);
   }
+
+  // Per-m² price range — applied in JS because the denorm column may be
+  // null and we want predictable behaviour ("show only buildings whose
+  // computed per-m² fits the range").
+  if (filters.pricePerM2From) {
+    const floor = filters.pricePerM2From;
+    buildings = buildings.filter(
+      (b) => b.price_per_m2_from_dirams != null && b.price_per_m2_from_dirams >= floor,
+    );
+  }
+  if (filters.pricePerM2To) {
+    const ceil = filters.pricePerM2To;
+    buildings = buildings.filter(
+      (b) => b.price_per_m2_from_dirams != null && b.price_per_m2_from_dirams <= ceil,
+    );
+  }
+
+  // Handover year — chip values are years like '2026' and special
+  // literals '2028+' (year >= 2028) and 'delivered' (status delivered).
+  if (filters.handoverYears?.length) {
+    const wanted = new Set(filters.handoverYears);
+    buildings = buildings.filter((b) => {
+      if (wanted.has('delivered') && b.status === 'delivered') return true;
+      if (!b.handover_estimated_quarter) return false;
+      const year = parseInt(b.handover_estimated_quarter.slice(0, 4), 10);
+      if (wanted.has(String(year))) return true;
+      if (wanted.has('2028+') && year >= 2028) return true;
+      return false;
+    });
+  }
+
+  // Amenities — building must include ALL requested amenities
+  if (filters.amenities?.length) {
+    const required = filters.amenities;
+    buildings = buildings.filter((b) =>
+      required.every((a) => (b.amenities ?? []).includes(a)),
+    );
+  }
+
+  // Nearby POI categories — applied last (and only when needed) because
+  // each building requires a separate Overpass call. Calls are cached
+  // for 24h via the fetch revalidate, so warm-cache filtering is fast;
+  // first-load on a fresh deploy will be slower for the buildings that
+  // pass all earlier filters. Building must have AT LEAST ONE POI of
+  // each requested category within NEARBY_THRESHOLD_M.
+  if (filters.nearbyCategories?.length) {
+    const wantedCats = filters.nearbyCategories;
+    const poiResults = await Promise.all(
+      buildings.map((b) => getNearbyPOIs(b.latitude, b.longitude)),
+    );
+    buildings = buildings.filter((_b, i) => {
+      const pois = poiResults[i]!;
+      return wantedCats.every((cat) => {
+        const nearest = pois[cat][0];
+        return nearest != null && nearest.distanceM <= NEARBY_THRESHOLD_M;
+      });
+    });
+  }
+
   return buildings;
 }
 

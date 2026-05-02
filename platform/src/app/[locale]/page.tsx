@@ -28,7 +28,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         getDistrictById(b.district_id),
         getListingsForBuildingId(b.id),
       ]);
-      return { b, dev, dist, units: units.slice(0, 2) };
+      return { b, dev, dist, units: units.slice(0, 2), unitsTotal: units.length };
     }),
   );
 
@@ -108,7 +108,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </Link>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
-            {featuredWithRefs.map(({ b, dev, dist, units }) => {
+            {featuredWithRefs.map(({ b, dev, dist, units, unitsTotal }) => {
               if (!dev || !dist) return null;
               return (
                 <BuildingCard
@@ -117,6 +117,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                   developer={dev}
                   district={dist}
                   matchingUnits={units}
+                  activeListingsCount={unitsTotal}
                 />
               );
             })}

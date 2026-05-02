@@ -4,7 +4,7 @@ import { MapPin, Building, Calendar, ArrowUpRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
-import { formatPriceNumber } from '@/lib/format';
+import { formatPriceNumber, pluralRu } from '@/lib/format';
 import { VerificationBadge } from './VerificationBadge';
 import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
@@ -24,6 +24,12 @@ export interface BuildingCardProps {
   developer: MockDeveloper;
   district: MockDistrict;
   matchingUnits?: MockListing[];
+  /** Total active listings in this building. When passed, shown inline
+   *  with the handover date so buyers can scan-spot which projects
+   *  have lots of options vs which have one unit left. Distinct from
+   *  matchingUnits.length because matchingUnits is only a slice for
+   *  preview rendering. */
+  activeListingsCount?: number;
   /** Diaspora currency (cookie-driven). When set + rates supplied,
    *  shows foreign-currency equivalent beneath TJS. */
   currency?: SupportedCurrency | null;
@@ -41,6 +47,7 @@ export function BuildingCard({
   developer,
   district,
   matchingUnits = [],
+  activeListingsCount,
   currency,
   rates,
   className,
@@ -145,11 +152,14 @@ export function BuildingCard({
           ) : null}
         </div>
 
-        {/* Matching units preview (Blueprint §8.6 Row 5) */}
+        {/* Available units preview — show up to 3 unit previews. If more
+            apartments are available than shown, append "+ ещё N квартир"
+            so buyers see at a glance there's more inside without
+            duplicating a count up in the header. */}
         {matchingUnits.length > 0 ? (
           <div className="flex flex-col gap-2 border-t border-stone-200 pt-3">
             <span className="text-caption font-medium text-stone-500">
-              Подходящие квартиры ({matchingUnits.length})
+              Доступные квартиры
             </span>
             {matchingUnits.slice(0, 3).map((u) => (
               <div
@@ -164,6 +174,15 @@ export function BuildingCard({
                 </span>
               </div>
             ))}
+            {activeListingsCount != null && activeListingsCount > matchingUnits.slice(0, 3).length ? (
+              <span className="inline-flex items-center gap-1 text-caption font-medium text-terracotta-700">
+                + ещё {activeListingsCount - matchingUnits.slice(0, 3).length}{' '}
+                {pluralRu(
+                  activeListingsCount - matchingUnits.slice(0, 3).length,
+                  ['квартира', 'квартиры', 'квартир'],
+                )}
+              </span>
+            ) : null}
           </div>
         ) : null}
       </div>

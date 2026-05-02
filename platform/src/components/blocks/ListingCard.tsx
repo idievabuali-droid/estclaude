@@ -4,7 +4,7 @@ import { Layers, MapPin, ArrowUpRight, CreditCard } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
-import { formatPriceNumber, formatM2, formatFloor } from '@/lib/format';
+import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo } from '@/lib/format';
 import { AppChip } from '@/components/primitives';
 import { FairnessIndicator, computeFairness, type FairnessLevel } from './FairnessIndicator';
 import { InstallmentDisplay } from './InstallmentDisplay';
@@ -195,6 +195,12 @@ export function ListingCard({
             totalPriceDirams={listing.price_total_dirams}
           />
         ) : null}
+
+        {/* Posted-ago — fresh-vs-stale signal buyers care about. Caption
+            size + muted colour so it doesn't compete with the price. */}
+        <span className="text-caption text-stone-400">
+          Опубликовано {formatPostedAgo(listing.published_at)}
+        </span>
       </div>
     </Link>
   );

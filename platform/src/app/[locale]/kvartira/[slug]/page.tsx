@@ -5,6 +5,7 @@ import {
   Ruler,
   Bath,
   ArrowUp,
+  ArrowUpRight,
   Eye,
   HelpCircle,
 } from 'lucide-react';
@@ -24,10 +25,11 @@ import {
   InstallmentDisplay,
   ListingCard,
 } from '@/components/blocks';
-import { formatPriceNumber, formatM2, formatFloor } from '@/lib/format';
+import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo } from '@/lib/format';
 import { getListing } from '@/services/listings';
 import { getNearbyPOIs } from '@/services/poi';
 import { NearbyPois } from '@/components/blocks';
+import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { ContactBarWithModal } from './ContactBarWithModal';
 
 const FINISHING_TONE = {
@@ -68,7 +70,12 @@ export default async function ListingDetailPage({
 
   const data = await getListing(slug);
   if (!data) notFound();
-  const { listing, building, developer, district, median, similar } = data;
+  const { listing, building, developer, district, median, similar, sellerPhone } = data;
+  // Diaspora context: when the buyer has set a foreign currency on
+  // /diaspora, the intent CTA switches from physical visit to online
+  // showing. Same listing, contextual action.
+  const currency = await readCurrencyCookie();
+  const isDiaspora = currency != null && currency !== 'TJS';
   // Currency intentionally NOT read here — apartment detail stays in
   // TJS for local buyers. Currency is a /diaspora-lane-only feature.
   const pois = await getNearbyPOIs(building.latitude, building.longitude);
@@ -122,14 +129,30 @@ export default async function ListingDetailPage({
       <section className="border-b border-stone-200 bg-white py-4">
         <AppContainer className="flex flex-col gap-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <Link
-              href={`/zhk/${building.slug}`}
-              className="inline-flex items-center gap-1 text-meta text-stone-700 hover:text-terracotta-600"
-            >
-              <MapPin className="size-3.5" />
-              <span className="font-medium text-stone-900">{building.name.ru}</span>
-              <span className="text-stone-500">· {district.name.ru}</span>
-            </Link>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {/* Building name + district link → goes to the building's
+                  detail page (where buyers see all units, dev info, etc). */}
+              <Link
+                href={`/zhk/${building.slug}`}
+                className="inline-flex items-center gap-1 text-meta text-stone-700 hover:text-terracotta-600"
+              >
+                <MapPin className="size-3.5" />
+                <span className="font-medium text-stone-900">{building.name.ru}</span>
+                <span className="text-stone-500">· {district.name.ru}</span>
+              </Link>
+              {/* Separate map link — distinct action: see exactly where
+                  this building sits on the map. Two clear options instead
+                  of overloading the building-name link. */}
+              <Link
+                href={`/novostroyki?view=karta&selected=${building.slug}`}
+                className="group inline-flex items-center gap-1 rounded-sm border border-stone-200 bg-stone-50 px-2 py-0.5 text-caption font-medium text-stone-700 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50 hover:text-terracotta-700"
+                aria-label="Показать на карте"
+              >
+                <MapPin className="size-3 text-terracotta-600" />
+                <span>На карте</span>
+                <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
+              </Link>
+            </div>
             {/* VerificationBadge hidden in V1 — see ListingCard for rationale. */}
           </div>
 
@@ -146,12 +169,26 @@ export default async function ListingDetailPage({
             ) : null}
           </div>
 
-          {/* Quick contact (desktop) */}
-          <div className="hidden flex-wrap gap-2 pt-2 md:flex">
-            <AppButton variant="primary" size="lg">WhatsApp</AppButton>
-            <AppButton variant="secondary" size="lg">Позвонить</AppButton>
-            <AppButton variant="secondary" size="lg">Запросить визит</AppButton>
-          </div>
+          {/* Posted-ago — freshness signal placed near the contact CTAs
+              so buyers verifying a listing before contacting can see
+              when it went up. Hybrid format: time-of-day for fresh
+              posts, absolute date for older. */}
+          <span className="text-meta text-stone-500">
+            Опубликовано {formatPostedAgo(listing.published_at)}
+          </span>
+
+          {/* Contact section — channels + intent in two grouped rows.
+              Lives inside ContactBarWithModal (which also renders the
+              mobile sticky bar + visit modal). One client component
+              owns the whole contact UI so layout/state stay consistent.
+              Bottom-of-file render is hidden because the desktop layout
+              is rendered here near the price; the sticky bar floats
+              regardless. */}
+          <ContactBarWithModal
+            listingTitle={`${listing.rooms_count}-комн в ${building.name.ru}`}
+            sellerPhone={sellerPhone}
+            isDiaspora={isDiaspora}
+          />
         </AppContainer>
       </section>
 
@@ -287,11 +324,8 @@ export default async function ListingDetailPage({
         </section>
       ) : null}
 
-      {/* Mobile sticky bar */}
-      <ContactBarWithModal
-        listingTitle={`${listing.rooms_count}-комн в ${building.name.ru}`}
-        whatsappPhone="+992900000000"
-      />
+      {/* Mobile sticky bar is rendered by the ContactBarWithModal
+          higher in the tree (near the price). One instance does both. */}
     </>
   );
 }

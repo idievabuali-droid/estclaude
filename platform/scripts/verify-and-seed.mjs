@@ -112,10 +112,12 @@ const developers = [
   console.log(`✓ ${developers.length} developers`);
 }
 
-// Seed seller user (mock — represents the founder posting on behalf of developers)
+// Seed seller user — the founder posting on behalf of developers and
+// for own-apartment listings. Phone is the live contact number used
+// for all channels (WhatsApp, Telegram, IMO, and direct calls).
 const founderUser = {
   id: '33333333-3333-3333-3333-333333333301',
-  phone: '+992900000099',
+  phone: '+992935563306',
   name: 'Founder Account',
   preferred_language: 'ru',
   phone_verified_at: new Date().toISOString(),
@@ -291,23 +293,38 @@ function mkListing(seed) {
 }
 // Listings — pricing tuned for the Vahdat market: roughly 3,500–5,500
 // TJS / m² depending on stage and finishing. Spread across all 6
-// buildings so every project has at least one active unit.
+// buildings so every project has at least one active unit. Three
+// flagship buildings (Vahdat Park, Гулистон Резиденс, Кофарнихон Сити)
+// are stocked with more units so the "+ ещё N квартир" overflow line
+// renders on the building cards.
 const listings = [
-  // Vahdat Park (under construction, центр) — mid-range developer pricing
+  // Vahdat Park (under construction, центр) — 8 units across mix of plans
   mkListing({ suffix: '101', building_id: buildings[0].id, source: 'developer', rooms: 2, size: 62, floor: 4, total_floors: 10, priceTjs: 285000, finishing: 'pre_finish', tier: 'phone_verified', installmentMonthly: 3400, bathrooms: 1, balcony: true, ceiling: 280 }),
   mkListing({ suffix: '102', building_id: buildings[0].id, source: 'developer', rooms: 3, size: 82, floor: 7, total_floors: 10, priceTjs: 393000, finishing: 'pre_finish', tier: 'phone_verified', installmentMonthly: 4700, bathrooms: 2, balcony: true, ceiling: 280 }),
   mkListing({ suffix: '103', building_id: buildings[0].id, source: 'developer', rooms: 1, size: 41, floor: 9, total_floors: 10, priceTjs: 168000, finishing: 'no_finish', tier: 'phone_verified', bathrooms: 1, balcony: false, ceiling: 280 }),
-  // Гулистон Резиденс (near completion) — developer + one intermediary
+  mkListing({ suffix: '104', building_id: buildings[0].id, source: 'developer', rooms: 2, size: 60, floor: 6, total_floors: 10, priceTjs: 268000, finishing: 'pre_finish', tier: 'phone_verified', installmentMonthly: 3200, bathrooms: 1, balcony: true, ceiling: 280 }),
+  mkListing({ suffix: '105', building_id: buildings[0].id, source: 'developer', rooms: 3, size: 88, floor: 5, total_floors: 10, priceTjs: 414000, finishing: 'pre_finish', tier: 'phone_verified', installmentMonthly: 4900, bathrooms: 2, balcony: true, ceiling: 280 }),
+  mkListing({ suffix: '106', building_id: buildings[0].id, source: 'developer', rooms: 1, size: 43, floor: 8, total_floors: 10, priceTjs: 175000, finishing: 'pre_finish', tier: 'phone_verified', installmentMonthly: 2100, bathrooms: 1, balcony: true, ceiling: 280 }),
+  mkListing({ suffix: '107', building_id: buildings[0].id, source: 'developer', rooms: 2, size: 65, floor: 3, total_floors: 10, priceTjs: 295000, finishing: 'pre_finish', tier: 'phone_verified', bathrooms: 1, balcony: true, ceiling: 280 }),
+  mkListing({ suffix: '108', building_id: buildings[0].id, source: 'developer', rooms: 3, size: 84, floor: 9, total_floors: 10, priceTjs: 405000, finishing: 'pre_finish', tier: 'phone_verified', installmentMonthly: 4800, bathrooms: 2, balcony: true, ceiling: 280 }),
+  // Гулистон Резиденс (near completion) — 5 units, finished interiors
   mkListing({ suffix: '201', building_id: buildings[1].id, source: 'developer', rooms: 3, size: 88, floor: 5, total_floors: 8, priceTjs: 484000, finishing: 'full_finish', tier: 'phone_verified', bathrooms: 2, balcony: true, ceiling: 290 }),
   mkListing({ suffix: '202', building_id: buildings[1].id, source: 'intermediary', rooms: 2, size: 68, floor: 3, total_floors: 8, priceTjs: 333000, finishing: 'full_finish', tier: 'listing_verified', desc: 'Светлая двухкомнатная с видом на горы.', bathrooms: 1, balcony: true, ceiling: 290 }),
+  mkListing({ suffix: '203', building_id: buildings[1].id, source: 'developer', rooms: 2, size: 70, floor: 6, total_floors: 8, priceTjs: 350000, finishing: 'full_finish', tier: 'phone_verified', bathrooms: 1, balcony: true, ceiling: 290 }),
+  mkListing({ suffix: '204', building_id: buildings[1].id, source: 'developer', rooms: 3, size: 95, floor: 7, total_floors: 8, priceTjs: 522000, finishing: 'full_finish', tier: 'phone_verified', bathrooms: 2, balcony: true, ceiling: 290 }),
+  mkListing({ suffix: '205', building_id: buildings[1].id, source: 'developer', rooms: 1, size: 45, floor: 4, total_floors: 8, priceTjs: 225000, finishing: 'full_finish', tier: 'phone_verified', bathrooms: 1, balcony: true, ceiling: 290 }),
   // Шарора Тауэр (announced, Шарора) — early-bird pricing on 1 unit
   mkListing({ suffix: '301', building_id: buildings[2].id, source: 'developer', rooms: 2, size: 56, floor: 3, total_floors: 9, priceTjs: 218000, finishing: 'no_finish', tier: 'phone_verified', installmentMonthly: 2600, bathrooms: 1, balcony: true, ceiling: 270 }),
   // Истиқлол Эволюшн (delivered) — owner resale + intermediary
   mkListing({ suffix: '401', building_id: buildings[3].id, source: 'owner', rooms: 2, size: 54, floor: 4, total_floors: 9, priceTjs: 211000, finishing: 'owner_renovated', tier: 'profile_verified', desc: 'Жилое состояние, ремонт сделан в 2024 году. Кухня и техника остаются.', bathrooms: 1, balcony: false, ceiling: 260 }),
   mkListing({ suffix: '402', building_id: buildings[3].id, source: 'intermediary', rooms: 3, size: 76, floor: 6, total_floors: 9, priceTjs: 312000, finishing: 'full_finish', tier: 'phone_verified', bathrooms: 2, balcony: true, ceiling: 260 }),
-  // Кофарнихон Сити (under construction, Сарбозор) — 2 units
+  // Кофарнихон Сити (under construction, Сарбозор) — 6 units
   mkListing({ suffix: '501', building_id: buildings[4].id, source: 'developer', rooms: 2, size: 64, floor: 5, total_floors: 10, priceTjs: 270000, finishing: 'pre_finish', tier: 'phone_verified', installmentMonthly: 3200, bathrooms: 1, balcony: true, ceiling: 280 }),
   mkListing({ suffix: '502', building_id: buildings[4].id, source: 'developer', rooms: 3, size: 86, floor: 8, total_floors: 10, priceTjs: 380000, finishing: 'pre_finish', tier: 'phone_verified', installmentMonthly: 4500, bathrooms: 2, balcony: true, ceiling: 280 }),
+  mkListing({ suffix: '503', building_id: buildings[4].id, source: 'developer', rooms: 1, size: 39, floor: 3, total_floors: 10, priceTjs: 158000, finishing: 'pre_finish', tier: 'phone_verified', bathrooms: 1, balcony: true, ceiling: 280 }),
+  mkListing({ suffix: '504', building_id: buildings[4].id, source: 'developer', rooms: 2, size: 60, floor: 6, total_floors: 10, priceTjs: 252000, finishing: 'pre_finish', tier: 'phone_verified', installmentMonthly: 3000, bathrooms: 1, balcony: true, ceiling: 280 }),
+  mkListing({ suffix: '505', building_id: buildings[4].id, source: 'developer', rooms: 3, size: 90, floor: 9, total_floors: 10, priceTjs: 405000, finishing: 'pre_finish', tier: 'phone_verified', installmentMonthly: 4800, bathrooms: 2, balcony: true, ceiling: 280 }),
+  mkListing({ suffix: '506', building_id: buildings[4].id, source: 'developer', rooms: 2, size: 67, floor: 7, total_floors: 10, priceTjs: 281000, finishing: 'pre_finish', tier: 'phone_verified', bathrooms: 1, balcony: true, ceiling: 280 }),
   // Орзу (announced, Гулистон) — affordable young-family positioning
   mkListing({ suffix: '601', building_id: buildings[5].id, source: 'developer', rooms: 1, size: 38, floor: 2, total_floors: 7, priceTjs: 142000, finishing: 'no_finish', tier: 'phone_verified', installmentMonthly: 1700, bathrooms: 1, balcony: true, ceiling: 270 }),
   mkListing({ suffix: '602', building_id: buildings[5].id, source: 'developer', rooms: 2, size: 55, floor: 4, total_floors: 7, priceTjs: 198000, finishing: 'no_finish', tier: 'phone_verified', installmentMonthly: 2400, bathrooms: 1, balcony: true, ceiling: 270 }),
