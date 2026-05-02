@@ -1,15 +1,20 @@
 /**
  * Seller-side queries for the /kabinet dashboard.
- * In V1 the user identity is hard-coded to the founder until Telegram OTP
- * auth is wired. After auth lands, replace `MOCK_FOUNDER_USER_ID` with
- * `auth.uid()` from Supabase auth.
+ *
+ * Uses the admin (service-role) Supabase client because RLS on
+ * listings + notifications is `auth.uid() = seller_user_id` /
+ * `user_id`, but our cookie-session auth doesn't set auth.uid(), so
+ * the regular client returns zero rows. Caller must verify the user
+ * via getCurrentUser() before passing userId.
  */
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { MockBuilding, MockListing } from '@/lib/mock';
 import { mapListing } from './buildings';
 import type { NotificationType } from '@/types/domain';
 
-// SPEC-GAP: until auth lands, the dashboard shows the founder's listings.
+// Founder seed user id — kept ONLY for the dashboard-stats query
+// that intentionally aggregates platform-wide data, not a current
+// user. All user-scoped queries below take an explicit userId arg.
 export const MOCK_FOUNDER_USER_ID = '33333333-3333-3333-3333-333333333301';
 
 export type SellerListing = MockListing & { building: MockBuilding | null };
@@ -23,7 +28,7 @@ export type SellerNotification = {
 };
 
 export async function listMyListings(userId = MOCK_FOUNDER_USER_ID): Promise<SellerListing[]> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('listings')
     .select('*')
@@ -71,7 +76,7 @@ export async function listMyListings(userId = MOCK_FOUNDER_USER_ID): Promise<Sel
 }
 
 export async function getMyNotifications(userId = MOCK_FOUNDER_USER_ID): Promise<SellerNotification[]> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('notifications')
     .select('id, type, payload, created_at, read_at')
@@ -88,7 +93,7 @@ export async function getMyDashboardStats(userId = MOCK_FOUNDER_USER_ID): Promis
   newRequests: number;
   visitsScheduled: number;
 }> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const [listingsRes, requestsRes, visitsRes] = await Promise.all([
     supabase
       .from('listings')

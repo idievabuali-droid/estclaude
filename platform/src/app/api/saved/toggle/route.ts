@@ -35,21 +35,44 @@ export async function POST(req: NextRequest) {
   const column = body.type === 'building' ? 'building_id' : 'listing_id';
 
   // Look for existing save first.
-  const { data: existing } = await supabase
+  const { data: existing, error: selectErr } = await supabase
     .from('saved_items')
     .select('id')
     .eq('user_id', user.id)
     .eq(column, body.id)
     .maybeSingle();
 
+  if (selectErr) {
+    console.error('saved/toggle select failed:', selectErr);
+    return NextResponse.json({ error: 'lookup failed' }, { status: 500 });
+  }
+
   if (existing) {
-    await supabase.from('saved_items').delete().eq('id', existing.id);
+    const { error: deleteErr } = await supabase
+      .from('saved_items')
+      .delete()
+      .eq('id', existing.id);
+    if (deleteErr) {
+      console.error('saved/toggle delete failed:', deleteErr);
+      return NextResponse.json({ error: 'delete failed' }, { status: 500 });
+    }
     return NextResponse.json({ saved: false });
   }
 
-  await supabase.from('saved_items').insert({
+  // Insert. Previously this was fire-and-forget — silent failures
+  // returned saved:true to the client even when nothing was actually
+  // written. Now we surface the error so SaveToggle reverts its
+  // optimistic flip and shows a proper toast.
+  const { error: insertErr } = await supabase.from('saved_items').insert({
     user_id: user.id,
     [column]: body.id,
   });
+  if (insertErr) {
+    console.error('saved/toggle insert failed:', insertErr);
+    return NextResponse.json(
+      { error: 'insert failed', detail: insertErr.message },
+      { status: 500 },
+    );
+  }
   return NextResponse.json({ saved: true });
 }

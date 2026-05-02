@@ -95,6 +95,11 @@ export function SaveToggle({ type, id, className }: SaveToggleProps) {
       if (!res.ok) throw new Error('toggle failed');
       const data = (await res.json()) as { saved: boolean };
       setSaved(data.saved);
+      // Refresh the route's server data so /izbrannoe re-renders
+      // with the new save state. Cheap on most pages (just reruns
+      // the server component); essential on /izbrannoe where the
+      // saved-list is the entire page.
+      router.refresh();
     } catch {
       // Revert on error.
       setSaved(!optimistic);

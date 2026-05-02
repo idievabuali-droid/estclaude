@@ -3,7 +3,16 @@
  * save (user_id NOT NULL). Telegram-based auth landed in 0008; pass
  * the current user's id from `getCurrentUser()` — never default to a
  * mock id, that previously leaked the founder's saves to every visitor.
+ *
+ * IMPORTANT — uses the admin (service-role) Supabase client. Reason:
+ * RLS on saved_items is `user_id = auth.uid()`, but our auth is
+ * cookie-session-based (not Supabase Auth), so auth.uid() is always
+ * NULL and the policy blocks reads for everyone. The admin client
+ * bypasses RLS — safe here because the caller has already verified
+ * the user via getCurrentUser() before calling, and we always scope
+ * by the explicit userId argument (no implicit "current user" leak).
  */
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import { mapListing } from './buildings';
@@ -101,7 +110,8 @@ export async function getMySavedItems(userId: string): Promise<{
   listings: SavedListing[];
   buildings: SavedBuilding[];
 }> {
-  const supabase = await createClient();
+  // Admin client to bypass RLS (see file-level comment for why).
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('saved_items')
     .select('saved_at, building_id, listing_id')

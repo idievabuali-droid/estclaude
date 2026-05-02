@@ -26,6 +26,18 @@ export async function POST() {
   expiresAt.setMinutes(expiresAt.getMinutes() + TOKEN_TTL_MINUTES);
 
   const supabase = createAdminClient();
+
+  // Opportunistic cleanup of expired auth_sessions. Free side effect
+  // of every login attempt — keeps the table from growing unbounded
+  // without a dedicated cron. Limit to old rows so we don't scan the
+  // whole table on every call.
+  const cutoff = new Date();
+  cutoff.setHours(cutoff.getHours() - 1);
+  void supabase
+    .from('auth_sessions')
+    .delete()
+    .lt('expires_at', cutoff.toISOString());
+
   const { error } = await supabase.from('auth_sessions').insert({
     token,
     status: 'pending',
