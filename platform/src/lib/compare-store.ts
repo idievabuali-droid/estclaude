@@ -5,10 +5,22 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 
 export type CompareType = 'buildings' | 'listings';
 
+/**
+ * Result of a toggle() call. Lets the caller distinguish between an
+ * ordinary add/remove and a "type-swap" that wiped the previous
+ * selection — so we can toast the user instead of silently losing
+ * their compare set.
+ */
+export type ToggleResult =
+  | { kind: 'added' }
+  | { kind: 'removed' }
+  | { kind: 'capped' }                                  // already at MAX, no-op
+  | { kind: 'type-swapped'; previousType: CompareType }; // cleared old, added new
+
 type CompareState = {
   type: CompareType | null;
   ids: string[];
-  toggle: (type: CompareType, id: string) => void;
+  toggle: (type: CompareType, id: string) => ToggleResult;
   remove: (id: string) => void;
   clear: () => void;
   hasItem: (type: CompareType, id: string) => boolean;
@@ -22,6 +34,8 @@ const MAX_ITEMS = 4;
  * survives page navigation but resets on a new browser session.
  *
  * Type is locked to whichever was added first — switching type clears.
+ * The toggle return value tells the caller what happened so it can
+ * surface a toast on type-swap (silent wipes are confusing UX).
  */
 export const useCompareStore = create<CompareState>()(
   persist(
@@ -30,17 +44,23 @@ export const useCompareStore = create<CompareState>()(
       ids: [],
       toggle(type, id) {
         const s = get();
-        // Different type → reset to the new selection
+        // Different type → wipe and start fresh with the new selection.
         if (s.type && s.type !== type) {
-          return set({ type, ids: [id] });
+          const previousType = s.type;
+          set({ type, ids: [id] });
+          return { kind: 'type-swapped', previousType };
         }
         const has = s.ids.includes(id);
         if (has) {
           const next = s.ids.filter((x) => x !== id);
-          return set({ type: next.length === 0 ? null : type, ids: next });
+          set({ type: next.length === 0 ? null : type, ids: next });
+          return { kind: 'removed' };
         }
-        if (s.ids.length >= MAX_ITEMS) return;
+        if (s.ids.length >= MAX_ITEMS) {
+          return { kind: 'capped' };
+        }
         set({ type, ids: [...s.ids, id] });
+        return { kind: 'added' };
       },
       remove(id) {
         const s = get();

@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { Check, Minus, X } from 'lucide-react';
+import { Check, Minus, X, TrendingUp, Trophy } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton, AppCard, AppCardContent } from '@/components/primitives';
@@ -9,16 +9,29 @@ import {
   getBuildingsByIds,
   getDeveloperById,
   getDistrictById,
-  listFeaturedBuildings,
-  listBuildings,
 } from '@/services/buildings';
-import type { MockBuilding, MockListing } from '@/lib/mock';
+import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import { formatPriceNumber, formatM2, formatFloor } from '@/lib/format';
 
 /**
- * Page 8 — /sravnenie (Compare).
- * Per Architecture: compare state lives in URL only, no compare table.
- * V1 supports comparing buildings OR listings (not mixed).
+ * /sravnenie — side-by-side comparison page.
+ *
+ * V1 polish:
+ *   1. WINNER SUMMARY card at the top — buyers see at a glance which item
+ *      wins on each meaningful dimension (cheapest, biggest, fastest
+ *      delivery, most verified developer, etc.) WITHOUT having to scan
+ *      every row of the table.
+ *   2. Per-row difference highlighting — winner cell green + check;
+ *      worst cell shows percentage delta in red so the magnitude of the
+ *      gap is obvious; tied rows get a subtle "одинаково" marker so the
+ *      buyer knows the row isn't a differentiator.
+ *   3. Rows grouped under section headers (Цена, Параметры, Доверие)
+ *      so a 12-row table reads as 3 sub-stories rather than a wall.
+ *   4. Empty-state-only fallback when ?ids is empty — the previous
+ *      half-baked demo dump was confusing and pulled random listings.
+ *
+ * Type guarantee: V1 supports comparing buildings OR listings, never
+ * mixed (enforced by the compare store).
  */
 export default async function SravneniePage({
   params,
@@ -37,42 +50,18 @@ export default async function SravneniePage({
 
   const idList = sp.ids?.split(',').filter(Boolean) ?? [];
 
-  // Fetch by IDs from Supabase. If no IDs supplied, show a default demo set
-  // so the page is always meaningful (preview link, etc.).
-  let listings: MockListing[] = [];
-  let buildings: MockBuilding[] = [];
+  // No demo fallback — empty state is honest. Previously we pulled
+  // random featured listings here which buyers found confusing
+  // ("why are these listings being compared?").
+  const listings: MockListing[] =
+    type === 'listings' && idList.length > 0 ? await getListingsByIds(idList) : [];
+  const buildings: MockBuilding[] =
+    type === 'buildings' && idList.length > 0 ? await getBuildingsByIds(idList) : [];
 
-  if (type === 'listings') {
-    if (idList.length > 0) {
-      listings = await getListingsByIds(idList);
-    } else {
-      const featured = await listFeaturedBuildings(3);
-      const ids = featured.map((b) => b.id);
-      // Demo fallback: take 3 listings from any of the featured buildings
-      const allBuildings = await listBuildings({});
-      const allBuildingIds = new Set(allBuildings.map((b) => b.id));
-      listings = (await getListingsByIds([])).slice(0, 0); // placeholder
-      // Pull first 3 active listings via a minimal query
-      const { listListings } = await import('@/services/listings');
-      const all = await listListings({});
-      listings = all
-        .filter((l) => allBuildingIds.has(l.building_id))
-        .slice(0, 3);
-      // Quiet unused
-      void ids;
-    }
-  } else {
-    if (idList.length > 0) {
-      buildings = await getBuildingsByIds(idList);
-    } else {
-      buildings = await listFeaturedBuildings(3);
-    }
-  }
-
-  // For buildings rendering — pre-fetch developer + district for each
-  const developerMap = new Map<string, Awaited<ReturnType<typeof getDeveloperById>>>();
-  const districtMap = new Map<string, Awaited<ReturnType<typeof getDistrictById>>>();
-  if (type === 'buildings') {
+  // For buildings rendering — pre-fetch developer + district per item.
+  const developerMap = new Map<string, MockDeveloper | null>();
+  const districtMap = new Map<string, MockDistrict | null>();
+  if (type === 'buildings' && buildings.length > 0) {
     const devIds = [...new Set(buildings.map((b) => b.developer_id))];
     const distIds = [...new Set(buildings.map((b) => b.district_id))];
     await Promise.all([
@@ -80,7 +69,7 @@ export default async function SravneniePage({
       ...distIds.map(async (id) => districtMap.set(id, await getDistrictById(id))),
     ]);
   }
-  // For listings rendering — also need parent buildings
+  // For listings rendering — also need parent buildings.
   const buildingsForListings = new Map<string, MockBuilding>();
   if (type === 'listings' && listings.length > 0) {
     const bIds = [...new Set(listings.map((l) => l.building_id))];
@@ -125,7 +114,7 @@ export default async function SravneniePage({
       </section>
 
       <section className="py-6">
-        <AppContainer>
+        <AppContainer className="flex flex-col gap-5">
           {isEmpty ? (
             <AppCard>
               <AppCardContent>
@@ -134,7 +123,7 @@ export default async function SravneniePage({
                   <h3 className="text-h3 font-semibold text-stone-900">Нечего сравнивать</h3>
                   <p className="text-meta text-stone-500">
                     Добавьте {type === 'listings' ? 'квартиры' : 'проекты'} в сравнение через
-                    кнопку весов на карточке.
+                    кнопку на карточке (значок с двумя стрелками).
                   </p>
                   <Link href={type === 'listings' ? '/kvartiry' : '/novostroyki'}>
                     <AppButton variant="primary">
@@ -163,6 +152,109 @@ export default async function SravneniePage({
   );
 }
 
+// ─── Helpers shared by both views ──────────────────────────────
+
+const VERIFICATION_RANK: Record<string, number> = {
+  listing_verified: 3,
+  profile_verified: 2,
+  phone_verified: 1,
+};
+
+/** Inline percentage delta vs the winning value (for "this is X% worse"). */
+function deltaPercent(value: number, winner: number, lowerIsBetter: boolean): string | null {
+  if (value === winner || winner === 0) return null;
+  const pct = lowerIsBetter
+    ? Math.round(((value - winner) / winner) * 100)
+    : Math.round(((winner - value) / winner) * 100);
+  if (pct === 0) return null;
+  return lowerIsBetter ? `+${pct}%` : `−${pct}%`;
+}
+
+/** Visual treatment for a single cell in a comparison row. */
+function cellClassFor(state: 'winner' | 'worst' | 'neutral'): string {
+  if (state === 'winner') {
+    return 'text-[color:var(--color-fairness-great)] font-semibold';
+  }
+  if (state === 'worst') return 'text-rose-700';
+  return 'text-stone-700';
+}
+
+/** Group section header used in both views. */
+function GroupHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <tr className="bg-stone-50">
+      <td
+        colSpan={99}
+        className="px-4 py-2 text-caption font-semibold uppercase tracking-wide text-stone-500"
+      >
+        {children}
+      </td>
+    </tr>
+  );
+}
+
+function MobileGroupLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-caption font-semibold uppercase tracking-wide text-stone-500">
+      {children}
+    </div>
+  );
+}
+
+/** Winner summary card — same structure for both listings + buildings. */
+interface WinnerRow {
+  icon: React.ReactNode;
+  metric: string;
+  itemLabel: string;
+  value: string;
+  href: string;
+}
+
+function WinnerSummary({ winners }: { winners: WinnerRow[] }) {
+  if (winners.length === 0) return null;
+  return (
+    <AppCard>
+      <AppCardContent>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <Trophy
+              className="size-5 text-[color:var(--color-fairness-great)]"
+              aria-hidden
+            />
+            <h2 className="text-h3 font-semibold text-stone-900">Кто лучше в чём</h2>
+          </div>
+          <div className="flex flex-col">
+            {winners.map((w, i) => (
+              <div
+                key={`${w.metric}-${i}`}
+                className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 py-2 last:border-b-0"
+              >
+                <div className="flex items-center gap-2">
+                  <span aria-hidden className="text-base">
+                    {w.icon}
+                  </span>
+                  <span className="text-meta text-stone-500">{w.metric}</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <Link
+                    href={w.href}
+                    className="text-meta font-semibold text-stone-900 hover:text-terracotta-600"
+                  >
+                    {w.itemLabel}
+                  </Link>
+                  <span className="text-caption text-stone-500 tabular-nums">{w.value}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </AppCardContent>
+    </AppCard>
+  );
+}
+
+// ─── Listings comparison ──────────────────────────────────────
+
 function ListingsCompare({
   items,
   buildingMap,
@@ -172,84 +264,226 @@ function ListingsCompare({
   buildingMap: Map<string, MockBuilding>;
   tFinishing: (k: string) => string;
 }) {
-  const minPrice = items.reduce(
-    (acc, l) => (l.price_total_dirams < acc ? l.price_total_dirams : acc),
-    items[0]!.price_total_dirams,
-  );
+  // Pre-compute winners for each numeric/winnable dimension.
+  const minPrice = Math.min(...items.map((l) => Number(l.price_total_dirams)));
+  const maxPrice = Math.max(...items.map((l) => Number(l.price_total_dirams)));
+  const minPricePerM2 = Math.min(...items.map((l) => Number(l.price_per_m2_dirams)));
+  const maxArea = Math.max(...items.map((l) => l.size_m2));
+  const maxFloor = Math.max(...items.map((l) => l.floor_number));
+  const anyInstallment = items.some((l) => l.installment_available);
+  const allSamePrice = minPrice === maxPrice;
 
-  const rows: Array<{ label: string; render: (l: MockListing) => React.ReactNode }> = [
+  const labelFor = (l: MockListing): string => {
+    const b = buildingMap.get(l.building_id);
+    return `${b?.name.ru ?? '—'} · ${l.rooms_count}-комн`;
+  };
+  const hrefFor = (l: MockListing) => `/kvartira/${l.slug}`;
+
+  // Build the winner summary.
+  const winners: WinnerRow[] = [];
+  if (!allSamePrice) {
+    const cheapest = items.find((l) => Number(l.price_total_dirams) === minPrice)!;
+    winners.push({
+      icon: '💰',
+      metric: 'Лучшая цена',
+      itemLabel: labelFor(cheapest),
+      value: `${formatPriceNumber(cheapest.price_total_dirams)} TJS`,
+      href: hrefFor(cheapest),
+    });
+  }
+  if (Math.min(...items.map((l) => l.size_m2)) !== maxArea) {
+    const biggest = items.find((l) => l.size_m2 === maxArea)!;
+    winners.push({
+      icon: '📐',
+      metric: 'Самая большая',
+      itemLabel: labelFor(biggest),
+      value: formatM2(biggest.size_m2),
+      href: hrefFor(biggest),
+    });
+  }
+  const cheapestPerM2 = items.find((l) => Number(l.price_per_m2_dirams) === minPricePerM2)!;
+  if (Math.max(...items.map((l) => Number(l.price_per_m2_dirams))) !== minPricePerM2) {
+    winners.push({
+      icon: '⚖️',
+      metric: 'Лучшая цена за м²',
+      itemLabel: labelFor(cheapestPerM2),
+      value: `${formatPriceNumber(cheapestPerM2.price_per_m2_dirams)} TJS / м²`,
+      href: hrefFor(cheapestPerM2),
+    });
+  }
+  if (anyInstallment && !items.every((l) => l.installment_available)) {
+    const withInstallment = items.filter((l) => l.installment_available);
+    winners.push({
+      icon: '💳',
+      metric: 'С рассрочкой',
+      itemLabel:
+        withInstallment.length === 1
+          ? `только у ${labelFor(withInstallment[0]!)}`
+          : `у ${withInstallment.length} из ${items.length}`,
+      value: '',
+      href: hrefFor(withInstallment[0]!),
+    });
+  }
+  // Verification: highest tier wins (dev-verified > listing > profile > phone).
+  const verRank = (l: MockListing): number => {
+    const b = buildingMap.get(l.building_id);
+    if (b && (l.source_type === 'developer')) return 4;
+    return VERIFICATION_RANK[l.verification_tier] ?? 0;
+  };
+  const maxVerRank = Math.max(...items.map(verRank));
+  if (Math.min(...items.map(verRank)) !== maxVerRank) {
+    const mostTrusted = items.find((l) => verRank(l) === maxVerRank)!;
+    winners.push({
+      icon: '✓',
+      metric: 'Лучшая проверка',
+      itemLabel: labelFor(mostTrusted),
+      value: '',
+      href: hrefFor(mostTrusted),
+    });
+  }
+
+  // ─── Rows definition with state per cell ──────────────────────
+  type Cell = { state: 'winner' | 'worst' | 'neutral'; node: React.ReactNode };
+  type Row = {
+    label: string;
+    group: 'price' | 'unit' | 'trust';
+    cells: (l: MockListing) => Cell;
+    allSame?: boolean;
+  };
+
+  const isAllSame = <T,>(values: T[]): boolean => values.every((v) => v === values[0]);
+
+  const rows: Row[] = [
     {
       label: 'Цена',
-      render: (l) => (
-        <span
-          className={`text-h3 font-semibold tabular-nums ${l.price_total_dirams === minPrice ? 'text-[color:var(--color-fairness-great)]' : 'text-stone-900'}`}
-        >
-          {formatPriceNumber(l.price_total_dirams)} TJS
-          {l.price_total_dirams === minPrice ? (
-            <Check className="ml-1 inline size-3.5" aria-label="Самая низкая цена" />
-          ) : null}
-        </span>
-      ),
+      group: 'price',
+      allSame: allSamePrice,
+      cells: (l) => {
+        const v = Number(l.price_total_dirams);
+        const state: Cell['state'] =
+          allSamePrice ? 'neutral' : v === minPrice ? 'winner' : v === maxPrice ? 'worst' : 'neutral';
+        const delta = deltaPercent(v, minPrice, true);
+        return {
+          state,
+          node: (
+            <span className={`text-h3 tabular-nums ${cellClassFor(state)}`}>
+              {formatPriceNumber(l.price_total_dirams)} TJS
+              {state === 'winner' ? <Check className="ml-1 inline size-3.5" aria-hidden /> : null}
+              {state === 'worst' && delta ? (
+                <span className="ml-2 text-caption font-normal">{delta}</span>
+              ) : null}
+            </span>
+          ),
+        };
+      },
     },
     {
       label: 'Цена за м²',
-      render: (l) => (
-        <span className="text-meta tabular-nums text-stone-700">
-          {formatPriceNumber(l.price_per_m2_dirams)} TJS
-        </span>
-      ),
-    },
-    {
-      label: 'Площадь',
-      render: (l) => (
-        <span className="text-meta tabular-nums text-stone-700">{formatM2(l.size_m2)}</span>
-      ),
-    },
-    {
-      label: 'Комнат',
-      render: (l) => <span className="text-meta tabular-nums text-stone-700">{l.rooms_count}</span>,
-    },
-    {
-      label: 'Этаж',
-      render: (l) => (
-        <span className="text-meta tabular-nums text-stone-700">
-          {formatFloor(l.floor_number, l.total_floors)}
-        </span>
-      ),
-    },
-    {
-      label: 'Отделка',
-      render: (l) => (
-        <span className="text-meta text-stone-700">{tFinishing(l.finishing_type)}</span>
-      ),
-    },
-    {
-      label: 'Источник',
-      render: (l) => <SourceChip source={l.source_type} />,
-    },
-    {
-      label: 'Проверка',
-      render: (l) => <VerificationBadge tier={l.verification_tier} />,
+      group: 'price',
+      allSame: isAllSame(items.map((l) => Number(l.price_per_m2_dirams))),
+      cells: (l) => {
+        const v = Number(l.price_per_m2_dirams);
+        const state: Cell['state'] = v === minPricePerM2 ? 'winner' : 'neutral';
+        return {
+          state,
+          node: (
+            <span className={`text-meta tabular-nums ${cellClassFor(state)}`}>
+              {formatPriceNumber(l.price_per_m2_dirams)} TJS
+            </span>
+          ),
+        };
+      },
     },
     {
       label: 'Рассрочка',
-      render: (l) =>
-        l.installment_available ? (
-          <Check className="size-4 text-[color:var(--color-fairness-great)]" aria-label="Есть" />
+      group: 'price',
+      allSame: isAllSame(items.map((l) => l.installment_available)),
+      cells: (l) => ({
+        state: l.installment_available ? 'winner' : 'neutral',
+        node: l.installment_available ? (
+          <span className="inline-flex items-center gap-1 text-meta font-medium text-[color:var(--color-fairness-great)]">
+            <Check className="size-4" aria-hidden /> Есть
+          </span>
         ) : (
-          <Minus className="size-4 text-stone-300" aria-label="Нет" />
+          <span className="inline-flex items-center gap-1 text-meta text-stone-400">
+            <Minus className="size-4" aria-hidden /> Нет
+          </span>
         ),
+      }),
+    },
+    {
+      label: 'Площадь',
+      group: 'unit',
+      allSame: isAllSame(items.map((l) => l.size_m2)),
+      cells: (l) => {
+        const state: Cell['state'] = l.size_m2 === maxArea ? 'winner' : 'neutral';
+        return {
+          state,
+          node: <span className={`text-meta tabular-nums ${cellClassFor(state)}`}>{formatM2(l.size_m2)}</span>,
+        };
+      },
+    },
+    {
+      label: 'Комнат',
+      group: 'unit',
+      allSame: isAllSame(items.map((l) => l.rooms_count)),
+      cells: (l) => ({
+        state: 'neutral',
+        node: <span className="text-meta tabular-nums text-stone-700">{l.rooms_count}</span>,
+      }),
+    },
+    {
+      label: 'Этаж',
+      group: 'unit',
+      allSame: isAllSame(items.map((l) => l.floor_number)),
+      cells: (l) => {
+        const state: Cell['state'] = l.floor_number === maxFloor ? 'winner' : 'neutral';
+        return {
+          state,
+          node: (
+            <span className={`text-meta tabular-nums ${cellClassFor(state)}`}>
+              {formatFloor(l.floor_number, l.total_floors)}
+            </span>
+          ),
+        };
+      },
+    },
+    {
+      label: 'Отделка',
+      group: 'unit',
+      allSame: isAllSame(items.map((l) => l.finishing_type)),
+      cells: (l) => ({
+        state: 'neutral',
+        node: <span className="text-meta text-stone-700">{tFinishing(l.finishing_type)}</span>,
+      }),
+    },
+    {
+      label: 'Источник',
+      group: 'trust',
+      allSame: isAllSame(items.map((l) => l.source_type)),
+      cells: (l) => ({ state: 'neutral', node: <SourceChip source={l.source_type} /> }),
+    },
+    {
+      label: 'Проверка',
+      group: 'trust',
+      allSame: isAllSame(items.map((l) => l.verification_tier)),
+      cells: (l) => {
+        const state: Cell['state'] = verRank(l) === maxVerRank ? 'winner' : 'neutral';
+        return { state, node: <VerificationBadge tier={l.verification_tier} /> };
+      },
     },
   ];
 
   return (
     <>
-      {/* MOBILE: vertical stacked cards (BUG-5). One full-width card per listing. */}
+      <WinnerSummary winners={winners} />
+
+      {/* MOBILE: per-listing cards stacked, with winner cells flagged */}
       <div className="flex flex-col gap-4 md:hidden">
         {items.map((l) => {
           const building = buildingMap.get(l.building_id);
           const isSold = l.status !== 'active';
-          const isCheapest = l.price_total_dirams === minPrice;
+          const isCheapest = Number(l.price_total_dirams) === minPrice && !allSamePrice;
           return (
             <AppCard key={l.id} className={isSold ? 'opacity-60' : ''}>
               <AppCardContent>
@@ -274,17 +508,34 @@ function ListingsCompare({
                       {l.status === 'sold' ? 'Продано' : 'Снято'}
                     </span>
                   ) : null}
-                  <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
-                    {rows.map((row) => (
-                      <div key={row.label} className="flex flex-col gap-0.5">
-                        <dt className="text-caption text-stone-500">{row.label}</dt>
-                        <dd>{row.render(l)}</dd>
-                      </div>
-                    ))}
-                  </dl>
+                  {(['price', 'unit', 'trust'] as const).map((group) => (
+                    <div key={group} className="flex flex-col gap-2">
+                      <MobileGroupLabel>
+                        {group === 'price' ? 'Цена' : group === 'unit' ? 'Параметры' : 'Доверие'}
+                      </MobileGroupLabel>
+                      <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+                        {rows
+                          .filter((r) => r.group === group)
+                          .map((row) => {
+                            const c = row.cells(l);
+                            return (
+                              <div key={row.label} className="flex flex-col gap-0.5">
+                                <dt className="text-caption text-stone-500">
+                                  {row.label}
+                                  {row.allSame ? (
+                                    <span className="ml-1 text-stone-400">· одинаково</span>
+                                  ) : null}
+                                </dt>
+                                <dd>{c.node}</dd>
+                              </div>
+                            );
+                          })}
+                      </dl>
+                    </div>
+                  ))}
                   {isCheapest ? (
                     <span className="inline-flex w-fit items-center gap-1 rounded-sm bg-green-50 px-2 py-1 text-caption font-medium text-[color:var(--color-fairness-great)]">
-                      <Check className="size-3" aria-hidden /> Самая низкая цена
+                      <TrendingUp className="size-3" aria-hidden /> Самая низкая цена
                     </span>
                   ) : null}
                 </div>
@@ -294,7 +545,7 @@ function ListingsCompare({
         })}
       </div>
 
-      {/* TABLET+: traditional comparison table */}
+      {/* TABLET+: traditional comparison table with row groups */}
       <div className="hidden overflow-x-auto rounded-md border border-stone-200 bg-white md:block">
         <table className="min-w-full">
           <thead>
@@ -336,17 +587,8 @@ function ListingsCompare({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr key={row.label} className="border-b border-stone-100 last:border-b-0">
-                <td className="sticky left-0 z-10 bg-white px-4 py-3 text-meta font-medium text-stone-500">
-                  {row.label}
-                </td>
-                {items.map((l) => (
-                  <td key={l.id} className="px-4 py-3">
-                    {row.render(l)}
-                  </td>
-                ))}
-              </tr>
+            {(['price', 'unit', 'trust'] as const).map((group) => (
+              <Group key={group} title={groupLabel(group)} rows={rows.filter((r) => r.group === group)} items={items} />
             ))}
           </tbody>
         </table>
@@ -355,14 +597,76 @@ function ListingsCompare({
   );
 }
 
+function groupLabel(group: 'price' | 'unit' | 'trust' | 'about'): string {
+  switch (group) {
+    case 'price':
+      return 'Цена';
+    case 'unit':
+      return 'Параметры квартиры';
+    case 'trust':
+      return 'Доверие';
+    case 'about':
+      return 'О ЖК';
+  }
+}
+
+/** Group of rows in a comparison table. Renders a section header
+ *  followed by the rows themselves. */
+function Group<T>({
+  title,
+  rows,
+  items,
+}: {
+  title: string;
+  rows: Array<{
+    label: string;
+    cells: (item: T) => { state: 'winner' | 'worst' | 'neutral'; node: React.ReactNode };
+    allSame?: boolean;
+  }>;
+  items: T[];
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <>
+      <GroupHeader>{title}</GroupHeader>
+      {rows.map((row) => (
+        <tr key={row.label} className="border-b border-stone-100 last:border-b-0">
+          <td className="sticky left-0 z-10 bg-white px-4 py-3 text-meta font-medium text-stone-500">
+            {row.label}
+            {row.allSame ? (
+              <span className="ml-2 text-caption font-normal text-stone-400">одинаково</span>
+            ) : null}
+          </td>
+          {items.map((item, idx) => {
+            const c = row.cells(item);
+            return (
+              <td
+                key={idx}
+                className={
+                  'px-4 py-3 ' +
+                  (c.state === 'winner' ? 'bg-green-50/50' : c.state === 'worst' ? 'bg-rose-50/40' : '')
+                }
+              >
+                {c.node}
+              </td>
+            );
+          })}
+        </tr>
+      ))}
+    </>
+  );
+}
+
+// ─── Buildings comparison ─────────────────────────────────────
+
 function BuildingsCompare({
   items,
   developerMap,
   districtMap,
 }: {
   items: MockBuilding[];
-  developerMap: Map<string, Awaited<ReturnType<typeof getDeveloperById>>>;
-  districtMap: Map<string, Awaited<ReturnType<typeof getDistrictById>>>;
+  developerMap: Map<string, MockDeveloper | null>;
+  districtMap: Map<string, MockDistrict | null>;
 }) {
   const STATUS: Record<string, string> = {
     announced: 'Котлован',
@@ -370,74 +674,203 @@ function BuildingsCompare({
     near_completion: 'Почти готов',
     delivered: 'Сдан',
   };
-  const minPrice = items.reduce(
-    (acc, b) =>
-      b.price_from_dirams != null && (acc == null || b.price_from_dirams < acc)
-        ? b.price_from_dirams
-        : acc,
-    items[0]?.price_from_dirams ?? null,
-  );
-  const rows: Array<{ label: string; render: (b: MockBuilding) => React.ReactNode }> = [
+  // Status rank: delivered = best (move-in-ready), announced = worst.
+  const STATUS_RANK: Record<string, number> = {
+    delivered: 4,
+    near_completion: 3,
+    under_construction: 2,
+    announced: 1,
+  };
+
+  const pricesPerM2 = items
+    .map((b) => (b.price_per_m2_from_dirams != null ? Number(b.price_per_m2_from_dirams) : null))
+    .filter((v): v is number => v != null);
+  const minPricePerM2 = pricesPerM2.length > 0 ? Math.min(...pricesPerM2) : null;
+  const maxPricePerM2 = pricesPerM2.length > 0 ? Math.max(...pricesPerM2) : null;
+  const allSamePricePerM2 = minPricePerM2 === maxPricePerM2;
+  const maxFloors = Math.max(...items.map((b) => b.total_floors));
+  const maxUnits = Math.max(...items.map((b) => b.total_units));
+  const maxStatusRank = Math.max(...items.map((b) => STATUS_RANK[b.status] ?? 0));
+
+  const labelFor = (b: MockBuilding) => b.name.ru;
+  const hrefFor = (b: MockBuilding) => `/zhk/${b.slug}`;
+
+  const winners: WinnerRow[] = [];
+  if (minPricePerM2 != null && !allSamePricePerM2) {
+    const cheapest = items.find(
+      (b) => b.price_per_m2_from_dirams != null && Number(b.price_per_m2_from_dirams) === minPricePerM2,
+    )!;
+    winners.push({
+      icon: '💰',
+      metric: 'Лучшая цена за м²',
+      itemLabel: labelFor(cheapest),
+      value: `от ${formatPriceNumber(cheapest.price_per_m2_from_dirams!)} TJS / м²`,
+      href: hrefFor(cheapest),
+    });
+  }
+  if (!items.every((b) => STATUS_RANK[b.status] === maxStatusRank)) {
+    const mostReady = items.find((b) => STATUS_RANK[b.status] === maxStatusRank)!;
+    winners.push({
+      icon: '🏗',
+      metric: 'Готовность к заселению',
+      itemLabel: labelFor(mostReady),
+      value: STATUS[mostReady.status] ?? '',
+      href: hrefFor(mostReady),
+    });
+  }
+  if (Math.min(...items.map((b) => b.total_units)) !== maxUnits) {
+    const biggest = items.find((b) => b.total_units === maxUnits)!;
+    winners.push({
+      icon: '🏢',
+      metric: 'Самый большой проект',
+      itemLabel: labelFor(biggest),
+      value: `${biggest.total_units} квартир`,
+      href: hrefFor(biggest),
+    });
+  }
+  // Best developer = verified one (boolean).
+  const verifiedItems = items.filter((b) => developerMap.get(b.developer_id)?.is_verified);
+  if (verifiedItems.length > 0 && verifiedItems.length < items.length) {
+    winners.push({
+      icon: '✓',
+      metric: 'Проверенный застройщик',
+      itemLabel:
+        verifiedItems.length === 1
+          ? `только у ${labelFor(verifiedItems[0]!)}`
+          : `у ${verifiedItems.length} из ${items.length}`,
+      value: '',
+      href: hrefFor(verifiedItems[0]!),
+    });
+  }
+
+  type Cell = { state: 'winner' | 'worst' | 'neutral'; node: React.ReactNode };
+  type Row = {
+    label: string;
+    group: 'price' | 'about' | 'trust';
+    cells: (b: MockBuilding) => Cell;
+    allSame?: boolean;
+  };
+
+  const isAllSame = <T,>(values: T[]): boolean => values.every((v) => v === values[0]);
+
+  const rows: Row[] = [
     {
       label: 'Цена от',
-      render: (b) =>
-        b.price_from_dirams ? (
-          <span
-            className={`text-h3 font-semibold tabular-nums ${b.price_from_dirams === minPrice ? 'text-[color:var(--color-fairness-great)]' : 'text-stone-900'}`}
-          >
-            {formatPriceNumber(b.price_from_dirams)} TJS
-          </span>
-        ) : (
-          <span className="text-meta text-stone-400">—</span>
-        ),
-    },
-    {
-      label: 'Статус',
-      render: (b) => <span className="text-meta text-stone-700">{STATUS[b.status]}</span>,
-    },
-    {
-      label: 'Сдача',
-      render: (b) => (
-        <span className="text-meta tabular-nums text-stone-700">
-          {b.handover_estimated_quarter ?? 'Сдан'}
-        </span>
-      ),
-    },
-    {
-      label: 'Этажей',
-      render: (b) => <span className="text-meta tabular-nums text-stone-700">{b.total_floors}</span>,
-    },
-    {
-      label: 'Квартир',
-      render: (b) => <span className="text-meta tabular-nums text-stone-700">{b.total_units}</span>,
-    },
-    {
-      label: 'Район',
-      render: (b) => {
-        const d = districtMap.get(b.district_id);
-        return <span className="text-meta text-stone-700">{d?.name.ru ?? '—'}</span>;
+      group: 'price',
+      allSame: allSamePricePerM2,
+      cells: (b) => {
+        if (b.price_per_m2_from_dirams == null) {
+          return { state: 'neutral', node: <span className="text-meta text-stone-400">—</span> };
+        }
+        const v = Number(b.price_per_m2_from_dirams);
+        const state: Cell['state'] =
+          allSamePricePerM2
+            ? 'neutral'
+            : v === minPricePerM2
+              ? 'winner'
+              : v === maxPricePerM2
+                ? 'worst'
+                : 'neutral';
+        const delta = minPricePerM2 != null ? deltaPercent(v, minPricePerM2, true) : null;
+        return {
+          state,
+          node: (
+            <span className={`text-h3 tabular-nums ${cellClassFor(state)}`}>
+              {formatPriceNumber(b.price_per_m2_from_dirams)} TJS / м²
+              {state === 'winner' ? <Check className="ml-1 inline size-3.5" aria-hidden /> : null}
+              {state === 'worst' && delta ? (
+                <span className="ml-2 text-caption font-normal">{delta}</span>
+              ) : null}
+            </span>
+          ),
+        };
       },
     },
     {
+      label: 'Статус',
+      group: 'about',
+      allSame: isAllSame(items.map((b) => b.status)),
+      cells: (b) => {
+        const state: Cell['state'] = (STATUS_RANK[b.status] ?? 0) === maxStatusRank ? 'winner' : 'neutral';
+        return { state, node: <span className={`text-meta ${cellClassFor(state)}`}>{STATUS[b.status]}</span> };
+      },
+    },
+    {
+      label: 'Сдача',
+      group: 'about',
+      allSame: isAllSame(items.map((b) => b.handover_estimated_quarter)),
+      cells: (b) => ({
+        state: 'neutral',
+        node: (
+          <span className="text-meta tabular-nums text-stone-700">
+            {b.handover_estimated_quarter ?? 'Сдан'}
+          </span>
+        ),
+      }),
+    },
+    {
+      label: 'Этажей',
+      group: 'about',
+      allSame: isAllSame(items.map((b) => b.total_floors)),
+      cells: (b) => {
+        const state: Cell['state'] = b.total_floors === maxFloors ? 'winner' : 'neutral';
+        return {
+          state,
+          node: <span className={`text-meta tabular-nums ${cellClassFor(state)}`}>{b.total_floors}</span>,
+        };
+      },
+    },
+    {
+      label: 'Квартир',
+      group: 'about',
+      allSame: isAllSame(items.map((b) => b.total_units)),
+      cells: (b) => {
+        const state: Cell['state'] = b.total_units === maxUnits ? 'winner' : 'neutral';
+        return {
+          state,
+          node: <span className={`text-meta tabular-nums ${cellClassFor(state)}`}>{b.total_units}</span>,
+        };
+      },
+    },
+    {
+      label: 'Район',
+      group: 'about',
+      allSame: isAllSame(items.map((b) => b.district_id)),
+      cells: (b) => ({
+        state: 'neutral',
+        node: <span className="text-meta text-stone-700">{districtMap.get(b.district_id)?.name.ru ?? '—'}</span>,
+      }),
+    },
+    {
       label: 'Застройщик',
-      render: (b) => {
+      group: 'trust',
+      cells: (b) => {
         const dev = developerMap.get(b.developer_id);
-        return (
-          <div className="flex flex-col gap-1">
-            <span className="text-meta text-stone-700">{dev?.display_name.ru ?? '—'}</span>
-            {dev?.is_verified ? <VerificationBadge tier="phone_verified" developerVerified /> : null}
-          </div>
-        );
+        const state: Cell['state'] = dev?.is_verified ? 'winner' : 'neutral';
+        return {
+          state,
+          node: (
+            <div className="flex flex-col gap-1">
+              <span className={`text-meta ${cellClassFor(state)}`}>{dev?.display_name.ru ?? '—'}</span>
+              {dev?.is_verified ? <VerificationBadge tier="phone_verified" developerVerified /> : null}
+            </div>
+          ),
+        };
       },
     },
   ];
 
   return (
     <>
-      {/* MOBILE: vertical stacked cards (BUG-5) */}
+      <WinnerSummary winners={winners} />
+
+      {/* MOBILE: per-building cards stacked */}
       <div className="flex flex-col gap-4 md:hidden">
         {items.map((b) => {
-          const isCheapest = b.price_from_dirams != null && b.price_from_dirams === minPrice;
+          const isCheapest =
+            !allSamePricePerM2 &&
+            b.price_per_m2_from_dirams != null &&
+            Number(b.price_per_m2_from_dirams) === minPricePerM2;
           return (
             <AppCard key={b.id}>
               <AppCardContent>
@@ -457,17 +890,36 @@ function BuildingsCompare({
                       <X className="size-4" />
                     </Link>
                   </div>
-                  <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
-                    {rows.map((row) => (
-                      <div key={row.label} className="flex flex-col gap-0.5">
-                        <dt className="text-caption text-stone-500">{row.label}</dt>
-                        <dd>{row.render(b)}</dd>
+                  {(['price', 'about', 'trust'] as const).map((group) => {
+                    const groupRows = rows.filter((r) => r.group === group);
+                    if (groupRows.length === 0) return null;
+                    return (
+                      <div key={group} className="flex flex-col gap-2">
+                        <MobileGroupLabel>
+                          {group === 'price' ? 'Цена' : group === 'about' ? 'О проекте' : 'Доверие'}
+                        </MobileGroupLabel>
+                        <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+                          {groupRows.map((row) => {
+                            const c = row.cells(b);
+                            return (
+                              <div key={row.label} className="flex flex-col gap-0.5">
+                                <dt className="text-caption text-stone-500">
+                                  {row.label}
+                                  {row.allSame ? (
+                                    <span className="ml-1 text-stone-400">· одинаково</span>
+                                  ) : null}
+                                </dt>
+                                <dd>{c.node}</dd>
+                              </div>
+                            );
+                          })}
+                        </dl>
                       </div>
-                    ))}
-                  </dl>
+                    );
+                  })}
                   {isCheapest ? (
                     <span className="inline-flex w-fit items-center gap-1 rounded-sm bg-green-50 px-2 py-1 text-caption font-medium text-[color:var(--color-fairness-great)]">
-                      <Check className="size-3" aria-hidden /> Самая низкая цена
+                      <TrendingUp className="size-3" aria-hidden /> Лучшая цена за м²
                     </span>
                   ) : null}
                 </div>
@@ -477,7 +929,7 @@ function BuildingsCompare({
         })}
       </div>
 
-      {/* TABLET+: traditional comparison table */}
+      {/* TABLET+: comparison table */}
       <div className="hidden overflow-x-auto rounded-md border border-stone-200 bg-white md:block">
         <table className="min-w-full">
           <thead>
@@ -507,17 +959,8 @@ function BuildingsCompare({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr key={row.label} className="border-b border-stone-100 last:border-b-0">
-                <td className="sticky left-0 z-10 bg-white px-4 py-3 text-meta font-medium text-stone-500">
-                  {row.label}
-                </td>
-                {items.map((b) => (
-                  <td key={b.id} className="px-4 py-3">
-                    {row.render(b)}
-                  </td>
-                ))}
-              </tr>
+            {(['price', 'about', 'trust'] as const).map((group) => (
+              <Group key={group} title={groupLabel(group)} rows={rows.filter((r) => r.group === group)} items={items} />
             ))}
           </tbody>
         </table>
