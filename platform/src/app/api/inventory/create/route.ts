@@ -63,6 +63,10 @@ interface CreateInventoryBody {
         // New building fields.
         name: string;
         address: string;
+        /** Optional landmark — appended to the description because we
+         *  don't have a dedicated DB column yet. Locals use these
+         *  ("напротив рынка Дусти") more than formal addresses. */
+        landmark?: string;
         district_id: string;
         developer_id: string;
         status: BuildingStatus;
@@ -122,6 +126,16 @@ export async function POST(req: NextRequest) {
       );
     }
     try {
+      // If the seller supplied a landmark, glue it onto the description
+      // until we add a dedicated `landmark` column. Format keeps it
+      // distinguishable for future migration to a structured field.
+      const composedDescription = [
+        b.description?.trim() || null,
+        b.landmark?.trim() ? `Ориентир: ${b.landmark.trim()}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n\n') || undefined;
+
       const created = await createBuilding({
         name: b.name.trim(),
         address: b.address.trim(),
@@ -131,7 +145,7 @@ export async function POST(req: NextRequest) {
         totalFloors: b.total_floors,
         totalUnits: b.total_units,
         handoverQuarter: b.handover_quarter,
-        description: b.description,
+        description: composedDescription,
         amenities: b.amenities,
         latitude: b.latitude,
         longitude: b.longitude,

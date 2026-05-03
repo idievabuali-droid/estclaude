@@ -13,10 +13,16 @@ import {
 } from '@/components/primitives';
 import { toast } from '@/components/primitives/AppToast';
 import { PhotoPicker, type PendingPhoto } from './PhotoPicker';
+import { LocationPicker } from './LocationPicker';
+import { NewDeveloperModal } from './NewDeveloperModal';
+import { NumberField } from './NumberField';
 
 interface DistrictOption {
   id: string;
   name: string;
+  /** Centroid lat/lng — used to centre the map picker on selection. */
+  center_lat: number;
+  center_lng: number;
 }
 
 interface BuildingOption {
@@ -29,6 +35,10 @@ interface DeveloperOption {
   name: string;
   display_name_ru: string;
 }
+
+/** Synthetic dropdown value that opens the new-developer modal
+ *  instead of selecting an existing one. UUIDs never look like this. */
+const ADD_DEVELOPER_VALUE = '__add_new__';
 
 export interface PostFlowProps {
   districts: DistrictOption[];
@@ -129,19 +139,28 @@ function makeApartmentDraft(overrides: Partial<ApartmentDraft> = {}): ApartmentD
 export function PostFlow({
   districts,
   existingBuildings,
-  developers,
+  developers: initialDevelopers,
   isFounder,
 }: PostFlowProps) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('choose');
   const [submitting, setSubmitting] = useState(false);
 
+  // Developers list is mutable: opening the new-developer modal can
+  // append a fresh entry. We initialise once from the server-fetched
+  // list and add to it locally as the user creates new ones.
+  const [developers, setDevelopers] = useState<DeveloperOption[]>(initialDevelopers);
+  const [developerModalOpen, setDeveloperModalOpen] = useState(false);
+
   // New-building form state.
   const [b, setB] = useState({
     name: '',
     address: '',
+    /** Optional landmark — Vahdat addresses are sparse; "напротив рынка"
+     *  is what locals actually use. Stored alongside the formal address. */
+    landmark: '',
     district_id: districts[0]?.id ?? '',
-    developer_id: developers[0]?.id ?? '',
+    developer_id: initialDevelopers[0]?.id ?? '',
     status: 'under_construction' as 'announced' | 'under_construction' | 'near_completion' | 'delivered',
     total_floors: '' as number | '',
     total_units: '' as number | '',
@@ -150,10 +169,17 @@ export function PostFlow({
     amenities: [] as string[],
   });
 
+  // Map-picked coordinates. Initially null — LocationPicker emits the
+  // district centroid on first mount so the form always has a value
+  // to submit even if the seller never drags the pin.
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+
   // Building-level cover photos (only used in 'new-building' mode).
   // Becomes the building's hero image + the cover_photo_id reference
   // on /zhk pages and building cards.
   const [buildingPhotos, setBuildingPhotos] = useState<PendingPhoto[]>([]);
+
+  const selectedDistrict = districts.find((d) => d.id === b.district_id);
 
   // Existing-building selection.
   const [existingBuildingId, setExistingBuildingId] = useState(
@@ -242,6 +268,7 @@ export function PostFlow({
           : {
               name: b.name.trim(),
               address: b.address.trim(),
+              landmark: b.landmark.trim() || undefined,
               district_id: b.district_id,
               developer_id: b.developer_id,
               status: b.status,
@@ -250,6 +277,8 @@ export function PostFlow({
               handover_quarter: b.handover_quarter.trim() || undefined,
               description: b.description.trim() || undefined,
               amenities: b.amenities,
+              latitude: coords?.lat,
+              longitude: coords?.lng,
               pendingPhotos: buildingPhotos,
             },
       apartments: apartments.map((a) => ({
@@ -397,14 +426,25 @@ export function PostFlow({
                 <AppSelect
                   label="Застройщик"
                   value={b.developer_id}
-                  onChange={(e) =>
-                    setB((s) => ({ ...s, developer_id: e.target.value }))
-                  }
+                  // Synthetic value opens the new-developer modal instead
+                  // of selecting; we deliberately don't update the form
+                  // state with __add_new__ so the dropdown bounces back
+                  // to the prior selection while the modal is open.
+                  onChange={(e) => {
+                    if (e.target.value === ADD_DEVELOPER_VALUE) {
+                      setDeveloperModalOpen(true);
+                      return;
+                    }
+                    setB((s) => ({ ...s, developer_id: e.target.value }));
+                  }}
                   required
-                  options={developers.map((d) => ({
-                    value: d.id,
-                    label: d.display_name_ru,
-                  }))}
+                  options={[
+                    ...developers.map((d) => ({
+                      value: d.id,
+                      label: d.display_name_ru,
+                    })),
+                    { value: ADD_DEVELOPER_VALUE, label: '+ Добавить нового застройщика' },
+                  ]}
                 />
                 <AppSelect
                   label="Стадия строительства"
@@ -423,35 +463,35 @@ export function PostFlow({
                   }
                   placeholder="2026-Q3"
                 />
-                <AppInput
+                <NumberField
                   label="Этажей в доме"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
                   value={b.total_floors}
-                  onChange={(e) =>
-                    setB((s) => ({
-                      ...s,
-                      total_floors: e.target.value === '' ? '' : Number(e.target.value),
-                    }))
-                  }
+                  onChange={(v) => setB((s) => ({ ...s, total_floors: v }))}
                   required
                 />
-                <AppInput
+                <NumberField
                   label="Всего квартир"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
                   value={b.total_units}
-                  onChange={(e) =>
-                    setB((s) => ({
-                      ...s,
-                      total_units: e.target.value === '' ? '' : Number(e.target.value),
-                    }))
-                  }
+                  onChange={(v) => setB((s) => ({ ...s, total_units: v }))}
                   required
                 />
               </div>
+              <AppInput
+                label="Ориентир (необязательно)"
+                value={b.landmark}
+                onChange={(e) => setB((s) => ({ ...s, landmark: e.target.value }))}
+                placeholder="напротив парка Дусти / рядом с базаром"
+                helperText="Если адреса нет на табличке — то, как место знают местные."
+              />
+              {selectedDistrict ? (
+                <LocationPicker
+                  centerLat={selectedDistrict.center_lat}
+                  centerLng={selectedDistrict.center_lng}
+                  centerKey={selectedDistrict.id}
+                  value={coords}
+                  onChange={setCoords}
+                />
+              ) : null}
               <AppTextarea
                 label="Описание"
                 value={b.description}
@@ -562,6 +602,15 @@ export function PostFlow({
       >
         {isFounder ? 'Опубликовать' : 'Отправить на модерацию'}
       </AppButton>
+
+      <NewDeveloperModal
+        open={developerModalOpen}
+        onClose={() => setDeveloperModalOpen(false)}
+        onCreated={(dev) => {
+          setDevelopers((list) => [...list, dev]);
+          setB((s) => ({ ...s, developer_id: dev.id }));
+        }}
+      />
     </div>
   );
 }
@@ -666,46 +715,25 @@ function ApartmentEditor({
               placeholder="—"
               options={ROOMS_OPTIONS}
             />
-            <AppInput
+            <NumberField
               label="Площадь, м²"
-              type="number"
-              inputMode="decimal"
-              step={0.5}
-              min={0}
+              decimal
               value={apartment.size_m2}
-              onChange={(e) =>
-                onChange({
-                  size_m2: e.target.value === '' ? '' : Number(e.target.value),
-                })
-              }
+              onChange={(v) => onChange({ size_m2: v })}
               required
               placeholder="55"
             />
-            <AppInput
+            <NumberField
               label="Этаж"
-              type="number"
-              inputMode="numeric"
-              min={1}
               value={apartment.floor_number}
-              onChange={(e) =>
-                onChange({
-                  floor_number: e.target.value === '' ? '' : Number(e.target.value),
-                })
-              }
+              onChange={(v) => onChange({ floor_number: v })}
               required
               placeholder="3"
             />
-            <AppInput
+            <NumberField
               label="Цена, TJS"
-              type="number"
-              inputMode="numeric"
-              min={0}
               value={apartment.price_tjs}
-              onChange={(e) =>
-                onChange({
-                  price_tjs: e.target.value === '' ? '' : Number(e.target.value),
-                })
-              }
+              onChange={(v) => onChange({ price_tjs: v })}
               required
               placeholder="450000"
             />
@@ -776,44 +804,30 @@ function ApartmentEditor({
               </label>
               {apartment.installmentEnabled ? (
                 <div className="grid grid-cols-3 gap-3">
-                  <AppInput
+                  <NumberField
                     label="Месяц, TJS"
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
                     value={apartment.installment_monthly_tjs ?? ''}
-                    onChange={(e) =>
+                    onChange={(v) =>
                       onChange({
-                        installment_monthly_tjs:
-                          e.target.value === '' ? undefined : Number(e.target.value),
+                        installment_monthly_tjs: v === '' ? undefined : v,
                       })
                     }
                   />
-                  <AppInput
+                  <NumberField
                     label="Первый взнос, %"
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    max={100}
                     value={apartment.installment_first_payment_percent ?? 30}
-                    onChange={(e) =>
+                    onChange={(v) =>
                       onChange({
-                        installment_first_payment_percent:
-                          e.target.value === '' ? undefined : Number(e.target.value),
+                        installment_first_payment_percent: v === '' ? undefined : v,
                       })
                     }
                   />
-                  <AppInput
+                  <NumberField
                     label="Срок, мес"
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={120}
                     value={apartment.installment_term_months ?? 84}
-                    onChange={(e) =>
+                    onChange={(v) =>
                       onChange({
-                        installment_term_months:
-                          e.target.value === '' ? undefined : Number(e.target.value),
+                        installment_term_months: v === '' ? undefined : v,
                       })
                     }
                   />

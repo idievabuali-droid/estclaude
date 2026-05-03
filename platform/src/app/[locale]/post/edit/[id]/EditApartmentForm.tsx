@@ -7,12 +7,12 @@ import {
   AppCard,
   AppCardContent,
   AppButton,
-  AppInput,
   AppSelect,
   AppTextarea,
 } from '@/components/primitives';
 import { toast } from '@/components/primitives/AppToast';
 import { PhotoPicker, type PendingPhoto } from '../../PhotoPicker';
+import { NumberField } from '../../NumberField';
 
 export interface ExistingPhoto {
   /** photos.id — what /api/listings/[id]/update needs to delete it. */
@@ -177,38 +177,23 @@ export function EditApartmentForm({
                 placeholder="—"
                 options={ROOMS_OPTIONS}
               />
-              <AppInput
+              <NumberField
                 label="Площадь, м²"
-                type="number"
-                inputMode="decimal"
-                step={0.5}
-                min={0}
+                decimal
                 value={size}
-                onChange={(e) =>
-                  setSize(e.target.value === '' ? '' : Number(e.target.value))
-                }
+                onChange={setSize}
                 required
               />
-              <AppInput
+              <NumberField
                 label="Этаж"
-                type="number"
-                inputMode="numeric"
-                min={1}
                 value={floor}
-                onChange={(e) =>
-                  setFloor(e.target.value === '' ? '' : Number(e.target.value))
-                }
+                onChange={setFloor}
                 required
               />
-              <AppInput
+              <NumberField
                 label="Цена, TJS"
-                type="number"
-                inputMode="numeric"
-                min={0}
                 value={price}
-                onChange={(e) =>
-                  setPrice(e.target.value === '' ? '' : Number(e.target.value))
-                }
+                onChange={setPrice}
                 required
               />
             </div>
@@ -305,43 +290,20 @@ export function EditApartmentForm({
                 </label>
                 {installmentEnabled ? (
                   <div className="grid grid-cols-3 gap-3">
-                    <AppInput
+                    <NumberField
                       label="Месяц, TJS"
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
                       value={installmentMonthly}
-                      onChange={(e) =>
-                        setInstallmentMonthly(
-                          e.target.value === '' ? '' : Number(e.target.value),
-                        )
-                      }
+                      onChange={setInstallmentMonthly}
                     />
-                    <AppInput
+                    <NumberField
                       label="Первый взнос, %"
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      max={100}
                       value={installmentPct}
-                      onChange={(e) =>
-                        setInstallmentPct(
-                          e.target.value === '' ? '' : Number(e.target.value),
-                        )
-                      }
+                      onChange={setInstallmentPct}
                     />
-                    <AppInput
+                    <NumberField
                       label="Срок, мес"
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={120}
                       value={installmentTerm}
-                      onChange={(e) =>
-                        setInstallmentTerm(
-                          e.target.value === '' ? '' : Number(e.target.value),
-                        )
-                      }
+                      onChange={setInstallmentTerm}
                     />
                   </div>
                 ) : null}
