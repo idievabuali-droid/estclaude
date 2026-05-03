@@ -7,6 +7,7 @@
  * city. See services/buildings.ts ACTIVE_CITY for the master switch.
  */
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import { mapListing } from './buildings';
 import { getDistrictBenchmark } from './benchmarks';
@@ -222,4 +223,125 @@ export async function submitContactRequest(input: {
   }
   // TODO: wire to insert into contact_requests once we have auth context.
   return { ok: true, id: `pending-auth-${Date.now()}` };
+}
+
+// ─── Listing creation (V1 founder + moderation flow) ────────
+
+export interface CreateListingInput {
+  buildingId: string;
+  /** UUID of the user creating the listing — set seller_user_id. */
+  sellerUserId: string;
+  /** Drives the source_type column. Founder posting on behalf of a
+   *  developer → 'developer'; phone-verified user → 'owner' default. */
+  sourceType: SourceType;
+  roomsCount: number;
+  /** Square meters, allows decimals (e.g. 45.5). */
+  sizeM2: number;
+  floorNumber: number;
+  /** Total floors of the parent building — optional, populated from
+   *  building when not specified. */
+  totalFloors?: number;
+  /** Total price in dirams (1 TJS = 100 dirams). */
+  priceTotalDirams: bigint;
+  finishingType: FinishingType;
+  bathroomCount?: number;
+  balcony?: boolean;
+  ceilingHeightCm?: number;
+  /** Russian description. */
+  description?: string;
+  installment?: {
+    monthlyDirams: bigint;
+    firstPaymentPercent: number;
+    termMonths: number;
+  };
+  /**
+   * Determines the listing's initial status:
+   * - 'active'         → visible immediately (founder flow)
+   * - 'pending_review' → hidden until founder approves (public flow)
+   */
+  initialStatus: 'active' | 'pending_review';
+}
+
+/**
+ * Creates a listing and returns its slug + id.
+ *
+ * Slug is built from the parent building's slug + apartment specs so
+ * it's both human-readable in URLs and unlikely to collide. On collision
+ * we suffix with a 4-char random string and retry.
+ *
+ * Uses admin client so RLS doesn't block (cookie-session auth doesn't
+ * set auth.uid()).
+ */
+export async function createListing(
+  input: CreateListingInput,
+): Promise<{ id: string; slug: string }> {
+  const supabase = createAdminClient();
+
+  // Need building's slug + total_floors to derive defaults.
+  const { data: building, error: bErr } = await supabase
+    .from('buildings')
+    .select('slug, total_floors')
+    .eq('id', input.buildingId)
+    .single();
+  if (bErr || !building) {
+    throw bErr ?? new Error(`Building ${input.buildingId} not found`);
+  }
+
+  // Slug pattern: <building>-<rooms>k-<floor>f-<sizeRound>m2[-<rand>].
+  // Round size to int for slug brevity; full decimal stays in DB.
+  const baseSlug = `${building.slug}-${input.roomsCount}k-${input.floorNumber}f-${Math.round(input.sizeM2)}m2`;
+  let slug = baseSlug;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data: existing } = await supabase
+      .from('listings')
+      .select('id')
+      .eq('slug', slug)
+      .maybeSingle();
+    if (!existing) break;
+    const suffix = Math.random().toString(36).slice(2, 6);
+    slug = `${baseSlug}-${suffix}`;
+  }
+
+  const installmentEnabled = input.installment != null;
+
+  const { data, error } = await supabase
+    .from('listings')
+    .insert({
+      slug,
+      building_id: input.buildingId,
+      seller_user_id: input.sellerUserId,
+      source_type: input.sourceType,
+      status: input.initialStatus,
+      rooms_count: input.roomsCount,
+      size_m2: input.sizeM2,
+      floor_number: input.floorNumber,
+      total_floors: input.totalFloors ?? building.total_floors,
+      price_total_dirams: input.priceTotalDirams.toString(),
+      // price_per_m2_dirams is generated-always-as in the schema, so
+      // we never set it explicitly.
+      finishing_type: input.finishingType,
+      installment_available: installmentEnabled,
+      installment_monthly_amount_dirams: installmentEnabled
+        ? input.installment!.monthlyDirams.toString()
+        : null,
+      installment_first_payment_percent: installmentEnabled
+        ? input.installment!.firstPaymentPercent
+        : null,
+      installment_term_months: installmentEnabled ? input.installment!.termMonths : null,
+      bathroom_count: input.bathroomCount ?? null,
+      balcony: input.balcony ?? null,
+      ceiling_height_cm: input.ceilingHeightCm ?? null,
+      unit_description: input.description
+        ? { ru: input.description, tg: input.description }
+        : null,
+      // verification_tier defaults to phone_verified per schema.
+      // published_at set when status moves to 'active' (now or after
+      // moderation approval).
+      published_at: input.initialStatus === 'active' ? new Date().toISOString() : null,
+    })
+    .select('id, slug')
+    .single();
+
+  if (error || !data) throw error ?? new Error('Failed to create listing');
+  return { id: data.id as string, slug: data.slug as string };
 }

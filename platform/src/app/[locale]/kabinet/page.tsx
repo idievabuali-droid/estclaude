@@ -24,8 +24,11 @@ import { listMyListings, getMyDashboardStats, getMyNotifications } from '@/servi
 import { getDeveloperById } from '@/services/buildings';
 import { formatPriceNumber, formatM2, formatFloor } from '@/lib/format';
 import { getCurrentUser } from '@/lib/auth/session';
+import { isFounder } from '@/lib/auth/roles';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { ListingStatus, NotificationType } from '@/types/domain';
 import { AccountSettings } from './AccountSettings';
+import { ModerationList, type PendingListingRow } from './ModerationList';
 
 const STATUS_BADGE: Record<
   ListingStatus,
@@ -64,6 +67,52 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
   const user = await getCurrentUser();
   if (!user) {
     redirect(`/voyti?redirect=${encodeURIComponent('/kabinet')}`);
+  }
+
+  const founder = await isFounder(user.id);
+
+  // Founder gets the moderation queue. We fetch pending listings + the
+  // submitter's phone + the parent building's name in one go so the
+  // queue renders without per-row roundtrips.
+  let pendingRows: PendingListingRow[] = [];
+  if (founder) {
+    const supabase = createAdminClient();
+    const { data: pending } = await supabase
+      .from('listings')
+      .select(
+        'id, rooms_count, size_m2, floor_number, price_total_dirams, building_id, seller_user_id, created_at',
+      )
+      .eq('status', 'pending_review')
+      .order('created_at', { ascending: true })
+      .limit(50);
+    const rows = pending ?? [];
+    if (rows.length > 0) {
+      const buildingIds = [...new Set(rows.map((r) => r.building_id as string))];
+      const sellerIds = [...new Set(rows.map((r) => r.seller_user_id as string))];
+      const [bRes, sRes] = await Promise.all([
+        supabase.from('buildings').select('id, name').in('id', buildingIds),
+        supabase.from('users').select('id, phone').in('id', sellerIds),
+      ]);
+      const buildingNames = new Map(
+        (bRes.data ?? []).map((b) => [
+          b.id as string,
+          (b.name as { ru: string }).ru,
+        ]),
+      );
+      const sellerPhones = new Map(
+        (sRes.data ?? []).map((u) => [u.id as string, u.phone as string]),
+      );
+      pendingRows = rows.map((r) => ({
+        id: r.id as string,
+        rooms_count: r.rooms_count as number,
+        size_m2: Number(r.size_m2),
+        floor_number: r.floor_number as number,
+        price_total_dirams: BigInt(r.price_total_dirams as string | number),
+        building_name: buildingNames.get(r.building_id as string) ?? '—',
+        seller_phone: sellerPhones.get(r.seller_user_id as string) ?? '—',
+        created_at: r.created_at as string,
+      }));
+    }
   }
 
   const [myListings, stats, notifications] = await Promise.all([
@@ -118,6 +167,26 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
           </AppCard>
         </AppContainer>
       </section>
+
+      {/* Moderation queue — founder-only. Renders right after the
+          account section so it's the first thing the founder sees on
+          login. Hidden entirely for non-founders (the queue is internal
+          to the platform team). */}
+      {founder ? (
+        <section className="bg-white py-5">
+          <AppContainer className="flex flex-col gap-3">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-h2 font-semibold text-stone-900">
+                На модерации
+              </h2>
+              <span className="text-meta tabular-nums text-stone-500">
+                {pendingRows.length}
+              </span>
+            </div>
+            <ModerationList rows={pendingRows} />
+          </AppContainer>
+        </section>
+      ) : null}
 
       {/* Stats grid */}
       {/* JOURNEY-8: hide the empty 0/0/0 stats grid when there are no listings yet */}

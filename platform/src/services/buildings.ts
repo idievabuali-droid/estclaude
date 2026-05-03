@@ -8,6 +8,7 @@
  * stray Dushanbe row in Supabase can never leak into the UI.
  */
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import type { BuildingStatus } from '@/types/domain';
 import { getNearbyPOIs, type PoiCategory } from './poi';
@@ -489,3 +490,133 @@ function mapListing(r: {
 
 // Re-export listing mapper for use by listings service
 export { mapListing };
+
+// ─── Building creation (V1 founder flow) ────────────────────
+
+export interface CreateBuildingInput {
+  /** Russian name shown across the platform. */
+  name: string;
+  /** Russian street address. */
+  address: string;
+  /** UUID of an existing district (Vahdat microdistrict). */
+  districtId: string;
+  /** UUID of the developer to attribute the project to. */
+  developerId: string;
+  status: BuildingStatus;
+  totalFloors: number;
+  totalUnits: number;
+  /** Quarter in YYYY-Qn format, e.g. "2026-Q3". Optional. */
+  handoverQuarter?: string;
+  /** Russian description, optional. */
+  description?: string;
+  /** Amenity slugs (parking / elevator / playground / security / gym / commercial-floor). */
+  amenities?: string[];
+  /** When unset, falls back to district centroid then Vahdat town centre. */
+  latitude?: number;
+  longitude?: number;
+  /**
+   * When true, building goes live immediately (founder flow).
+   * When false, stays unpublished until approved (moderation flow).
+   */
+  publishImmediately: boolean;
+}
+
+const VAHDAT_FALLBACK_COORDS = { lat: 38.5511, lng: 69.0214 };
+
+/** Slugify Russian name → URL-safe lowercase ASCII. Drops everything
+ *  but letters / digits / hyphens; collapses multi-hyphens. */
+function slugify(input: string): string {
+  // Transliterate Cyrillic → Latin, lowercase, then strip non-ASCII.
+  const cyr = 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя';
+  const lat = ['a','b','v','g','d','e','yo','zh','z','i','y','k','l','m','n','o','p','r','s','t','u','f','h','c','ch','sh','sch','','y','','e','yu','ya'];
+  const lower = input.toLowerCase();
+  let result = '';
+  for (const ch of lower) {
+    const idx = cyr.indexOf(ch);
+    if (idx >= 0) result += lat[idx];
+    else result += ch;
+  }
+  return result
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80) || 'zhk';
+}
+
+/**
+ * Creates a new building. Generates a URL-safe slug from the name; if
+ * a collision exists, appends a 4-character random suffix until unique.
+ *
+ * Uses the admin client so RLS doesn't block writes (our auth is
+ * cookie-session, not Supabase Auth, so auth.uid() is null).
+ *
+ * Lat/lng fallback chain: explicit input → district centroid → Vahdat
+ * town centre. Buildings without coords would otherwise fail the NOT
+ * NULL constraint and break the founder flow.
+ */
+export async function createBuilding(
+  input: CreateBuildingInput,
+): Promise<{ id: string; slug: string }> {
+  const supabase = createAdminClient();
+
+  // Slug generation with collision retry. Try the base slug first;
+  // on conflict, suffix with random 4-char nanoid-style and retry.
+  const baseSlug = slugify(input.name);
+  let slug = baseSlug;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data: existing } = await supabase
+      .from('buildings')
+      .select('id')
+      .eq('slug', slug)
+      .maybeSingle();
+    if (!existing) break;
+    const suffix = Math.random().toString(36).slice(2, 6);
+    slug = `${baseSlug}-${suffix}`;
+  }
+
+  // Coords fallback: district centroid → Vahdat town centre.
+  let latitude = input.latitude;
+  let longitude = input.longitude;
+  if (latitude == null || longitude == null) {
+    const { data: district } = await supabase
+      .from('districts')
+      .select('center_latitude, center_longitude')
+      .eq('id', input.districtId)
+      .maybeSingle();
+    latitude =
+      latitude ?? (district?.center_latitude as number | null) ?? VAHDAT_FALLBACK_COORDS.lat;
+    longitude =
+      longitude ?? (district?.center_longitude as number | null) ?? VAHDAT_FALLBACK_COORDS.lng;
+  }
+
+  // Note: `cover_color` is not stored in the DB — it's a computed
+  // field added at the mapping layer (rowToBuilding) based on the
+  // slug hash. So we don't insert it here.
+
+  const { data, error } = await supabase
+    .from('buildings')
+    .insert({
+      slug,
+      developer_id: input.developerId,
+      district_id: input.districtId,
+      city: ACTIVE_CITY,
+      name: { ru: input.name, tg: input.name },
+      address: { ru: input.address, tg: input.address },
+      latitude,
+      longitude,
+      description: input.description
+        ? { ru: input.description, tg: input.description }
+        : null,
+      status: input.status,
+      handover_estimated_quarter: input.handoverQuarter ?? null,
+      total_units: input.totalUnits,
+      total_floors: input.totalFloors,
+      amenities: input.amenities ?? [],
+      is_published: input.publishImmediately,
+    })
+    .select('id, slug')
+    .single();
+
+  if (error || !data) throw error ?? new Error('Failed to create building');
+  return { id: data.id as string, slug: data.slug as string };
+}
