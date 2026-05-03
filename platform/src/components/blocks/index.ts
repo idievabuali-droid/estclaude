@@ -26,6 +26,8 @@ export { MobileFiltersWrapper } from './MobileFiltersWrapper';
 export type { MobileFiltersWrapperProps } from './MobileFiltersWrapper';
 export { FilterChipSheet } from './FilterChipSheet';
 export type { FilterChipSheetProps } from './FilterChipSheet';
+export { ShareButton } from './ShareButton';
+export type { ShareButtonProps } from './ShareButton';
 export { SaveToggle } from './SaveToggle';
 export type { SaveToggleProps } from './SaveToggle';
 export { NearbyPois } from './NearbyPois';
