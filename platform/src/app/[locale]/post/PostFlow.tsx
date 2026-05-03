@@ -12,6 +12,7 @@ import {
   AppTextarea,
 } from '@/components/primitives';
 import { toast } from '@/components/primitives/AppToast';
+import { PhotoPicker, type PendingPhoto } from './PhotoPicker';
 
 interface DistrictOption {
   id: string;
@@ -53,6 +54,9 @@ interface ApartmentDraft {
    * bathroom, so just capturing the type covers most cases.
    */
   bathroom_separate: '' | 'combined' | 'separate';
+  /** Photos already uploaded to Storage by /api/storage/upload but
+   *  not yet attached to a listing — submission attaches them. */
+  photos: PendingPhoto[];
   // Advanced (collapsed by default):
   description?: string;
   installmentEnabled: boolean;
@@ -101,6 +105,7 @@ function makeApartmentDraft(overrides: Partial<ApartmentDraft> = {}): ApartmentD
     price_tjs: '',
     finishing_type: '',
     bathroom_separate: '',
+    photos: [],
     installmentEnabled: false,
     ...overrides,
   };
@@ -145,6 +150,11 @@ export function PostFlow({
     amenities: [] as string[],
   });
 
+  // Building-level cover photos (only used in 'new-building' mode).
+  // Becomes the building's hero image + the cover_photo_id reference
+  // on /zhk pages and building cards.
+  const [buildingPhotos, setBuildingPhotos] = useState<PendingPhoto[]>([]);
+
   // Existing-building selection.
   const [existingBuildingId, setExistingBuildingId] = useState(
     existingBuildings[0]?.id ?? '',
@@ -174,6 +184,10 @@ export function PostFlow({
         ...src,
         uid: Math.random().toString(36).slice(2, 10),
         floor_number: nextFloor,
+        // Photos start fresh on duplicates — same-photo-on-multiple-
+        // floors is rare and would force the user to remember to swap
+        // them. Cleaner to require an upload per duplicated unit.
+        photos: [],
       });
       const next = [...arr];
       next.splice(idx + 1, 0, copy);
@@ -236,6 +250,7 @@ export function PostFlow({
               handover_quarter: b.handover_quarter.trim() || undefined,
               description: b.description.trim() || undefined,
               amenities: b.amenities,
+              pendingPhotos: buildingPhotos,
             },
       apartments: apartments.map((a) => ({
         rooms_count: Number(a.rooms_count),
@@ -260,6 +275,7 @@ export function PostFlow({
               term_months: a.installment_term_months ?? 84,
             }
           : undefined,
+        pendingPhotos: a.photos,
       })),
     };
 
@@ -444,6 +460,13 @@ export function PostFlow({
                 }
                 rows={3}
                 placeholder="Кирпичный дом, закрытый двор, паркинг…"
+              />
+              <PhotoPicker
+                label="Фото ЖК"
+                kind="building_exterior"
+                max={8}
+                photos={buildingPhotos}
+                onChange={setBuildingPhotos}
               />
               <div className="flex flex-col gap-2">
                 <span className="text-caption font-medium text-stone-500">Удобства</span>
@@ -714,6 +737,14 @@ function ApartmentEditor({
               ]}
             />
           </div>
+
+          <PhotoPicker
+            label="Фото квартиры"
+            kind="unit_living"
+            max={15}
+            photos={apartment.photos}
+            onChange={(photos) => onChange({ photos })}
+          />
 
           <button
             type="button"

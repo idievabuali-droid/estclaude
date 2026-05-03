@@ -16,6 +16,8 @@ import { getListing } from '@/services/listings';
 import { getNearbyPOIs, POI_LABELS, type PoiCategory } from '@/services/poi';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { getExchangeRates } from '@/services/currency';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { supabasePublicUrl } from '@/services/photos';
 import { ContactBarWithModal } from './ContactBarWithModal';
 
 const FINISHING_TONE = {
@@ -109,13 +111,38 @@ export default async function ListingDetailPage({
     item: pois[cat][0] ?? null,
   })).filter((x) => x.item != null);
 
+  // Pull every photo for this listing so we can render the gallery
+  // beneath the hero. Ordered by display_order so the seller's chosen
+  // sequence (currently: cover first, then upload order) is preserved.
+  // Admin client because RLS on `photos` is locked to the uploader.
+  const photoSupabase = createAdminClient();
+  const { data: photoRows } = await photoSupabase
+    .from('photos')
+    .select('id, storage_path')
+    .eq('listing_id', listing.id)
+    .order('display_order', { ascending: true });
+  const photoUrls = (photoRows ?? [])
+    .map((p) => ({ id: p.id as string, url: supabasePublicUrl(p.storage_path as string) }))
+    .filter((p): p is { id: string; url: string } => p.url != null);
+
   return (
     <>
       {/* ─── 1. HERO ────────────────────────────────────────────── */}
+      {/* Hero uses the cover photo when uploaded; otherwise the source-
+          coded color block stays as a placeholder. The bottom gradient
+          + title sit on top in both modes. */}
       <div
-        className="relative aspect-[16/9] w-full md:aspect-[21/9]"
-        style={{ backgroundColor: listing.cover_color }}
+        className="relative aspect-[16/9] w-full bg-stone-100 md:aspect-[21/9]"
+        style={listing.cover_photo_url ? undefined : { backgroundColor: listing.cover_color }}
       >
+        {listing.cover_photo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={listing.cover_photo_url}
+            alt={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
+            className="absolute inset-0 size-full object-cover"
+          />
+        ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-stone-900/65 via-stone-900/15 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0">
           <AppContainer className="pb-3 md:pb-4">
@@ -125,6 +152,28 @@ export default async function ListingDetailPage({
           </AppContainer>
         </div>
       </div>
+
+      {/* Photo gallery — rendered only when there are MORE photos
+          beyond the cover, so single-photo listings don't show a
+          one-tile grid. */}
+      {photoUrls.length > 1 ? (
+        <section className="border-b border-stone-200 bg-white py-4">
+          <AppContainer>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+              {photoUrls.map((p) => (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  key={p.id}
+                  src={p.url}
+                  alt=""
+                  className="aspect-square w-full rounded-md object-cover"
+                  loading="lazy"
+                />
+              ))}
+            </div>
+          </AppContainer>
+        </section>
+      ) : null}
 
       {/* ─── 2. BREADCRUMBS ─────────────────────────────────────── */}
       <nav aria-label="Хлебные крошки" className="border-b border-stone-200 bg-stone-50">

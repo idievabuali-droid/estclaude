@@ -4,7 +4,12 @@ import { AppContainer } from '@/components/primitives';
 import { getCurrentUser } from '@/lib/auth/session';
 import { isFounder } from '@/lib/auth/roles';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { EditApartmentForm, type EditApartmentInitial } from './EditApartmentForm';
+import { supabasePublicUrl } from '@/services/photos';
+import {
+  EditApartmentForm,
+  type EditApartmentInitial,
+  type ExistingPhoto,
+} from './EditApartmentForm';
 
 /**
  * /post/edit/[id] — edit a single existing listing.
@@ -53,6 +58,21 @@ export default async function EditListingPage({
     .select('name, slug')
     .eq('id', listing.building_id)
     .maybeSingle();
+
+  // Existing photos for the apartment, in display order. Passed to the
+  // form so the seller can remove individual ones — the form sends the
+  // chosen ids back as removePhotoIds and the API deletes them.
+  const { data: existingPhotoRows } = await supabase
+    .from('photos')
+    .select('id, storage_path')
+    .eq('listing_id', listing.id)
+    .order('display_order', { ascending: true });
+  const existingPhotos: ExistingPhoto[] = (existingPhotoRows ?? [])
+    .map((p) => ({
+      id: p.id as string,
+      url: supabasePublicUrl(p.storage_path as string),
+    }))
+    .filter((p): p is ExistingPhoto => p.url != null);
 
   // Convert dirams (1 TJS = 100 dirams) → TJS for the form. The form
   // collects + the API converts back on save. Bigint columns come
@@ -108,6 +128,7 @@ export default async function EditListingPage({
             initial={initial}
             buildingName={buildingName}
             buildingSlug={buildingSlug}
+            existingPhotos={existingPhotos}
           />
         </AppContainer>
       </section>

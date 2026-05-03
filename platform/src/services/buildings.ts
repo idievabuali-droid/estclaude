@@ -12,6 +12,21 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import type { BuildingStatus } from '@/types/domain';
 import { getNearbyPOIs, type PoiCategory } from './poi';
+import { supabasePublicUrl } from './photos';
+
+/** Supabase select clauses for embedding the cover photo. PostgREST
+ *  requires disambiguating the FK because both photos→buildings (via
+ *  building_id) and buildings→photos (via cover_photo_id) exist; the
+ *  hint `!buildings_cover_photo_fk` / `!listings_cover_photo_fk` picks
+ *  the named constraint so the embed resolves correctly. The constraint
+ *  names live in migration 0013 (buildings) and 0003 (listings).
+ *
+ *  Exported so listings/seller/saved services reuse the same shape —
+ *  keeps the join syntax in one place. */
+export const BUILDING_SELECT =
+  '*, cover_photo:photos!buildings_cover_photo_fk(storage_path)';
+export const LISTING_SELECT =
+  '*, cover_photo:photos!listings_cover_photo_fk(storage_path)';
 
 /** A building is considered "near" a POI category when the closest
  *  result of that category is within this many metres. ~12 minute walk
@@ -69,11 +84,26 @@ function rowToBuilding(row: BuildingRowWithJoins): MockBuilding {
     total_floors: row.total_floors ?? 0,
     amenities: row.amenities ?? [],
     cover_color: BUILDING_COVER[row.status],
+    // PostgREST returns the `cover_photo:photos!cover_photo_id(...)`
+    // embed as either an object or an array depending on the relation
+    // shape; defensive narrow handles both.
+    cover_photo_url: supabasePublicUrl(extractCoverStoragePath(row.cover_photo)),
     price_from_dirams: row.price_from_dirams != null ? BigInt(row.price_from_dirams) : null,
     price_per_m2_from_dirams:
       row.price_per_m2_from_dirams != null ? BigInt(row.price_per_m2_from_dirams) : null,
     description: row.description ?? { ru: '', tg: '' },
   };
+}
+
+/** Normalises the embedded cover_photo shape to a single storage_path
+ *  (or null). PostgREST may serialise the FK embed as either an object
+ *  or a one-element array depending on relationship metadata. */
+function extractCoverStoragePath(
+  value: { storage_path: string } | { storage_path: string }[] | null | undefined,
+): string | null {
+  if (!value) return null;
+  if (Array.isArray(value)) return value[0]?.storage_path ?? null;
+  return value.storage_path ?? null;
 }
 
 type BuildingRowWithJoins = {
@@ -96,13 +126,18 @@ type BuildingRowWithJoins = {
   featured_rank: number | null;
   price_from_dirams: number | null;
   price_per_m2_from_dirams: number | null;
+  cover_photo: { storage_path: string } | { storage_path: string }[] | null;
 };
 
 export async function listBuildings(filters: BuildingFilters = {}): Promise<MockBuilding[]> {
   const supabase = await createClient();
   // ACTIVE_CITY is enforced on every query — caller-supplied `city`
   // filter is ignored to keep the V1 launch lane pure.
-  let q = supabase.from('buildings').select('*').eq('is_published', true).eq('city', ACTIVE_CITY);
+  let q = supabase
+    .from('buildings')
+    .select(BUILDING_SELECT)
+    .eq('is_published', true)
+    .eq('city', ACTIVE_CITY);
   if (filters.status?.length) q = q.in('status', filters.status);
   if (filters.q) q = q.ilike('name->>ru', `%${filters.q}%`);
 
@@ -198,7 +233,7 @@ export async function listFeaturedBuildings(limit = 3): Promise<MockBuilding[]> 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('buildings')
-    .select('*')
+    .select(BUILDING_SELECT)
     .eq('is_published', true)
     .eq('city', ACTIVE_CITY)
     .eq('is_featured', true)
@@ -251,7 +286,7 @@ export async function getBuilding(slug: string): Promise<{
   const supabase = await createClient();
   const { data: bRow, error } = await supabase
     .from('buildings')
-    .select('*')
+    .select(BUILDING_SELECT)
     .eq('slug', slug)
     .maybeSingle();
   if (error) throw error;
@@ -263,7 +298,7 @@ export async function getBuilding(slug: string): Promise<{
     supabase.from('districts').select('*').eq('id', building.district_id).single(),
     supabase
       .from('listings')
-      .select('*')
+      .select(LISTING_SELECT)
       .eq('building_id', building.id)
       .eq('status', 'active')
       .order('rooms_count', { ascending: true }),
@@ -326,7 +361,7 @@ export async function getBuildingBySlug(slug: string): Promise<MockBuilding | nu
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('buildings')
-    .select('*')
+    .select(BUILDING_SELECT)
     .eq('slug', slug)
     .eq('city', ACTIVE_CITY)
     .maybeSingle();
@@ -368,7 +403,7 @@ export async function listDistricts(): Promise<MockDistrict[]> {
 export async function getBuildingsByIds(ids: string[]): Promise<MockBuilding[]> {
   if (ids.length === 0) return [];
   const supabase = await createClient();
-  const { data, error } = await supabase.from('buildings').select('*').in('id', ids);
+  const { data, error } = await supabase.from('buildings').select(BUILDING_SELECT).in('id', ids);
   if (error) throw error;
   const map = new Map<string, MockBuilding>();
   for (const r of (data ?? []) as BuildingRowWithJoins[]) {
@@ -382,7 +417,7 @@ export async function getListingsForBuildingId(buildingId: string): Promise<Mock
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('listings')
-    .select('*')
+    .select(LISTING_SELECT)
     .eq('building_id', buildingId)
     .eq('status', 'active');
   if (error) throw error;
@@ -457,6 +492,7 @@ function mapListing(r: {
   balcony: boolean | null;
   ceiling_height_cm: number | null;
   bathroom_separate?: boolean | null;
+  cover_photo?: { storage_path: string } | { storage_path: string }[] | null;
 }): MockListing {
   return {
     id: r.id,
@@ -480,6 +516,7 @@ function mapListing(r: {
     installment_term_months: r.installment_term_months,
     verification_tier: r.verification_tier as MockListing['verification_tier'],
     cover_color: LISTING_COVER_BY_SOURCE[r.source_type] ?? 'oklch(0.704 0.14 40)',
+    cover_photo_url: supabasePublicUrl(extractCoverStoragePath(r.cover_photo)),
     unit_description: r.unit_description ?? { ru: '', tg: '' },
     view_count: r.view_count,
     published_at: r.published_at ?? new Date().toISOString(),
@@ -490,8 +527,11 @@ function mapListing(r: {
   };
 }
 
-// Re-export listing mapper for use by listings service
-export { mapListing };
+// Re-export mapper helpers for cross-service use (listings service
+// reuses the same row → MockBuilding/MockListing logic so cover_photo
+// joins stay in one place).
+export { mapListing, rowToBuilding };
+export type { BuildingRowWithJoins };
 
 // ─── Building creation (V1 founder flow) ────────────────────
 

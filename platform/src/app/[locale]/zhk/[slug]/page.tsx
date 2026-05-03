@@ -83,10 +83,21 @@ export default async function BuildingDetailPage({
   return (
     <>
       {/* ─── 1. HERO ────────────────────────────────────────────── */}
+      {/* Hero uses the uploaded cover photo when present, else the
+          status-coded color block. The dark-bottom gradient stays in
+          both modes so the white title stays readable. */}
       <div
-        className="relative aspect-[2/1] w-full md:aspect-[21/9]"
-        style={{ backgroundColor: building.cover_color }}
+        className="relative aspect-[2/1] w-full bg-stone-100 md:aspect-[21/9]"
+        style={building.cover_photo_url ? undefined : { backgroundColor: building.cover_color }}
       >
+        {building.cover_photo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={building.cover_photo_url}
+            alt={building.name.ru}
+            className="absolute inset-0 size-full object-cover"
+          />
+        ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-stone-900/65 via-stone-900/20 to-transparent" />
         <div className="absolute left-3 top-3">
           <span className="inline-flex w-fit items-center gap-1 rounded-sm bg-white/90 px-2 py-1 text-caption font-medium text-stone-900">

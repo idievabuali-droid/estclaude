@@ -12,6 +12,11 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getCurrentUser } from '@/lib/auth/session';
 import { isFounder } from '@/lib/auth/roles';
 import { listingOwnedBy, updateListing } from '@/services/listings';
+import {
+  attachAndSetCover,
+  deletePhotos,
+  type PendingPhoto,
+} from '@/services/photos';
 import type { FinishingType } from '@/types/domain';
 
 interface UpdateBody {
@@ -27,6 +32,13 @@ interface UpdateBody {
     first_payment_percent: number;
     term_months: number;
   } | null;
+  /** Photos already uploaded to Storage by /api/storage/upload —
+   *  attached to this listing as new `photos` rows. */
+  pendingPhotos?: PendingPhoto[];
+  /** photos.id values the seller marked for removal. Both the row and
+   *  the Storage object are deleted; if any was the cover, the parent's
+   *  cover_photo_id is cleared first to avoid an FK violation. */
+  removePhotoIds?: string[];
 }
 
 const TJS_TO_DIRAMS = 100n;
@@ -84,6 +96,27 @@ export async function POST(
       },
       { editorIsFounder: founder },
     );
+    // Photo edits run AFTER the field update so we don't mutate
+    // photos for a listing that failed validation. Failures here are
+    // logged but don't roll back the field changes — the seller can
+    // retry photo edits without losing their other edits.
+    if (body.removePhotoIds && body.removePhotoIds.length > 0) {
+      try {
+        await deletePhotos(body.removePhotoIds);
+      } catch (err) {
+        console.error('deletePhotos failed (non-fatal):', err);
+      }
+    }
+    if (body.pendingPhotos && body.pendingPhotos.length > 0) {
+      try {
+        await attachAndSetCover('listing', id, body.pendingPhotos, {
+          uploaderId: user.id,
+        });
+      } catch (err) {
+        console.error('attaching new photos failed (non-fatal):', err);
+      }
+    }
+
     return NextResponse.json({ ok: true, re_moderated: result.reModerated });
   } catch (err) {
     console.error('updateListing failed:', err);

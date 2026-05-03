@@ -72,6 +72,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'update failed' }, { status: 500 });
   }
 
+  // Auto-publish the parent building when its first listing gets
+  // approved. Non-founders create buildings as is_published=false so
+  // they don't show up on /novostroyki until at least one listing has
+  // been vetted; without this step the building would stay invisible
+  // forever even after we approve listings inside it. Cheap extra
+  // UPDATE — single founder click, no concurrency.
+  if (body.action === 'approve') {
+    const { data: bld } = await supabase
+      .from('buildings')
+      .select('id, is_published')
+      .eq('id', listing.building_id)
+      .maybeSingle();
+    if (bld && bld.is_published === false) {
+      const { error: pubErr } = await supabase
+        .from('buildings')
+        .update({ is_published: true })
+        .eq('id', bld.id);
+      if (pubErr) {
+        console.error('building auto-publish failed (non-fatal):', pubErr);
+      }
+    }
+  }
+
   // Notify the submitter via Telegram if they have a chat_id linked.
   // Fire-and-forget — don't block the API response on Telegram outage.
   try {

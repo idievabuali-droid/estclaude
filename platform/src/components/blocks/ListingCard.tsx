@@ -89,21 +89,39 @@ export function ListingCard({
         className,
       )}
     >
-      {/* Cover photo placeholder — colored block with overlay so it doesn't look like a wireframe */}
+      {/* Cover area. With an uploaded photo we render the image edge-
+          to-edge and demote the rooms+m² label to a small bottom-corner
+          chip so it doesn't bury the photo. Without a photo we keep the
+          colored placeholder with the giant centered label so empty
+          listings still look intentional. */}
       <div
-        className="relative aspect-[4/3] w-full"
-        style={{ backgroundColor: listing.cover_color }}
+        className="relative aspect-[4/3] w-full bg-stone-100"
+        style={listing.cover_photo_url ? undefined : { backgroundColor: listing.cover_color }}
       >
+        {listing.cover_photo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={listing.cover_photo_url}
+            alt={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
+            className="absolute inset-0 size-full object-cover"
+            loading="lazy"
+          />
+        ) : null}
         <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/30" />
-        {/* Big rooms+m² overlay so empty placeholder feels intentional */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="text-h1 font-semibold text-white drop-shadow-sm tabular-nums">
-            {listing.rooms_count}-комн
+        {listing.cover_photo_url ? (
+          <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-sm bg-stone-900/70 px-2 py-1 text-caption font-medium text-white tabular-nums">
+            {listing.rooms_count}-комн · {formatM2(listing.size_m2)}
           </span>
-          <span className="text-meta font-medium text-white/85 tabular-nums">
-            {formatM2(listing.size_m2)}
-          </span>
-        </div>
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <span className="text-h1 font-semibold text-white drop-shadow-sm tabular-nums">
+              {listing.rooms_count}-комн
+            </span>
+            <span className="text-meta font-medium text-white/85 tabular-nums">
+              {formatM2(listing.size_m2)}
+            </span>
+          </div>
+        )}
         {/* Installment badge — only for listings that offer financing.
             Top-left placement makes it scannable while flipping through
             cards: buyers shopping by monthly budget can spot eligible

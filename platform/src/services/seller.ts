@@ -9,7 +9,13 @@
  */
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { MockBuilding, MockListing } from '@/lib/mock';
-import { mapListing } from './buildings';
+import {
+  mapListing,
+  rowToBuilding,
+  type BuildingRowWithJoins,
+  BUILDING_SELECT,
+  LISTING_SELECT,
+} from './buildings';
 import type { NotificationType } from '@/types/domain';
 
 // Founder seed user id — kept ONLY for the dashboard-stats query
@@ -31,7 +37,7 @@ export async function listMyListings(userId = MOCK_FOUNDER_USER_ID): Promise<Sel
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('listings')
-    .select('*')
+    .select(LISTING_SELECT)
     .eq('seller_user_id', userId)
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
@@ -44,32 +50,12 @@ export async function listMyListings(userId = MOCK_FOUNDER_USER_ID): Promise<Sel
   const buildingIds = [...new Set(listings.map((l) => l.building_id))];
   const { data: bRows } = await supabase
     .from('buildings')
-    .select('*')
+    .select(BUILDING_SELECT)
     .in('id', buildingIds);
 
   const buildingMap = new Map<string, MockBuilding>();
-  for (const r of bRows ?? []) {
-    buildingMap.set(r.id, {
-      id: r.id,
-      slug: r.slug,
-      developer_id: r.developer_id,
-      district_id: r.district_id,
-      city: r.city as 'dushanbe' | 'vahdat',
-      name: r.name,
-      address: r.address,
-      latitude: Number(r.latitude),
-      longitude: Number(r.longitude),
-      status: r.status,
-      handover_estimated_quarter: r.handover_estimated_quarter,
-      total_units: r.total_units ?? 0,
-      total_floors: r.total_floors ?? 0,
-      amenities: r.amenities ?? [],
-      cover_color: 'oklch(0.704 0.14 40)',
-      price_from_dirams: r.price_from_dirams != null ? BigInt(r.price_from_dirams) : null,
-      price_per_m2_from_dirams:
-        r.price_per_m2_from_dirams != null ? BigInt(r.price_per_m2_from_dirams) : null,
-      description: r.description ?? { ru: '', tg: '' },
-    });
+  for (const r of (bRows ?? []) as BuildingRowWithJoins[]) {
+    buildingMap.set(r.id, rowToBuilding(r));
   }
 
   return listings.map((l) => ({ ...l, building: buildingMap.get(l.building_id) ?? null }));

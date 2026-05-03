@@ -27,6 +27,7 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { isFounder } from '@/lib/auth/roles';
 import { createBuilding } from '@/services/buildings';
 import { createListing } from '@/services/listings';
+import { attachAndSetCover, type PendingPhoto } from '@/services/photos';
 import type { BuildingStatus, FinishingType } from '@/types/domain';
 
 interface ApartmentInput {
@@ -49,6 +50,8 @@ interface ApartmentInput {
     first_payment_percent: number;
     term_months: number;
   };
+  /** Photos already uploaded to Storage by /api/storage/upload. */
+  pendingPhotos?: PendingPhoto[];
 }
 
 interface CreateInventoryBody {
@@ -70,6 +73,8 @@ interface CreateInventoryBody {
         amenities?: string[];
         latitude?: number;
         longitude?: number;
+        /** Building cover photos (already uploaded to Storage). */
+        pendingPhotos?: PendingPhoto[];
       };
   apartments: ApartmentInput[];
 }
@@ -134,6 +139,19 @@ export async function POST(req: NextRequest) {
       });
       buildingId = created.id;
       buildingSlug = created.slug;
+
+      // Attach building cover photos if the user uploaded any. Sets
+      // cover_photo_id on the new building so cards/hero can show
+      // the real image instead of the colored placeholder.
+      if (b.pendingPhotos && b.pendingPhotos.length > 0) {
+        try {
+          await attachAndSetCover('building', buildingId, b.pendingPhotos, {
+            uploaderId: user.id,
+          });
+        } catch (err) {
+          console.error('attaching building photos failed (non-fatal):', err);
+        }
+      }
     } catch (err) {
       console.error('createBuilding failed:', err);
       return NextResponse.json(
@@ -184,6 +202,19 @@ export async function POST(req: NextRequest) {
         initialStatus,
       });
       created.push(c);
+
+      // Attach apartment photos. Same pattern as buildings — failures
+      // here don't roll back the listing creation (caller can edit and
+      // re-add photos).
+      if (apt.pendingPhotos && apt.pendingPhotos.length > 0) {
+        try {
+          await attachAndSetCover('listing', c.id, apt.pendingPhotos, {
+            uploaderId: user.id,
+          });
+        } catch (err) {
+          console.error(`attaching photos for listing #${i} failed:`, err);
+        }
+      }
     } catch (err) {
       console.error(`createListing #${i} failed:`, err);
       failed.push({ index: i, error: String(err) });

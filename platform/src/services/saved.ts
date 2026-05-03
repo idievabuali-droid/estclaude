@@ -14,7 +14,13 @@
  */
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
-import { mapListing } from './buildings';
+import {
+  mapListing,
+  rowToBuilding,
+  type BuildingRowWithJoins,
+  BUILDING_SELECT,
+  LISTING_SELECT,
+} from './buildings';
 
 export type SavedListing = {
   kind: 'listing';
@@ -32,37 +38,6 @@ export type SavedBuilding = {
   district: MockDistrict | null;
   matchingUnits: MockListing[];
 };
-
-function mapBuilding(r: {
-  id: string; slug: string; developer_id: string; district_id: string; city: string;
-  name: { ru: string; tg?: string }; address: { ru: string; tg?: string };
-  latitude: number; longitude: number; description: { ru: string; tg?: string } | null;
-  status: MockBuilding['status']; handover_estimated_quarter: string | null;
-  total_units: number | null; total_floors: number | null; amenities: string[] | null;
-  price_from_dirams: number | null; price_per_m2_from_dirams: number | null;
-}): MockBuilding {
-  return {
-    id: r.id,
-    slug: r.slug,
-    developer_id: r.developer_id,
-    district_id: r.district_id,
-    city: r.city as 'dushanbe' | 'vahdat',
-    name: r.name,
-    address: r.address,
-    latitude: Number(r.latitude),
-    longitude: Number(r.longitude),
-    status: r.status,
-    handover_estimated_quarter: r.handover_estimated_quarter,
-    total_units: r.total_units ?? 0,
-    total_floors: r.total_floors ?? 0,
-    amenities: r.amenities ?? [],
-    cover_color: 'oklch(0.704 0.14 40)',
-    price_from_dirams: r.price_from_dirams != null ? BigInt(r.price_from_dirams) : null,
-    price_per_m2_from_dirams:
-      r.price_per_m2_from_dirams != null ? BigInt(r.price_per_m2_from_dirams) : null,
-    description: r.description ?? { ru: '', tg: '' },
-  };
-}
 
 function mapDev(r: {
   id: string; name: string; display_name: { ru: string; tg?: string };
@@ -110,10 +85,10 @@ export async function getMySavedItems(userId: string): Promise<{
 
   const [bRes, lRes] = await Promise.all([
     buildingIds.length
-      ? supabase.from('buildings').select('*').in('id', buildingIds)
+      ? supabase.from('buildings').select(BUILDING_SELECT).in('id', buildingIds)
       : Promise.resolve({ data: [], error: null }),
     listingIds.length
-      ? supabase.from('listings').select('*').in('id', listingIds)
+      ? supabase.from('listings').select(LISTING_SELECT).in('id', listingIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
   if (bRes.error || lRes.error) throw bRes.error ?? lRes.error;
@@ -129,7 +104,7 @@ export async function getMySavedItems(userId: string): Promise<{
   const allBuildingIds = [...new Set([...buildingsRaw.map((b) => b.id), ...listingBuildingIds])];
 
   const { data: extraBuildings } = listingBuildingIds.length
-    ? await supabase.from('buildings').select('*').in('id', allBuildingIds)
+    ? await supabase.from('buildings').select(BUILDING_SELECT).in('id', allBuildingIds)
     : { data: buildingsRaw };
   const allBuildings = extraBuildings ?? [];
 
@@ -146,14 +121,16 @@ export async function getMySavedItems(userId: string): Promise<{
 
   const devMap = new Map((devRes.data ?? []).map((d) => [d.id, mapDev(d)]));
   const distMap = new Map((distRes.data ?? []).map((d) => [d.id, mapDistrict(d)]));
-  const buildingMap = new Map(allBuildings.map((b) => [b.id, mapBuilding(b)]));
+  const buildingMap = new Map(
+    (allBuildings as BuildingRowWithJoins[]).map((b) => [b.id, rowToBuilding(b)] as const),
+  );
 
   // matching units for each saved building
   const matchingUnitsMap = new Map<string, MockListing[]>();
   for (const b of buildingsRaw) {
     const { data: units } = await supabase
       .from('listings')
-      .select('*')
+      .select(LISTING_SELECT)
       .eq('building_id', b.id)
       .eq('status', 'active')
       .limit(3);

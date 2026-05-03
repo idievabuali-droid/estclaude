@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import {
   AppCard,
@@ -11,6 +12,14 @@ import {
   AppTextarea,
 } from '@/components/primitives';
 import { toast } from '@/components/primitives/AppToast';
+import { PhotoPicker, type PendingPhoto } from '../../PhotoPicker';
+
+export interface ExistingPhoto {
+  /** photos.id — what /api/listings/[id]/update needs to delete it. */
+  id: string;
+  /** Public URL for the thumbnail. */
+  url: string;
+}
 
 export interface EditApartmentInitial {
   id: string;
@@ -55,14 +64,24 @@ export function EditApartmentForm({
   initial,
   buildingName,
   buildingSlug,
+  existingPhotos,
 }: {
   initial: EditApartmentInitial;
   buildingName: string;
   buildingSlug: string | null;
+  existingPhotos: ExistingPhoto[];
 }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(initial.installment_enabled);
+
+  // Photo state. Existing photos are visible immediately; clicking the
+  // X stages an id in `removePhotoIds` (no immediate deletion — only
+  // applied on save). New uploads flow through PhotoPicker into
+  // `newPhotos` and get attached server-side at save time.
+  const [removePhotoIds, setRemovePhotoIds] = useState<string[]>([]);
+  const [newPhotos, setNewPhotos] = useState<PendingPhoto[]>([]);
+  const visibleExisting = existingPhotos.filter((p) => !removePhotoIds.includes(p.id));
 
   const [rooms, setRooms] = useState<number | ''>(initial.rooms_count);
   const [size, setSize] = useState<number | ''>(initial.size_m2);
@@ -113,6 +132,8 @@ export function EditApartmentForm({
             term_months: Number(installmentTerm) || 84,
           }
         : null,
+      pendingPhotos: newPhotos,
+      removePhotoIds,
     };
 
     try {
@@ -215,6 +236,46 @@ export function EditApartmentForm({
                 ]}
               />
             </div>
+
+            {/* Existing photos — thumbnails with X to mark for removal.
+                Removal stages locally; nothing is deleted until "Save"
+                (and then the API actually deletes from Storage + DB). */}
+            {visibleExisting.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                <span className="text-meta font-medium text-stone-700">
+                  Текущие фото
+                </span>
+                <div className="grid grid-cols-3 gap-2 md:grid-cols-4">
+                  {visibleExisting.map((p) => (
+                    <div
+                      key={p.id}
+                      className="group relative aspect-square overflow-hidden rounded-md border border-stone-200 bg-stone-100"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p.url} alt="" className="size-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setRemovePhotoIds((ids) => [...ids, p.id])}
+                        aria-label="Удалить фото"
+                        className="absolute right-1 top-1 inline-flex size-6 items-center justify-center rounded-sm bg-white/85 text-stone-700 hover:bg-white hover:text-rose-600"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Add new photos. Uploads happen immediately to Storage;
+                DB rows are inserted only when the seller hits Save. */}
+            <PhotoPicker
+              label={visibleExisting.length === 0 ? 'Фото квартиры' : 'Добавить фото'}
+              kind="unit_living"
+              max={Math.max(1, 15 - visibleExisting.length)}
+              photos={newPhotos}
+              onChange={setNewPhotos}
+            />
 
             <button
               type="button"

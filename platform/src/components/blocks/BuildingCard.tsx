@@ -69,18 +69,35 @@ export function BuildingCard({
         className,
       )}
     >
-      {/* Cover with building-name overlay so it doesn't look like a wireframe */}
+      {/* Cover area. When the building has an uploaded cover photo we
+          render it edge-to-edge; otherwise we fall back to the colored
+          placeholder + glyph + name overlay so empty inventory still
+          looks intentional rather than broken. The chip + save buttons
+          on top stay positioned the same way in both modes. */}
       <div
-        className="relative aspect-[16/9] w-full"
-        style={{ backgroundColor: building.cover_color }}
+        className="relative aspect-[16/9] w-full bg-stone-100"
+        style={building.cover_photo_url ? undefined : { backgroundColor: building.cover_color }}
       >
-        {/* Soft inner gradient for legibility */}
+        {building.cover_photo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={building.cover_photo_url}
+            alt={building.name.ru}
+            className="absolute inset-0 size-full object-cover"
+            loading="lazy"
+          />
+        ) : null}
+        {/* Soft inner gradient for legibility (kept in both modes so
+            the white chip text stays readable on bright photos too). */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/30" />
-        {/* Centered building glyph + name */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
-          <Building className="size-8 text-white/70" aria-hidden />
-          <span className="text-h3 font-semibold text-white drop-shadow-sm">{building.name.ru}</span>
-        </div>
+        {/* Centered building glyph + name — only on the placeholder, so
+            we don't cover real photos with text. */}
+        {building.cover_photo_url ? null : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
+            <Building className="size-8 text-white/70" aria-hidden />
+            <span className="text-h3 font-semibold text-white drop-shadow-sm">{building.name.ru}</span>
+          </div>
+        )}
         {/* Stage chip + help popover. The "?" lets buyers learn what
             the stage means and how long it usually takes without
             leaving the card. stopParentClick prevents the help-button
