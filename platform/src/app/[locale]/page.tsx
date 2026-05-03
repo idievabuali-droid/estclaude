@@ -139,6 +139,30 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </section>
       ) : null}
 
+      {/* ─── "Хотите разместить?" CTA — V1 publishes everything
+           through the founder, so this banner points sellers to the
+           contact card instead of a self-serve form they can't use. */}
+      <section className="border-t border-stone-200 py-6">
+        <AppContainer>
+          <div className="flex flex-col items-start gap-3 rounded-md border border-terracotta-200 bg-terracotta-50/60 p-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-h3 font-semibold text-stone-900">
+                Хотите разместить квартиру?
+              </h2>
+              <p className="text-meta text-stone-700">
+                Напишите нам — зададим несколько вопросов и опубликуем за вас.
+              </p>
+            </div>
+            <Link
+              href="/post"
+              className="inline-flex h-11 shrink-0 items-center rounded-md bg-terracotta-600 px-4 text-meta font-medium text-white transition-colors hover:bg-terracotta-700"
+            >
+              Связаться с нами
+            </Link>
+          </div>
+        </AppContainer>
+      </section>
+
       {/* ─── Свежие квартиры — recent apartment listings ─────── */}
       {recentRaw.length > 0 ? (
         <section className="border-t border-stone-200 bg-stone-50 py-7">

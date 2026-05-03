@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
 import { AppContainer } from '@/components/primitives';
 import { getCurrentUser } from '@/lib/auth/session';
@@ -6,6 +5,7 @@ import { isFounder } from '@/lib/auth/roles';
 import { listBuildings } from '@/services/buildings';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { PostFlow } from './PostFlow';
+import { ContactCard } from './ContactCard';
 
 // Vahdat town centre — used when a district has no centroid stored
 // (legacy seed rows). Same constant as services/buildings.ts.
@@ -48,14 +48,38 @@ export default async function PostPage({
   const { locale } = await params;
   setRequestLocale(locale);
 
+  // V1 publishing model: only the founder posts directly. Everyone
+  // else (logged-in or not) gets a contact card explaining how to
+  // reach us so we can post on their behalf. No /voyti redirect for
+  // non-founders — making people log in just to read "call this
+  // number" is pointless friction.
   const user = await getCurrentUser();
-  if (!user) {
-    redirect(`/voyti?redirect=${encodeURIComponent('/post')}`);
+  const founder = user ? await isFounder(user.id) : false;
+
+  if (!founder) {
+    return (
+      <>
+        <section className="border-b border-stone-200 bg-white">
+          <AppContainer className="flex flex-col gap-2 py-5">
+            <h1 className="text-h1 font-semibold text-stone-900">
+              Разместить квартиру
+            </h1>
+            <p className="text-meta text-stone-500">
+              На старте платформы мы публикуем все объявления вручную,
+              чтобы вычитать каждое и помочь с фото.
+            </p>
+          </AppContainer>
+        </section>
+        <section className="py-6 pb-20">
+          <AppContainer>
+            <ContactCard />
+          </AppContainer>
+        </section>
+      </>
+    );
   }
 
-  const founder = await isFounder(user.id);
-
-  // Pre-fetch reference data the form needs:
+  // Founder path: pre-fetch the reference data the form needs.
   //  - districts (with centroid coords) → dropdown + map pre-centering
   //  - existing buildings → dropdown for "apartment in existing"
   //  - developers → dropdown for new buildings
@@ -95,9 +119,7 @@ export default async function PostPage({
         <AppContainer className="flex flex-col gap-2 py-5">
           <h1 className="text-h1 font-semibold text-stone-900">Добавить объявление</h1>
           <p className="text-meta text-stone-500">
-            {founder
-              ? 'Опубликовано сразу после нажатия «Опубликовать».'
-              : 'После заполнения объявление пойдёт на модерацию — мы проверим и опубликуем в течение 1-2 дней.'}
+            Опубликовано сразу после нажатия «Опубликовать».
           </p>
         </AppContainer>
       </section>
