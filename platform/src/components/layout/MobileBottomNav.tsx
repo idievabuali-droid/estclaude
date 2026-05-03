@@ -5,6 +5,7 @@ import { Home, Bookmark, User, GitCompare } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { Link, usePathname } from '@/i18n/navigation';
 import { useCompareStore } from '@/lib/compare-store';
+import { FEATURES } from '@/lib/feature-flags';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -66,22 +67,24 @@ function MobileBottomNavInner() {
     searchParams.get('focus') != null;
   if (isFocusMap) return null;
 
+  // Compare gating: when the feature is OFF, never insert the dynamic
+  // 'Сравнение (N)' slot — keeps the nav at 3 permanent items. The
+  // store rehydrate still runs (hooks must be called unconditionally)
+  // but its result is ignored.
   const compareCount = hydrated ? compareIds.length : 0;
   const compareHref = compareType
     ? `/sravnenie?type=${compareType}&ids=${compareIds.join(',')}`
     : '/sravnenie';
 
-  // Insert the dynamic Сравнение item between Избранное and Кабинет
-  // when the compare set is non-empty. Position keeps related items
-  // (saved + compare) adjacent, with profile/account at the far right.
-  const items: NavItem[] = compareCount > 0
-    ? [
-        BASE_ITEMS[0]!,
-        BASE_ITEMS[1]!,
-        { href: compareHref, Icon: GitCompare, label: 'Сравнение', badge: compareCount },
-        BASE_ITEMS[2]!,
-      ]
-    : BASE_ITEMS;
+  const items: NavItem[] =
+    FEATURES.compare && compareCount > 0
+      ? [
+          BASE_ITEMS[0]!,
+          BASE_ITEMS[1]!,
+          { href: compareHref, Icon: GitCompare, label: 'Сравнение', badge: compareCount },
+          BASE_ITEMS[2]!,
+        ]
+      : BASE_ITEMS;
 
   // Tailwind needs the class to be statically known; pre-compute the
   // grid-cols class explicitly rather than building it from a number.

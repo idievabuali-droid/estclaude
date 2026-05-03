@@ -9,6 +9,7 @@ import { STAGE_INFO } from '@/lib/building-stages';
 import { VerificationBadge } from './VerificationBadge';
 import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
+import { FEATURES } from '@/lib/feature-flags';
 import { PriceConversion } from './PriceConversion';
 import { StageInfoPopover } from './StageInfoPopover';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
@@ -90,7 +91,12 @@ export function BuildingCard({
         </div>
         <div className="absolute right-3 top-3 flex flex-col gap-2">
           <SaveToggle type="building" id={building.id} />
-          <CompareToggle type="buildings" id={building.id} />
+          {/* Compare hidden in V1 — see lib/feature-flags.ts. With ~6
+              buildings the icon adds visual weight for marginal value.
+              Re-enable when inventory crosses ~20 active buildings. */}
+          {FEATURES.compare ? (
+            <CompareToggle type="buildings" id={building.id} />
+          ) : null}
         </div>
       </div>
 

@@ -5,6 +5,7 @@ import { ArrowRight, X, GitCompare } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { AppButton } from '@/components/primitives';
 import { useCompareStore, COMPARE_MAX_ITEMS } from '@/lib/compare-store';
+import { FEATURES } from '@/lib/feature-flags';
 
 interface PreviewItem {
   id: string;
@@ -37,6 +38,15 @@ interface PreviewItem {
  *     when the buyer is at cap.
  */
 export function CompareBar() {
+  // Feature is hidden in V1 — see lib/feature-flags.ts. Returning
+  // null here means none of the hooks below run, the rehydrate
+  // doesn't fire, the API isn't called. Cleanest way to fully
+  // suspend the feature without removing the code.
+  if (!FEATURES.compare) return null;
+  return <CompareBarInner />;
+}
+
+function CompareBarInner() {
   const [hydrated, setHydrated] = useState(false);
   const [items, setItems] = useState<PreviewItem[]>([]);
   const [confirmingClear, setConfirmingClear] = useState(false);

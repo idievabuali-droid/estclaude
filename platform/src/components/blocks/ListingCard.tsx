@@ -10,6 +10,7 @@ import { FairnessIndicator, computeFairness, type FairnessLevel } from './Fairne
 import { InstallmentDisplay } from './InstallmentDisplay';
 import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
+import { FEATURES } from '@/lib/feature-flags';
 import { PriceConversion } from './PriceConversion';
 import type { MockListing, MockBuilding } from '@/lib/mock';
 import type { ExchangeRates, SupportedCurrency } from '@/services/currency';
@@ -117,7 +118,10 @@ export function ListingCard({
         ) : null}
         <div className="absolute right-3 top-3 flex flex-col gap-2">
           <SaveToggle type="listing" id={listing.id} />
-          <CompareToggle type="listings" id={listing.id} />
+          {/* Compare hidden in V1 — see lib/feature-flags.ts. */}
+          {FEATURES.compare ? (
+            <CompareToggle type="listings" id={listing.id} />
+          ) : null}
         </div>
         <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-sm bg-stone-900/70 px-2 py-1 text-caption font-medium text-white tabular-nums">
           <Layers className="size-3" /> {formatFloor(listing.floor_number, listing.total_floors)}

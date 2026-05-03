@@ -14,6 +14,7 @@ import {
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import { formatPriceNumber, formatM2, formatFloor } from '@/lib/format';
 import { getCurrentUser } from '@/lib/auth/session';
+import { FEATURES } from '@/lib/feature-flags';
 
 /**
  * /sravnenie — side-by-side comparison.
@@ -61,6 +62,44 @@ export default async function SravneniePage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+
+  // Compare hidden in V1 — render a friendly 'coming later' page so
+  // any in-flight bookmarks / shared URLs land somewhere reasonable
+  // instead of 404. See lib/feature-flags.ts for the re-enable
+  // threshold. Bail BEFORE hitting Supabase so we don't fetch ids
+  // for a hidden page.
+  if (!FEATURES.compare) {
+    return (
+      <section className="py-7 md:py-9">
+        <AppContainer>
+          <AppCard>
+            <AppCardContent>
+              <div className="flex flex-col items-center gap-3 py-6 text-center">
+                <Minus className="size-8 text-stone-400" aria-hidden />
+                <h1 className="text-h2 font-semibold text-stone-900">
+                  Сравнение пока недоступно
+                </h1>
+                <p className="max-w-md text-meta text-stone-600">
+                  Эта функция появится позже, когда у нас будет больше проектов.
+                  А пока сохраняйте понравившиеся ЖК и квартиры в избранное —
+                  мы пришлём, когда у них что-то изменится.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <Link href="/novostroyki">
+                    <AppButton variant="primary">К новостройкам</AppButton>
+                  </Link>
+                  <Link href="/kvartiry">
+                    <AppButton variant="secondary">К квартирам</AppButton>
+                  </Link>
+                </div>
+              </div>
+            </AppCardContent>
+          </AppCard>
+        </AppContainer>
+      </section>
+    );
+  }
+
   const sp = await searchParams;
   const tFinishing = await getTranslations('Finishing');
 
