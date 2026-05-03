@@ -46,10 +46,14 @@ interface ApartmentDraft {
   floor_number: number | '';
   price_tjs: number | '';
   finishing_type: 'no_finish' | 'pre_finish' | 'full_finish' | 'owner_renovated' | '';
+  /**
+   * Russian RE convention: совмещённый (combined toilet+bath) vs
+   * раздельный (separate). 'separate' = true, 'combined' = false,
+   * '' = not specified. Tajik apartments rarely have more than one
+   * bathroom, so just capturing the type covers most cases.
+   */
+  bathroom_separate: '' | 'combined' | 'separate';
   // Advanced (collapsed by default):
-  bathroom_count?: number;
-  balcony?: boolean;
-  ceiling_height_cm?: number;
   description?: string;
   installmentEnabled: boolean;
   installment_monthly_tjs?: number;
@@ -96,6 +100,7 @@ function makeApartmentDraft(overrides: Partial<ApartmentDraft> = {}): ApartmentD
     floor_number: '',
     price_tjs: '',
     finishing_type: '',
+    bathroom_separate: '',
     installmentEnabled: false,
     ...overrides,
   };
@@ -239,9 +244,14 @@ export function PostFlow({
         price_tjs: Number(a.price_tjs),
         finishing_type: a.finishing_type as
           | 'no_finish' | 'pre_finish' | 'full_finish' | 'owner_renovated',
-        bathroom_count: a.bathroom_count,
-        balcony: a.balcony,
-        ceiling_height_cm: a.ceiling_height_cm,
+        // Convention: true = раздельный (separate), false = совмещённый
+        // (combined). Empty string = not specified → null in DB.
+        bathroom_separate:
+          a.bathroom_separate === 'separate'
+            ? true
+            : a.bathroom_separate === 'combined'
+              ? false
+              : undefined,
         description: a.description?.trim() || undefined,
         installment: a.installmentEnabled
           ? {
@@ -678,71 +688,49 @@ function ApartmentEditor({
             />
           </div>
 
-          <AppSelect
-            label="Отделка"
-            value={apartment.finishing_type}
-            onChange={(e) =>
-              onChange({ finishing_type: e.target.value as ApartmentDraft['finishing_type'] })
-            }
-            required
-            placeholder="—"
-            options={FINISHING_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-          />
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <AppSelect
+              label="Отделка"
+              value={apartment.finishing_type}
+              onChange={(e) =>
+                onChange({ finishing_type: e.target.value as ApartmentDraft['finishing_type'] })
+              }
+              required
+              placeholder="—"
+              options={FINISHING_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+            />
+            <AppSelect
+              label="Санузел"
+              value={apartment.bathroom_separate}
+              onChange={(e) =>
+                onChange({
+                  bathroom_separate: e.target.value as ApartmentDraft['bathroom_separate'],
+                })
+              }
+              placeholder="—"
+              options={[
+                { value: 'combined', label: 'Совмещённый' },
+                { value: 'separate', label: 'Раздельный' },
+              ]}
+            />
+          </div>
 
           <button
             type="button"
             onClick={() => setAdvancedOpen((v) => !v)}
             className="inline-flex w-fit items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800"
           >
-            {advancedOpen ? '▾' : '▸'} {advancedOpen ? 'Скрыть' : 'Расширенно'}
+            {advancedOpen ? '▾' : '▸'} {advancedOpen ? 'Скрыть' : 'Описание и рассрочка'}
           </button>
 
           {advancedOpen ? (
             <div className="flex flex-col gap-3 border-t border-stone-200 pt-3">
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                <AppInput
-                  label="Санузлов"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={apartment.bathroom_count ?? ''}
-                  onChange={(e) =>
-                    onChange({
-                      bathroom_count:
-                        e.target.value === '' ? undefined : Number(e.target.value),
-                    })
-                  }
-                />
-                <AppInput
-                  label="Высота потолка, см"
-                  type="number"
-                  inputMode="numeric"
-                  min={200}
-                  max={400}
-                  value={apartment.ceiling_height_cm ?? ''}
-                  onChange={(e) =>
-                    onChange({
-                      ceiling_height_cm:
-                        e.target.value === '' ? undefined : Number(e.target.value),
-                    })
-                  }
-                />
-                <label className="flex items-center gap-2 self-end pb-2 text-meta text-stone-700">
-                  <input
-                    type="checkbox"
-                    checked={apartment.balcony ?? false}
-                    onChange={(e) => onChange({ balcony: e.target.checked })}
-                    className="size-4"
-                  />
-                  Балкон
-                </label>
-              </div>
               <AppTextarea
                 label="Описание квартиры"
                 rows={2}
                 value={apartment.description ?? ''}
                 onChange={(e) => onChange({ description: e.target.value })}
-                placeholder="Угловая, окна на юг, тёплый пол…"
+                placeholder="Угловая, окна на юг, балкон, особенности"
               />
               <label className="flex items-center gap-2 text-meta text-stone-700">
                 <input

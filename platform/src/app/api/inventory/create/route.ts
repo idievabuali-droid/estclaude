@@ -37,9 +37,12 @@ interface ApartmentInput {
   price_tjs: number;
   finishing_type: FinishingType;
   total_floors?: number;
-  bathroom_count?: number;
-  balcony?: boolean;
-  ceiling_height_cm?: number;
+  /**
+   * Russian RE convention: true = раздельный (separate toilet from
+   * bath), false = совмещённый (combined). Most Tajik apartments
+   * have one bathroom, so capturing the type is enough.
+   */
+  bathroom_separate?: boolean;
   description?: string;
   installment?: {
     monthly_tjs: number;
@@ -168,9 +171,7 @@ export async function POST(req: NextRequest) {
         totalFloors: apt.total_floors,
         priceTotalDirams: BigInt(Math.round(apt.price_tjs)) * TJS_TO_DIRAMS,
         finishingType: apt.finishing_type,
-        bathroomCount: apt.bathroom_count,
-        balcony: apt.balcony,
-        ceilingHeightCm: apt.ceiling_height_cm,
+        bathroomSeparate: apt.bathroom_separate,
         description: apt.description,
         installment: apt.installment
           ? {

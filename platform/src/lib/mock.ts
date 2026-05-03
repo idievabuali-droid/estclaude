@@ -78,6 +78,12 @@ export type MockListing = {
   bathroom_count: number | null;
   balcony: boolean | null;
   ceiling_height_cm: number | null;
+  /**
+   * Russian RE convention: true = раздельный (toilet separate from
+   * bath), false = совмещённый (combined). Null = not specified
+   * (legacy listings + sellers who skip the field).
+   */
+  bathroom_separate: boolean | null;
 };
 
 // Helpers
@@ -322,6 +328,7 @@ function mkListing(seed: {
     bathroom_count: seed.bathrooms ?? null,
     balcony: seed.balcony ?? null,
     ceiling_height_cm: seed.ceiling ?? null,
+    bathroom_separate: null,
   };
 }
 

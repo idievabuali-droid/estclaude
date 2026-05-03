@@ -4,9 +4,7 @@ import {
   Layers,
   Ruler,
   Bath,
-  ArrowUp,
   ArrowUpRight,
-  Eye,
 } from 'lucide-react';
 import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
@@ -252,25 +250,11 @@ export default async function ListingDetailPage({
               label="Этаж"
               value={formatFloor(listing.floor_number, listing.total_floors)}
             />
-            {listing.bathroom_count != null ? (
+            {listing.bathroom_separate != null ? (
               <Fact
                 icon={<Bath className="size-4 text-stone-500" />}
-                label="Санузлов"
-                value={String(listing.bathroom_count)}
-              />
-            ) : null}
-            {listing.ceiling_height_cm ? (
-              <Fact
-                icon={<ArrowUp className="size-4 text-stone-500" />}
-                label="Потолок"
-                value={`${(listing.ceiling_height_cm / 100).toFixed(1)} м`}
-              />
-            ) : null}
-            {listing.balcony != null ? (
-              <Fact
-                icon={<Eye className="size-4 text-stone-500" />}
-                label="Балкон"
-                value={listing.balcony ? 'есть' : 'нет'}
+                label="Санузел"
+                value={listing.bathroom_separate ? 'раздельный' : 'совмещённый'}
               />
             ) : null}
           </div>

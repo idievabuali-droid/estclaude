@@ -46,3 +46,5 @@ supabase/_combined.sql
 **/test-results
 
 .vercel
+.codex-cian-chrome-profile/
+cian-*.png

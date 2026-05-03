@@ -456,6 +456,7 @@ function mapListing(r: {
   bathroom_count: number | null;
   balcony: boolean | null;
   ceiling_height_cm: number | null;
+  bathroom_separate?: boolean | null;
 }): MockListing {
   return {
     id: r.id,
@@ -485,6 +486,7 @@ function mapListing(r: {
     bathroom_count: r.bathroom_count,
     balcony: r.balcony,
     ceiling_height_cm: r.ceiling_height_cm,
+    bathroom_separate: r.bathroom_separate ?? null,
   };
 }
 

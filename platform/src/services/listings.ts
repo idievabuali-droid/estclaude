@@ -244,9 +244,13 @@ export interface CreateListingInput {
   /** Total price in dirams (1 TJS = 100 dirams). */
   priceTotalDirams: bigint;
   finishingType: FinishingType;
-  bathroomCount?: number;
-  balcony?: boolean;
-  ceilingHeightCm?: number;
+  /**
+   * Russian RE convention: true = раздельный (toilet separate from
+   * bath), false = совмещённый (combined). Most Tajik apartments
+   * have a single bathroom; capturing the type alone is enough.
+   * Undefined = seller didn't specify.
+   */
+  bathroomSeparate?: boolean;
   /** Russian description. */
   description?: string;
   installment?: {
@@ -328,9 +332,7 @@ export async function createListing(
         ? input.installment!.firstPaymentPercent
         : null,
       installment_term_months: installmentEnabled ? input.installment!.termMonths : null,
-      bathroom_count: input.bathroomCount ?? null,
-      balcony: input.balcony ?? null,
-      ceiling_height_cm: input.ceilingHeightCm ?? null,
+      bathroom_separate: input.bathroomSeparate ?? null,
       unit_description: input.description
         ? { ru: input.description, tg: input.description }
         : null,
@@ -344,4 +346,181 @@ export async function createListing(
 
   if (error || !data) throw error ?? new Error('Failed to create listing');
   return { id: data.id as string, slug: data.slug as string };
+}
+
+// ─── Listing lifecycle (V1) ──────────────────────────────────
+
+/**
+ * Returns true if the user owns this listing (created it). Used by
+ * the lifecycle endpoints to gate actions: only the owner (or a
+ * founder) can edit / hide / mark sold / delete.
+ */
+export async function listingOwnedBy(listingId: string, userId: string): Promise<boolean> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from('listings')
+    .select('seller_user_id')
+    .eq('id', listingId)
+    .maybeSingle();
+  return data?.seller_user_id === userId;
+}
+
+/**
+ * Sets a listing's status. Used for hide / show / mark-sold actions.
+ *
+ * Allowed transitions (V1):
+ *   active        → hidden | sold
+ *   hidden        → active
+ *   pending_review → cannot change here (use moderation endpoint)
+ *   sold | rejected → active (republish)
+ *
+ * Caller is responsible for permission checks (founder OR listing owner).
+ */
+export type ListingLifecycleStatus = 'active' | 'hidden' | 'sold';
+
+export async function setListingStatus(
+  listingId: string,
+  newStatus: ListingLifecycleStatus,
+): Promise<void> {
+  const supabase = createAdminClient();
+  // When activating, refresh published_at so the listing shows up at
+  // the top of newest-first sorts again. When hiding / marking sold,
+  // we leave published_at alone — that's the original publish moment.
+  const patch: Record<string, unknown> = { status: newStatus };
+  if (newStatus === 'active') {
+    patch.published_at = new Date().toISOString();
+  }
+  const { error } = await supabase.from('listings').update(patch).eq('id', listingId);
+  if (error) throw error;
+}
+
+/**
+ * Soft-delete: sets `deleted_at`. Listings filtered by
+ * `is('deleted_at', null)` everywhere we read so this hides them
+ * without losing the row (referential integrity for any orphan
+ * contact_requests / saves).
+ */
+export async function softDeleteListing(listingId: string): Promise<void> {
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from('listings')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', listingId);
+  if (error) throw error;
+}
+
+/**
+ * Patch fields on an existing listing. Returns whether the change
+ * triggered re-moderation — the caller surfaces a different toast
+ * for "edited & live" vs "sent back for review".
+ *
+ * Re-moderation policy (only for non-founders editing previously-
+ * approved listings):
+ *   - Price drop ≥ 10% → re-moderate
+ *   - Rooms count change → re-moderate
+ *   - Size change > 5 m² → re-moderate
+ *   - Building change → re-moderate
+ *   - Description / installment / bathroom / finishing → instant
+ *
+ * Founders' edits never re-moderate.
+ */
+export interface UpdateListingInput {
+  roomsCount?: number;
+  sizeM2?: number;
+  floorNumber?: number;
+  priceTotalDirams?: bigint;
+  finishingType?: FinishingType;
+  bathroomSeparate?: boolean | null;
+  description?: string | null;
+  installment?: {
+    monthlyDirams: bigint;
+    firstPaymentPercent: number;
+    termMonths: number;
+  } | null;
+}
+
+export async function updateListing(
+  listingId: string,
+  input: UpdateListingInput,
+  options: { editorIsFounder: boolean },
+): Promise<{ reModerated: boolean }> {
+  const supabase = createAdminClient();
+
+  // Read the existing row so we can detect significant changes.
+  const { data: existing, error: readErr } = await supabase
+    .from('listings')
+    .select(
+      'rooms_count, size_m2, price_total_dirams, building_id, status',
+    )
+    .eq('id', listingId)
+    .single();
+  if (readErr || !existing) throw readErr ?? new Error('Listing not found');
+
+  const wasActive = existing.status === 'active';
+  let reModerate = false;
+
+  if (!options.editorIsFounder && wasActive) {
+    if (
+      input.roomsCount != null &&
+      input.roomsCount !== (existing.rooms_count as number)
+    ) {
+      reModerate = true;
+    }
+    if (
+      input.sizeM2 != null &&
+      Math.abs(input.sizeM2 - Number(existing.size_m2)) > 5
+    ) {
+      reModerate = true;
+    }
+    if (input.priceTotalDirams != null) {
+      const oldPrice = Number(existing.price_total_dirams);
+      const newPrice = Number(input.priceTotalDirams);
+      if (oldPrice > 0 && (oldPrice - newPrice) / oldPrice >= 0.1) {
+        // Price dropped ≥ 10% — typical anti-fraud trigger; cheap
+        // listings get extra attention to spot bait-and-switch.
+        reModerate = true;
+      }
+    }
+  }
+
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (input.roomsCount != null) patch.rooms_count = input.roomsCount;
+  if (input.sizeM2 != null) patch.size_m2 = input.sizeM2;
+  if (input.floorNumber != null) patch.floor_number = input.floorNumber;
+  if (input.priceTotalDirams != null) {
+    patch.price_total_dirams = input.priceTotalDirams.toString();
+  }
+  if (input.finishingType != null) patch.finishing_type = input.finishingType;
+  if (input.bathroomSeparate !== undefined) {
+    patch.bathroom_separate = input.bathroomSeparate;
+  }
+  if (input.description !== undefined) {
+    patch.unit_description = input.description
+      ? { ru: input.description, tg: input.description }
+      : null;
+  }
+  if (input.installment !== undefined) {
+    if (input.installment === null) {
+      patch.installment_available = false;
+      patch.installment_monthly_amount_dirams = null;
+      patch.installment_first_payment_percent = null;
+      patch.installment_term_months = null;
+    } else {
+      patch.installment_available = true;
+      patch.installment_monthly_amount_dirams = input.installment.monthlyDirams.toString();
+      patch.installment_first_payment_percent = input.installment.firstPaymentPercent;
+      patch.installment_term_months = input.installment.termMonths;
+    }
+  }
+  if (reModerate) patch.status = 'pending_review';
+
+  const { error: updateErr } = await supabase
+    .from('listings')
+    .update(patch)
+    .eq('id', listingId);
+  if (updateErr) throw updateErr;
+
+  return { reModerated: reModerate };
 }
