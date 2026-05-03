@@ -13,10 +13,8 @@
  * by the explicit userId argument (no implicit "current user" leak).
  */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import { mapListing } from './buildings';
-import type { ChangeEventType } from '@/types/domain';
 
 export type SavedListing = {
   kind: 'listing';
@@ -33,18 +31,6 @@ export type SavedBuilding = {
   developer: MockDeveloper | null;
   district: MockDistrict | null;
   matchingUnits: MockListing[];
-};
-
-export type SavedChange = {
-  type: ChangeEventType;
-  payload: Record<string, unknown>;
-  listing_id: string | null;
-  building_id: string | null;
-  /** Slug of the linked listing or building so the badge can render as a Link (JOURNEY-6). */
-  href: string | null;
-  /** Short label of the linked item ("ЖК Vahdat Park · 2-комн") for display. */
-  context: string | null;
-  created_at: string;
 };
 
 function mapBuilding(r: {
@@ -206,63 +192,3 @@ export async function getMySavedItems(userId: string): Promise<{
   return { listings, buildings };
 }
 
-export async function getRecentChangeEvents(): Promise<SavedChange[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('change_events')
-    .select('type, payload, listing_id, building_id, created_at')
-    .order('created_at', { ascending: false })
-    .limit(5);
-  if (error) throw error;
-  const rows = data ?? [];
-
-  // JOURNEY-6: resolve slugs so each badge can be a Link to its source
-  const listingIds = [...new Set(rows.map((r) => r.listing_id).filter(Boolean) as string[])];
-  const buildingIds = [...new Set(rows.map((r) => r.building_id).filter(Boolean) as string[])];
-
-  const [lRes, bRes] = await Promise.all([
-    listingIds.length
-      ? supabase.from('listings').select('id, slug, building_id, rooms_count, size_m2').in('id', listingIds)
-      : Promise.resolve({ data: [] }),
-    buildingIds.length
-      ? supabase.from('buildings').select('id, slug, name').in('id', buildingIds)
-      : Promise.resolve({ data: [] }),
-  ]);
-  const listingMap = new Map((lRes.data ?? []).map((l) => [l.id, l]));
-  const buildingMap = new Map((bRes.data ?? []).map((b) => [b.id, b]));
-
-  // Also need listing's parent building for context
-  const parentBuildingIds = [...new Set([...listingMap.values()].map((l) => l.building_id))];
-  const { data: parents } = parentBuildingIds.length
-    ? await supabase.from('buildings').select('id, name').in('id', parentBuildingIds)
-    : { data: [] };
-  const parentMap = new Map((parents ?? []).map((b) => [b.id, b]));
-
-  return rows.map((r) => {
-    let href: string | null = null;
-    let context: string | null = null;
-    if (r.listing_id) {
-      const l = listingMap.get(r.listing_id);
-      if (l) {
-        href = `/kvartira/${l.slug}`;
-        const parent = parentMap.get(l.building_id);
-        context = parent ? `${parent.name.ru} · ${l.rooms_count}-комн` : `${l.rooms_count}-комн`;
-      }
-    } else if (r.building_id) {
-      const b = buildingMap.get(r.building_id);
-      if (b) {
-        href = `/zhk/${b.slug}`;
-        context = b.name.ru;
-      }
-    }
-    return {
-      type: r.type as ChangeEventType,
-      payload: r.payload as Record<string, unknown>,
-      listing_id: r.listing_id,
-      building_id: r.building_id,
-      href,
-      context,
-      created_at: r.created_at,
-    };
-  });
-}
