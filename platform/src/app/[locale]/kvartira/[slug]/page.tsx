@@ -10,7 +10,7 @@ import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppChip } from '@/components/primitives';
-import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle, ShareButton, MiniMap } from '@/components/blocks';
+import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle, ShareButton, MiniMap, PhotoGallery } from '@/components/blocks';
 import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgoLong } from '@/lib/format';
@@ -160,66 +160,72 @@ export default async function ListingDetailPage({
 
   return (
     <>
-      {/* ─── 1. HERO ────────────────────────────────────────────── */}
-      {/* Hero uses the cover photo when uploaded; otherwise the source-
-          coded color block stays as a placeholder. The bottom gradient
-          + title sit on top in both modes. */}
-      <div
-        className="relative aspect-[16/9] w-full bg-stone-100 md:aspect-[21/9]"
-        style={listing.cover_photo_url ? undefined : { backgroundColor: listing.cover_color }}
-      >
-        {listing.cover_photo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={listing.cover_photo_url}
-            alt={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
-            className="absolute inset-0 size-full object-cover"
+      {/* ─── 1. HERO + PHOTO GALLERY ─────────────────────────────── */}
+      {/* Hero IS the gallery. Mobile: full-bleed scroll-snap carousel
+          (swipe right/left between photos, tap any to fullscreen).
+          Desktop: hero photo + 4-thumb strip below. The title +
+          Save/Share actions overlay the hero on both. Replaces the
+          previous static grid that pushed the price below the fold. */}
+      {photoUrls.length > 0 ? (
+        <div className="relative">
+          <PhotoGallery
+            photos={photoUrls}
+            alt={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} в ${building.name.ru}`}
+            heroAspect="21/9"
           />
-        ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-stone-900/65 via-stone-900/15 to-transparent" />
-        {/* Save + Share top-right of hero. Share was the biggest
-            multi-decision-maker friction (Saidakbar→Hilola, Madina→
-            parents, Faridun→Zarrina): URL had to be copied by hand
-            because there was no share affordance anywhere. Native share
-            sheet on mobile, WhatsApp/Telegram/copy menu on desktop. */}
-        <div className="absolute right-3 top-3 z-10 flex items-center gap-2 md:right-5 md:top-5">
-          <ShareButton
-            compact
-            text={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} в ${building.name.ru}`}
-            title={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
-          />
-          <SaveToggle type="listing" id={listing.id} />
-        </div>
-        <div className="absolute bottom-0 left-0 right-0">
-          <AppContainer className="pb-3 md:pb-4">
-            <h1 className="text-h2 font-semibold leading-[var(--leading-h2)] text-white drop-shadow-sm md:text-h1">
-              {listing.rooms_count}-комн · {formatM2(listing.size_m2)}
-            </h1>
-          </AppContainer>
-        </div>
-      </div>
-
-      {/* Photo gallery — rendered only when there are MORE photos
-          beyond the cover, so single-photo listings don't show a
-          one-tile grid. */}
-      {photoUrls.length > 1 ? (
-        <section className="border-b border-stone-200 bg-white py-4">
-          <AppContainer>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-              {photoUrls.map((p) => (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  key={p.id}
-                  src={p.url}
-                  alt=""
-                  className="aspect-square w-full rounded-md object-cover"
-                  loading="lazy"
-                />
-              ))}
+          {/* Top-right actions: same Save + Share affordance as before,
+              now positioned over the gallery. pointer-events-auto so
+              taps on the buttons don't open the lightbox. */}
+          <div className="pointer-events-none absolute right-3 top-3 z-20 flex items-center gap-2 md:right-5 md:top-5">
+            <div className="pointer-events-auto">
+              <ShareButton
+                compact
+                text={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} в ${building.name.ru}`}
+                title={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
+              />
             </div>
-          </AppContainer>
-        </section>
-      ) : null}
+            <div className="pointer-events-auto">
+              <SaveToggle type="listing" id={listing.id} />
+            </div>
+          </div>
+          {/* Bottom title overlay — gradient sits inside the gallery so
+              the carousel transition still works underneath. The title
+              is pointer-events-none so taps fall through to the photo
+              and open the lightbox. */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-stone-900/65 via-stone-900/10 to-transparent">
+            <AppContainer className="pb-3 md:pb-4">
+              <h1 className="text-h2 font-semibold leading-[var(--leading-h2)] text-white drop-shadow-sm md:text-h1">
+                {listing.rooms_count}-комн · {formatM2(listing.size_m2)}
+              </h1>
+            </AppContainer>
+          </div>
+        </div>
+      ) : (
+        // No-photo fallback: source-coded coloured hero. Single photo
+        // listings still go through the gallery above (single slide,
+        // no counter, lightbox optional).
+        <div
+          className="relative aspect-[16/9] w-full bg-stone-100 md:aspect-[21/9]"
+          style={{ backgroundColor: listing.cover_color }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-stone-900/65 via-stone-900/15 to-transparent" />
+          <div className="absolute right-3 top-3 z-10 flex items-center gap-2 md:right-5 md:top-5">
+            <ShareButton
+              compact
+              text={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} в ${building.name.ru}`}
+              title={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
+            />
+            <SaveToggle type="listing" id={listing.id} />
+          </div>
+          <div className="absolute bottom-0 left-0 right-0">
+            <AppContainer className="pb-3 md:pb-4">
+              <h1 className="text-h2 font-semibold leading-[var(--leading-h2)] text-white drop-shadow-sm md:text-h1">
+                {listing.rooms_count}-комн · {formatM2(listing.size_m2)}
+              </h1>
+            </AppContainer>
+          </div>
+        </div>
+      )}
 
       {/* ─── 2. BREADCRUMBS ─────────────────────────────────────── */}
       <nav aria-label="Хлебные крошки" className="border-b border-stone-200 bg-stone-50">

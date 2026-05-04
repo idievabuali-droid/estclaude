@@ -61,3 +61,5 @@ export { SortChip } from './SortChip';
 export type { SortMode } from './SortChip';
 export { MiniMap } from './MiniMap';
 export type { MiniMapProps } from './MiniMap';
+export { PhotoGallery } from './PhotoGallery';
+export type { PhotoGalleryProps } from './PhotoGallery';
