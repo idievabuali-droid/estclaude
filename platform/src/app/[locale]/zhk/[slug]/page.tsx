@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { MapPin, Calendar, Layers, Users, Camera, ArrowUpRight, BadgeCheck } from 'lucide-react';
+import { MapPin, Calendar, Layers, Users, Camera, ArrowUpRight, BadgeCheck, MessageCircle } from 'lucide-react';
+import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import {
@@ -431,7 +432,27 @@ export default async function BuildingDetailPage({
                       </span>
                     ) : null}
                   </div>
-                  <AppButton variant="secondary">Все проекты застройщика</AppButton>
+                  {/* Two CTAs side-by-side. "Связаться" is the new
+                      primary action — was missing entirely; Saidakbar
+                      had no path to ask the developer a pre-purchase
+                      question without leaving the page. WhatsApp tap
+                      with prefilled building context. "Все проекты"
+                      gets fixed (was dead) in the next commit when the
+                      developer filter ships on /novostroyki. */}
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={`${FOUNDER_CONTACTS.whatsappLink}?text=${encodeURIComponent(
+                        `Здравствуйте! Интересует ЖК ${building.name.ru} от ${developer.display_name.ru}. Можете подсказать?`,
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <AppButton variant="primary">
+                        <MessageCircle className="size-4" /> Связаться с застройщиком
+                      </AppButton>
+                    </a>
+                    <AppButton variant="secondary">Все проекты застройщика</AppButton>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">

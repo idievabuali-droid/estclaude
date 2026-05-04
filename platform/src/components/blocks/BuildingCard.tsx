@@ -9,6 +9,7 @@ import { STAGE_INFO } from '@/lib/building-stages';
 import { VerificationBadge } from './VerificationBadge';
 import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
+import { BuildingContactButton } from './BuildingContactButton';
 import { FEATURES } from '@/lib/feature-flags';
 import { PriceConversion } from './PriceConversion';
 import { StageInfoPopover } from './StageInfoPopover';
@@ -115,6 +116,16 @@ export function BuildingCard({
         </div>
         <div className="absolute right-3 top-3 flex flex-col gap-2">
           <SaveToggle type="building" id={building.id} />
+          {/* Связаться: WhatsApp tap with prefilled context. Was
+              missing entirely — buyers had to click through to the
+              detail page just to ask a pre-purchase question, then
+              dig further. The pill funnels to the founder (no per-
+              developer phone in V1) but the WhatsApp message carries
+              the building name so context lands in chat. */}
+          <BuildingContactButton
+            buildingName={building.name.ru}
+            buildingAddress={`${district.name.ru} · ${building.address.ru}`}
+          />
           {/* Compare hidden in V1 — see lib/feature-flags.ts. With ~6
               buildings the icon adds visual weight for marginal value.
               Re-enable when inventory crosses ~20 active buildings. */}

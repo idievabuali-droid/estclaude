@@ -63,3 +63,5 @@ export { MiniMap } from './MiniMap';
 export type { MiniMapProps } from './MiniMap';
 export { PhotoGallery } from './PhotoGallery';
 export type { PhotoGalleryProps } from './PhotoGallery';
+export { BuildingContactButton } from './BuildingContactButton';
+export type { BuildingContactButtonProps } from './BuildingContactButton';
