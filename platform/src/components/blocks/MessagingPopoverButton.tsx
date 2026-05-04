@@ -1,0 +1,147 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { MessageSquare, MessageCircle, Send, Image as ImageIcon } from 'lucide-react';
+import { AppButton } from '@/components/primitives';
+import { cn } from '@/lib/utils';
+
+export interface MessagingPopoverButtonProps {
+  /** WhatsApp deep-link (already includes the prefilled text). */
+  whatsappHref: string;
+  /** Telegram deep-link (already includes the prefilled text). */
+  telegramHref: string;
+  /** IMO deep-link, or null when IMO is unsupported. */
+  imoHref?: string | null;
+  /** Visual variant:
+   *   primary-lg: desktop labeled big button (used in detail-page contact section)
+   *   primary-mobile: mobile sticky-bar primary slot (labeled, flex-1)
+   *   icon-stack: mobile sticky-bar icon-with-label slot (compact) */
+  variant: 'primary-lg' | 'primary-mobile' | 'icon-stack';
+  className?: string;
+}
+
+/**
+ * One "Сообщения" button → popover with WhatsApp / Telegram / IMO.
+ * Replaces the previous 3-icon-row pattern (WA + TG + IMO each as a
+ * separate button) which felt cluttered on mobile and made the
+ * primary action ambiguous.
+ *
+ * Tap → small floating menu with the 3 channels. User picks the one
+ * they actually use. Closes on selection or outside click.
+ *
+ * The popover renders below or above the button based on available
+ * space — auto-flips when the button is near the bottom of the
+ * viewport (the mobile sticky bar case). For V1 we just always anchor
+ * above when the variant is mobile, below otherwise — no dynamic flip
+ * logic, simpler.
+ */
+export function MessagingPopoverButton({
+  whatsappHref,
+  telegramHref,
+  imoHref,
+  variant,
+  className,
+}: MessagingPopoverButtonProps) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (!wrapRef.current) return;
+      if (!wrapRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  const trigger = (() => {
+    if (variant === 'primary-lg') {
+      return (
+        <AppButton variant="primary" size="lg" onClick={() => setOpen((v) => !v)}>
+          <MessageSquare className="size-4" /> Сообщения
+        </AppButton>
+      );
+    }
+    if (variant === 'primary-mobile') {
+      return (
+        <AppButton variant="primary" size="md" className="w-full" onClick={() => setOpen((v) => !v)}>
+          <MessageSquare className="size-4" /> Сообщения
+        </AppButton>
+      );
+    }
+    // icon-stack — used in the mobile sticky bar's secondary slots when
+    // the bar prefers a denser layout. Not currently default.
+    return (
+      <AppButton variant="secondary" size="md" className="h-12 px-2 py-1" onClick={() => setOpen((v) => !v)}>
+        <span className="flex flex-col items-center justify-center gap-0.5 leading-none">
+          <MessageSquare className="size-4" aria-hidden />
+          <span className="text-[10px] font-medium">Сообщ.</span>
+        </span>
+      </AppButton>
+    );
+  })();
+
+  // Anchoring: mobile sticky bar always opens upward (the bar is at
+  // the bottom of the viewport so a downward popover gets clipped).
+  // Desktop opens below.
+  const popoverPosition =
+    variant === 'primary-mobile' || variant === 'icon-stack'
+      ? 'bottom-full mb-2'
+      : 'top-full mt-2';
+
+  return (
+    <div ref={wrapRef} className={cn('relative inline-flex', variant === 'primary-mobile' ? 'flex-1 min-w-0' : '', className)}>
+      {trigger}
+      {open ? (
+        <div
+          role="menu"
+          aria-label="Способ связи"
+          className={`absolute left-0 right-0 z-30 ${popoverPosition} min-w-[15rem] overflow-hidden rounded-md border border-stone-200 bg-white shadow-lg`}
+        >
+          <a
+            href={whatsappHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-3 py-2.5 text-meta text-stone-900 hover:bg-stone-50"
+          >
+            <span className="inline-flex size-7 items-center justify-center rounded-full bg-[color:var(--color-fairness-great)] text-white" aria-hidden>
+              <MessageCircle className="size-3.5" />
+            </span>
+            WhatsApp
+          </a>
+          <a
+            href={telegramHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-3 py-2.5 text-meta text-stone-900 hover:bg-stone-50"
+          >
+            <span className="inline-flex size-7 items-center justify-center rounded-full bg-[color:var(--color-semantic-info)] text-white" aria-hidden>
+              <Send className="size-3.5" />
+            </span>
+            Telegram
+          </a>
+          {imoHref ? (
+            <a
+              href={imoHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-3 py-2.5 text-meta text-stone-900 hover:bg-stone-50"
+            >
+              <span className="inline-flex size-7 items-center justify-center rounded-full bg-stone-700 text-white" aria-hidden>
+                <ImageIcon className="size-3.5" />
+              </span>
+              IMO
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}

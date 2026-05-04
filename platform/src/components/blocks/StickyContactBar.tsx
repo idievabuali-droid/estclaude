@@ -1,9 +1,10 @@
 'use client';
 
 import type { ComponentType } from 'react';
-import { MessageCircle, Send, Phone, Image as ImageIcon } from 'lucide-react';
+import { Phone } from 'lucide-react';
 import { AppButton } from '@/components/primitives';
 import type { ContactLinks } from '@/lib/contact-links';
+import { MessagingPopoverButton } from './MessagingPopoverButton';
 
 export interface StickyContactBarProps {
   links: ContactLinks;
@@ -15,14 +16,17 @@ export interface StickyContactBarProps {
 }
 
 /**
- * Sticky bottom bar (mobile only). Layout:
- *   [ 💬 WhatsApp (labeled primary, flex-1) ] [ icon+small label × 4 ]
+ * Sticky bottom bar (mobile only). Consolidated layout:
+ *   [ 💬 Сообщения (labeled primary, flex-1) ] [ Звонок ] [ Визит ]
  *
- * WhatsApp gets the labeled primary slot because it's the dominant
- * channel in our market (Tajik buyers default to WA). The other four
- * (Telegram, IMO, Phone, Intent) used to be unlabeled icons — buyers
- * had to guess which was which. Now each carries a 9px label under
- * the icon, still fits on 375px.
+ * Was 5 buttons (WA labeled + TG/IMO/Phone/Intent icon-stacks) which
+ * felt cluttered and made the primary action ambiguous. The user
+ * walked the live mobile site on iPhone and flagged it as messy.
+ *
+ * New layout: one "Сообщения" popover (WhatsApp / Telegram / IMO),
+ * one "Звонок", one "Визит". Three buttons, each one a distinct
+ * intent (chat / call / book). Buyer doesn't have to guess which
+ * messenger; they tap Сообщения and the popover lets them pick.
  *
  * The intent button (rightmost) opens the visit/online-showing form
  * via onIntent — same modal that the desktop "Запланировать" CTA opens.
@@ -54,22 +58,12 @@ export function StickyContactBar({
       style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
     >
       <div className="flex items-center gap-1.5 px-3 pt-3">
-        <a href={links.whatsapp} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0">
-          <AppButton variant="primary" size="md" className="w-full">
-            <MessageCircle className="size-4" />
-            WhatsApp
-          </AppButton>
-        </a>
-        <a href={links.telegram} target="_blank" rel="noopener noreferrer" aria-label="Telegram">
-          <AppButton variant="secondary" size="md" className="h-12 px-2 py-1">
-            <IconWithLabel icon={<Send className="size-4" aria-hidden />} label="TG" />
-          </AppButton>
-        </a>
-        <a href={links.imo} target="_blank" rel="noopener noreferrer" aria-label="IMO">
-          <AppButton variant="secondary" size="md" className="h-12 px-2 py-1">
-            <IconWithLabel icon={<ImageIcon className="size-4" aria-hidden />} label="IMO" />
-          </AppButton>
-        </a>
+        <MessagingPopoverButton
+          variant="primary-mobile"
+          whatsappHref={links.whatsapp}
+          telegramHref={links.telegram}
+          imoHref={links.imo}
+        />
         <a href={links.call} aria-label="Позвонить">
           <AppButton variant="secondary" size="md" className="h-12 px-2 py-1">
             <IconWithLabel icon={<Phone className="size-4" aria-hidden />} label="Звонок" />

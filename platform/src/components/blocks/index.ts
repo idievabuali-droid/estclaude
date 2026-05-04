@@ -65,3 +65,5 @@ export { PhotoGallery } from './PhotoGallery';
 export type { PhotoGalleryProps } from './PhotoGallery';
 export { BuildingContactButton } from './BuildingContactButton';
 export type { BuildingContactButtonProps } from './BuildingContactButton';
+export { MessagingPopoverButton } from './MessagingPopoverButton';
+export type { MessagingPopoverButtonProps } from './MessagingPopoverButton';

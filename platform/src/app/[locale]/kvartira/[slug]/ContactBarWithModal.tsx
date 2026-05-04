@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MessageCircle, Send, Phone, Image as ImageIcon, CalendarCheck, Video } from 'lucide-react';
+import { Phone, CalendarCheck, Video } from 'lucide-react';
 import {
   AppButton,
   AppInput,
@@ -11,6 +11,7 @@ import {
 } from '@/components/primitives';
 import { toast } from '@/components/primitives/AppToast';
 import { StickyContactBar } from '@/components/blocks/StickyContactBar';
+import { MessagingPopoverButton } from '@/components/blocks/MessagingPopoverButton';
 import { buildContactLinks } from '@/lib/contact-links';
 
 export interface ContactBarWithModalProps {
@@ -64,44 +65,28 @@ export function ContactBarWithModal({
 
   return (
     <>
-      {/* Desktop section: two grouped rows (channels vs intent) */}
-      <div className="hidden flex-col gap-4 pt-2 md:flex">
-        <div className="flex flex-col gap-2">
-          <span className="text-caption font-medium uppercase tracking-wide text-stone-500">
-            Связаться с продавцом
-          </span>
-          <div className="flex flex-wrap items-center gap-2">
-            <a href={links.whatsapp} target="_blank" rel="noopener noreferrer">
-              <AppButton variant="primary" size="lg">
-                <MessageCircle className="size-4" /> WhatsApp
-              </AppButton>
-            </a>
-            <a href={links.telegram} target="_blank" rel="noopener noreferrer">
-              <AppButton variant="secondary" size="lg">
-                <Send className="size-4" /> Telegram
-              </AppButton>
-            </a>
-            <a href={links.imo} target="_blank" rel="noopener noreferrer">
-              <AppButton variant="secondary" size="lg">
-                <ImageIcon className="size-4" /> IMO
-              </AppButton>
-            </a>
-            <a href={links.call}>
-              <AppButton variant="secondary" size="lg">
-                <Phone className="size-4" /> Позвонить
-              </AppButton>
-            </a>
-          </div>
-        </div>
-        <div className="flex flex-col gap-2">
-          <span className="text-caption font-medium uppercase tracking-wide text-stone-500">
-            Запланировать
-          </span>
+      {/* Desktop section: consolidated to 2 primary actions
+          (Сообщения popover + Позвонить) plus a smaller intent
+          button. The 5-buttons row (WA + TG + IMO + Phone + Visit)
+          looked like contact paralysis — one row of options that
+          all said "talk to seller" with no clear primary. */}
+      <div className="hidden flex-col gap-3 pt-2 md:flex">
+        <div className="flex flex-wrap items-center gap-2">
+          <MessagingPopoverButton
+            variant="primary-lg"
+            whatsappHref={links.whatsapp}
+            telegramHref={links.telegram}
+            imoHref={links.imo}
+          />
+          <a href={links.call}>
+            <AppButton variant="secondary" size="lg">
+              <Phone className="size-4" /> Позвонить
+            </AppButton>
+          </a>
           <AppButton
             variant="secondary"
             size="lg"
             onClick={() => setOpen(true)}
-            className="w-fit"
           >
             <IntentIcon className="size-4" /> {intentLabel}
           </AppButton>
