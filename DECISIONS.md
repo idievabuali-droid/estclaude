@@ -56,9 +56,13 @@ Newest at top.
 - D1 desktop layout cap: `AppContainer` already 1200px max — earlier audit screenshots looked narrow because of low-res capture, not actual layout.
 - D2 MobileBottomNav: already `md:hidden` (display: none at md+).
 
-**Deferred (still real, separate commit):**
-- M2 mini-map embed on /zhk + /kvartira detail — needs a compact `MiniMap` component or `MapView` refactor.
+**Commit 6b1bcf0 — Mini-map embeds (the deferred M2)**
+- M2. New `MiniMap` block (compact MapLibre instance, single terracotta dot + label pill, no chip bar). Embedded on `/kvartira/[slug]` (220px) inside the "Что рядом" section above the chips, and on `/zhk/[slug]` (260px) inside `#nearby` above `NearbyPois`. Russian-first label override. Closes the spatial-answer gap — buyers no longer have to tap "На карте" to see where the building IS.
+
+**Deferred (still real but lower priority):**
 - M16 hide chips in POI mode — judged unnecessary; the "Рядом с «X»" header establishes POI primacy and keeping chips lets buyer narrow further.
+
+The full Madina + Faridun audit list is now zero open.
 
 **Method change locked in CLAUDE.md** (will write next time we touch it):
 - Re-verify "audit findings" by inspecting the actual DOM (computed widths / display values), not just by screenshot interpretation. D1 + D2 in this batch were both screenshot-misinterpretation false alarms — saved a commit's worth of unnecessary work by checking via `getBoundingClientRect` first.
