@@ -95,6 +95,52 @@ export default async function VisitorPage({
     contactListingMeta = new Map(((data ?? []) as Array<{ id: string; slug: string }>).map((r) => [r.id, { slug: r.slug }]));
   }
 
+  // Hydrate the buyer-profile slugs/codes into human Russian so the
+  // "Что они ищут" summary doesn't read as cryptic codes:
+  //   - district slug ("gulistan") → name ("Гулистон")
+  //   - top listing slug → "ЖК X · 2-комн 62 м²"
+  //   - top building slug → "ЖК X"
+  // Three small batched lookups; cached for the request only.
+  const profileBuildingSlugs = profile.topBuildingSlugs;
+  const profileListingSlugs = profile.topListingSlugs;
+  const profileDistrictSlugs = profile.districts;
+  const [profileBuildingsRes, profileListingsRes, profileDistrictsRes] = await Promise.all([
+    profileBuildingSlugs.length
+      ? supabase.from('buildings').select('slug, name').in('slug', profileBuildingSlugs)
+      : Promise.resolve({ data: [] as never[] }),
+    profileListingSlugs.length
+      ? supabase
+          .from('listings')
+          .select('slug, rooms_count, size_m2, building:buildings!inner(name)')
+          .in('slug', profileListingSlugs)
+      : Promise.resolve({ data: [] as never[] }),
+    profileDistrictSlugs.length
+      ? supabase.from('districts').select('slug, name').in('slug', profileDistrictSlugs)
+      : Promise.resolve({ data: [] as never[] }),
+  ]);
+  const profileBuildingNames = new Map<string, string>();
+  for (const r of (profileBuildingsRes.data ?? []) as Array<{ slug: string; name: { ru?: string } }>) {
+    profileBuildingNames.set(r.slug, r.name?.ru ?? r.slug);
+  }
+  const profileListingLabels = new Map<string, string>();
+  for (const r of (profileListingsRes.data ?? []) as Array<{
+    slug: string;
+    rooms_count: number;
+    size_m2: number | string;
+    building: { name: { ru?: string } } | { name: { ru?: string } }[] | null;
+  }>) {
+    const bld = Array.isArray(r.building) ? r.building[0] : r.building;
+    const buildingName = bld?.name?.ru ?? '—';
+    profileListingLabels.set(
+      r.slug,
+      `${buildingName} · ${r.rooms_count}-комн ${Number(r.size_m2)} м²`,
+    );
+  }
+  const profileDistrictNames = new Map<string, string>();
+  for (const r of (profileDistrictsRes.data ?? []) as Array<{ slug: string; name: { ru?: string } }>) {
+    profileDistrictNames.set(r.slug, r.name?.ru ?? r.slug);
+  }
+
   return (
     <>
       <section className="border-b border-stone-200 bg-white">
@@ -125,7 +171,12 @@ export default async function VisitorPage({
         <AppContainer className="flex flex-col gap-5">
           {/* Buyer profile — the headline summary so the operator can
               read in one glance what kind of buyer this is. */}
-          <BuyerProfileCard profile={profile} />
+          <BuyerProfileCard
+            profile={profile}
+            districtNames={profileDistrictNames}
+            listingLabels={profileListingLabels}
+            buildingNames={profileBuildingNames}
+          />
 
           {/* Frictions — the actionable problem signals. Empty state
               hidden so the section disappears when there's nothing to
@@ -311,7 +362,17 @@ export default async function VisitorPage({
   );
 }
 
-function BuyerProfileCard({ profile }: { profile: BuyerProfile }) {
+function BuyerProfileCard({
+  profile,
+  districtNames,
+  listingLabels,
+  buildingNames,
+}: {
+  profile: BuyerProfile;
+  districtNames: Map<string, string>;
+  listingLabels: Map<string, string>;
+  buildingNames: Map<string, string>;
+}) {
   const lines: string[] = [];
   if (profile.dominantRooms) {
     lines.push(`${profile.dominantRooms}-комн`);
@@ -323,7 +384,11 @@ function BuyerProfileCard({ profile }: { profile: BuyerProfile }) {
     else if (min != null) lines.push(`от ${fmtTjs(min)} TJS`);
   }
   if (profile.districts.length > 0) {
-    lines.push(`районы: ${profile.districts.slice(0, 3).join(', ')}`);
+    // Render Russian names (e.g. "Гулистон") instead of slugs ("gulistan").
+    const named = profile.districts
+      .slice(0, 3)
+      .map((slug) => districtNames.get(slug) ?? slug);
+    lines.push(`районы: ${named.join(', ')}`);
   }
   if (profile.finishings.length > 0) {
     const fin = profile.finishings.slice(0, 2).map((f) => FINISHING_LABEL[f] ?? f);
@@ -359,7 +424,7 @@ function BuyerProfileCard({ profile }: { profile: BuyerProfile }) {
                     href={`/kvartira/${s}`}
                     className="inline-flex h-7 items-center rounded-sm bg-stone-100 px-2 text-caption text-stone-800 hover:bg-stone-200"
                   >
-                    кв · {s}
+                    {listingLabels.get(s) ?? `кв · ${s}`}
                   </Link>
                 ))}
                 {profile.topBuildingSlugs.map((s) => (
@@ -368,7 +433,7 @@ function BuyerProfileCard({ profile }: { profile: BuyerProfile }) {
                     href={`/zhk/${s}`}
                     className="inline-flex h-7 items-center rounded-sm bg-stone-100 px-2 text-caption text-stone-800 hover:bg-stone-200"
                   >
-                    ЖК · {s}
+                    {buildingNames.get(s) ?? `ЖК · ${s}`}
                   </Link>
                 ))}
               </div>

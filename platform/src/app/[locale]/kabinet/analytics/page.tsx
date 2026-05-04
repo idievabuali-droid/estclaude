@@ -82,10 +82,21 @@ export default async function AnalyticsPage({
     : allEvents.filter((e) => !e.user_id || !staffUserIds.has(e.user_id as string));
 
   // ─── Funnel stages ──────────────────────────────────────────
-  // visited → searched → viewed listing → contact_or_save_or_callback
+  // visited → searched → viewed listing → (saved search OR gave
+  // callback OR clicked contact). The last stage splits three ways
+  // because those events represent very different intent levels —
+  // bundling them hid the real "this person actually wants to talk"
+  // signal under "this person ticked subscribe".
   const visitorStages = new Map<
     string,
-    { visited: boolean; searched: boolean; viewedListing: boolean; converted: boolean }
+    {
+      visited: boolean;
+      searched: boolean;
+      viewedListing: boolean;
+      savedSearch: boolean;
+      gaveCallback: boolean;
+      clickedContact: boolean;
+    }
   >();
   const eventCounter: Record<string, number> = {};
   const channelClicks: Record<string, number> = {};
@@ -102,7 +113,14 @@ export default async function AnalyticsPage({
     const evType = e.event_type as string;
     eventCounter[evType] = (eventCounter[evType] ?? 0) + 1;
 
-    const stage = visitorStages.get(anonId) ?? { visited: false, searched: false, viewedListing: false, converted: false };
+    const stage = visitorStages.get(anonId) ?? {
+      visited: false,
+      searched: false,
+      viewedListing: false,
+      savedSearch: false,
+      gaveCallback: false,
+      clickedContact: false,
+    };
     stage.visited = true;
     if (evType === 'search_run') stage.searched = true;
     const props = (e.properties ?? {}) as Record<string, unknown>;
@@ -124,9 +142,9 @@ export default async function AnalyticsPage({
       const slug = props.building_slug as string | undefined;
       if (slug) buildingEngagement[slug] = (buildingEngagement[slug] ?? 0) + 1;
     }
-    if (evType === 'contact_button_click' || evType === 'callback_request_submitted' || evType === 'saved_search_subscribed') {
-      stage.converted = true;
-    }
+    if (evType === 'saved_search_subscribed') stage.savedSearch = true;
+    if (evType === 'callback_request_submitted') stage.gaveCallback = true;
+    if (evType === 'contact_button_click') stage.clickedContact = true;
     if (evType === 'contact_button_click') {
       const channel = (props.channel as string | undefined) ?? 'unknown';
       channelClicks[channel] = (channelClicks[channel] ?? 0) + 1;
@@ -157,13 +175,17 @@ export default async function AnalyticsPage({
     visited: 0,
     searched: 0,
     viewedListing: 0,
-    converted: 0,
+    savedSearch: 0,
+    gaveCallback: 0,
+    clickedContact: 0,
   };
   for (const s of visitorStages.values()) {
     if (s.visited) funnelCounts.visited++;
     if (s.searched) funnelCounts.searched++;
     if (s.viewedListing) funnelCounts.viewedListing++;
-    if (s.converted) funnelCounts.converted++;
+    if (s.savedSearch) funnelCounts.savedSearch++;
+    if (s.gaveCallback) funnelCounts.gaveCallback++;
+    if (s.clickedContact) funnelCounts.clickedContact++;
   }
 
   // ─── Hot leads ──────────────────────────────────────────────
@@ -182,19 +204,62 @@ export default async function AnalyticsPage({
         v.sample as Record<string, string | string[] | undefined>,
       ),
       page: v.page,
+      sample: v.sample,
     }))
     .sort((a, b) => b.uniqueVisitors - a.uniqueVisitors)
     .slice(0, 10);
 
   // ─── Top engaged listings/buildings ─────────────────────────
-  const topListings = Object.entries(listingEngagement)
+  const topListingsRaw = Object.entries(listingEngagement)
     .map(([key, count]) => ({ key, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
-  const topBuildings = Object.entries(buildingEngagement)
+  const topBuildingsRaw = Object.entries(buildingEngagement)
     .map(([key, count]) => ({ key, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
+
+  // Hydrate slugs to human labels so the operator reads "ЖК Vahdat
+  // Park · 2-комн 62 м²" instead of "vp-2k-a". Two batched queries.
+  const listingSlugs = topListingsRaw.map((r) => r.key);
+  const buildingSlugs = topBuildingsRaw.map((r) => r.key);
+  const [listingMetaRes, buildingMetaRes] = await Promise.all([
+    listingSlugs.length
+      ? supabase
+          .from('listings')
+          .select('slug, rooms_count, size_m2, building:buildings!inner(name)')
+          .in('slug', listingSlugs)
+      : Promise.resolve({ data: [] as never[] }),
+    buildingSlugs.length
+      ? supabase.from('buildings').select('slug, name').in('slug', buildingSlugs)
+      : Promise.resolve({ data: [] as never[] }),
+  ]);
+  const listingNames = new Map<string, string>();
+  for (const row of (listingMetaRes.data ?? []) as Array<{
+    slug: string;
+    rooms_count: number;
+    size_m2: number | string;
+    building: { name: { ru?: string } } | { name: { ru?: string } }[] | null;
+  }>) {
+    const bld = Array.isArray(row.building) ? row.building[0] : row.building;
+    const buildingName = bld?.name?.ru ?? '—';
+    listingNames.set(
+      row.slug,
+      `${buildingName} · ${row.rooms_count}-комн ${Number(row.size_m2)} м²`,
+    );
+  }
+  const buildingNames = new Map<string, string>();
+  for (const row of (buildingMetaRes.data ?? []) as Array<{ slug: string; name: { ru?: string } }>) {
+    buildingNames.set(row.slug, row.name?.ru ?? row.slug);
+  }
+  const topListings = topListingsRaw.map((r) => ({
+    ...r,
+    label: listingNames.get(r.key) ?? r.key,
+  }));
+  const topBuildings = topBuildingsRaw.map((r) => ({
+    ...r,
+    label: buildingNames.get(r.key) ?? r.key,
+  }));
 
   // ─── Visitor table ──────────────────────────────────────────
   const topVisitors = Object.entries(visitorActivity)
@@ -273,7 +338,9 @@ export default async function AnalyticsPage({
             visited={funnelCounts.visited}
             searched={funnelCounts.searched}
             viewedListing={funnelCounts.viewedListing}
-            converted={funnelCounts.converted}
+            savedSearch={funnelCounts.savedSearch}
+            gaveCallback={funnelCounts.gaveCallback}
+            clickedContact={funnelCounts.clickedContact}
             distinctIdentified={distinctIdentified.size}
             distinctVisitors={distinctVisitors}
           />
@@ -380,35 +447,47 @@ function Funnel({
   visited,
   searched,
   viewedListing,
-  converted,
+  savedSearch,
+  gaveCallback,
+  clickedContact,
   distinctIdentified,
   distinctVisitors,
 }: {
   visited: number;
   searched: number;
   viewedListing: number;
-  converted: number;
+  savedSearch: number;
+  gaveCallback: number;
+  clickedContact: number;
   distinctIdentified: number;
   distinctVisitors: number;
 }) {
-  const stages = [
+  const mainStages = [
     { label: 'Зашли', count: visited, prev: visited },
     { label: 'Искали', count: searched, prev: visited },
     { label: 'Открыли квартиру', count: viewedListing, prev: searched },
-    { label: 'Связались / сохранили', count: converted, prev: viewedListing },
+  ];
+  // Last stage splits because the three intent levels are too
+  // different to bundle (Cian-style breakdown). Saved-search is
+  // weakest, clicked-contact is strongest. Drop-off between them
+  // tells you what's actually working.
+  const conversionStages = [
+    { label: 'Сохранили поиск', count: savedSearch, color: 'text-stone-700' },
+    { label: 'Оставили номер', count: gaveCallback, color: 'text-amber-700' },
+    { label: 'Нажали контакт', count: clickedContact, color: 'text-terracotta-700' },
   ];
   return (
     <AppCard>
       <AppCardContent>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-h2 font-semibold text-stone-900">Воронка</h2>
             <span className="text-caption text-stone-500 tabular-nums">
               {distinctIdentified} из {distinctVisitors} вошли через Telegram
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {stages.map((s, i) => {
+          <div className="grid grid-cols-3 gap-3">
+            {mainStages.map((s, i) => {
               const dropPct = s.prev > 0 ? Math.round((s.count / s.prev) * 100) : null;
               return (
                 <div key={s.label} className="flex flex-col gap-1 rounded-md border border-stone-200 bg-stone-50 p-3">
@@ -425,6 +504,33 @@ function Funnel({
                 </div>
               );
             })}
+          </div>
+          <div className="flex flex-col gap-2 border-t border-stone-200 pt-3">
+            <span className="text-caption font-medium text-stone-500">
+              Конверсии (от тех, кто открыл квартиру)
+            </span>
+            <div className="grid grid-cols-3 gap-3">
+              {conversionStages.map((s) => {
+                const pct =
+                  viewedListing > 0 ? Math.round((s.count / viewedListing) * 100) : null;
+                return (
+                  <div
+                    key={s.label}
+                    className="flex flex-col gap-0.5 rounded-md border border-stone-200 bg-white p-3"
+                  >
+                    <span className="text-caption text-stone-500">{s.label}</span>
+                    <span className={`text-h2 font-semibold tabular-nums ${s.color}`}>
+                      {s.count}
+                    </span>
+                    {pct != null ? (
+                      <span className="text-caption tabular-nums text-stone-500">
+                        {pct}% от просмотревших
+                      </span>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </AppCardContent>
@@ -503,7 +609,7 @@ function HotLeadsBlock({ leads }: { leads: HotLead[] }) {
 function NoResultsBlock({
   rows,
 }: {
-  rows: Array<{ filtersKey: string; uniqueVisitors: number; label: string; page: string }>;
+  rows: Array<{ filtersKey: string; uniqueVisitors: number; label: string; page: string; sample: Record<string, unknown> }>;
 }) {
   return (
     <AppCard>
@@ -516,6 +622,7 @@ function NoResultsBlock({
           <p className="text-meta text-stone-500">
             Запросы, по которым покупатели ничего не нашли. Ранжировано по числу
             уникальных посетителей — добавление таких объявлений принесёт больше всего.
+            Нажмите на запрос, чтобы открыть текущий каталог с этими фильтрами.
           </p>
           {rows.length === 0 ? (
             <p className="text-meta text-stone-500">
@@ -523,17 +630,32 @@ function NoResultsBlock({
             </p>
           ) : (
             <ul className="flex flex-col gap-2">
-              {rows.map((r) => (
-                <li
-                  key={r.filtersKey}
-                  className="flex items-start justify-between gap-3 border-t border-stone-100 pt-2 first:border-t-0 first:pt-0"
-                >
-                  <span className="text-meta text-stone-700">{r.label}</span>
-                  <AppBadge variant="tier-2">
-                    {r.uniqueVisitors} {pluralVisitors(r.uniqueVisitors)}
-                  </AppBadge>
-                </li>
-              ))}
+              {rows.map((r) => {
+                const path = r.page === 'kvartiry' ? '/kvartiry' : '/novostroyki';
+                const qs = new URLSearchParams();
+                for (const [k, v] of Object.entries(r.sample)) {
+                  if (v == null) continue;
+                  if (Array.isArray(v)) qs.set(k, v.join(','));
+                  else qs.set(k, String(v));
+                }
+                const href = qs.toString() ? `${path}?${qs.toString()}` : path;
+                return (
+                  <li
+                    key={r.filtersKey}
+                    className="border-t border-stone-100 first:border-t-0"
+                  >
+                    <Link
+                      href={href}
+                      className="flex items-start justify-between gap-3 py-2 hover:bg-stone-50"
+                    >
+                      <span className="text-meta text-stone-700">{r.label}</span>
+                      <AppBadge variant="tier-2">
+                        {r.uniqueVisitors} {pluralVisitors(r.uniqueVisitors)}
+                      </AppBadge>
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -550,7 +672,7 @@ function EngagementList({
 }: {
   title: string;
   empty: string;
-  rows: Array<{ key: string; count: number }>;
+  rows: Array<{ key: string; count: number; label: string }>;
   hrefPrefix: string;
 }) {
   return (
@@ -566,9 +688,9 @@ function EngagementList({
                 <li key={r.key} className="flex items-center justify-between gap-3">
                   <Link
                     href={`${hrefPrefix}${r.key}`}
-                    className="truncate text-meta text-terracotta-700 hover:text-terracotta-800"
+                    className="min-w-0 truncate text-meta text-terracotta-700 hover:text-terracotta-800"
                   >
-                    {r.key}
+                    {r.label}
                   </Link>
                   <AppBadge variant="neutral">{r.count}</AppBadge>
                 </li>
