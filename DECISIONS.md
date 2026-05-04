@@ -6,6 +6,45 @@ Newest at top.
 
 ---
 
+## 2026-05-04 · Saidakbar walkthrough → 4-commit "complete value" batch
+
+**What changed:** ran a third role-play walkthrough using a deliberately different persona (Saidakbar Khurshedov, 41, IT consultant in Dubai, browses MacBook + iPhone, Russian + English fluent — no Tajik, used to Bayut + Property Finder, decision style: research deeply + share with wife in Dushanbe). Surfaced ~20 friction items across home / list / detail / save / share / diaspora.
+
+**Role lens chosen for the fix batch** (V1 stage, zero users, every line of code is a bet on first-user impression):
+1. **Founder PM at zero-users** — ruthless cutter. Asked "if we ship only 4 fixes from this list, which 4 deliver complete value to the FIRST user?" Cut everything that needs >2 users to validate.
+2. **Trust-first UX strategist** — each shipped item must close a fail or add a "real product, not side project" feel. Polish-without-behavior-change cut.
+3. **Real-user advocate** — Madina + Faridun + Saidakbar combined-persona lens; replays each fix mentally before it ships.
+
+**Cut from the audit list (deferred until the user data exists):**
+- English locale toggle (no confirmed English-only user)
+- Currency picker AED/TRY/KZT (no confirmed UAE/Turkey/KZ user)
+- /izbrannoe notes field (needs 5+ saves to matter)
+- Multi-apartment compare re-enable (re-enabling /sravnenie before polish is worse than no compare)
+- /diaspora video-tour service explainer (the service doesn't exist yet; fake page worse than no page)
+- "О нас" page + trust counters (numbers too small to help; copy not written)
+
+**4 commits shipped (the "complete value" cut):**
+
+**Commit e3153e5 — ShareButton on /kvartira + /zhk hero + OpenGraph link previews (S1)**
+Multi-decision-maker buyers (Saidakbar→Hilola, Madina→parents, Faridun→Zarrina) had ZERO share affordance — copied URLs by hand. Now `ShareButton` mounted next to SaveToggle on both detail heroes. New `compact` icon-only variant matches SaveToggle's visual weight. `url` is optional now — resolves `window.location.href` at click time so server components can drop the button without plumbing URLs. Mobile uses native Web Share API; desktop falls back to a 3-channel popover (WhatsApp / Telegram / copy-link). OpenGraph + Twitter card metadata: /kvartira gets a price-forward title ("3-комн 88 м² · 484 000 TJS · ЖК Гулистон Резиденс") + cover image; /zhk gets building name + district + price floor + cover. WhatsApp/Telegram link previews now answer "is this in budget?" before Hilola opens.
+
+**Commit d504cc4 — Photo carousel + fullscreen lightbox on /kvartira (S2)**
+The static 2/3-column thumbnail grid (cover hero + all photos shown at once) looked broken next to Cian/Bayut/Krisha and pushed the price below the fold on mobile. New `PhotoGallery` block: mobile = full-bleed scroll-snap carousel with 1/N counter; desktop = hero + 4-thumb strip with "+ ещё N" overlay on the 4th when there are more photos; tap any photo → fullscreen `<dialog>` with prev/next arrows, keyboard nav, click-backdrop-to-close. No 3rd-party library. The gallery IS the hero now, with title + Save + Share overlay. /zhk skipped this commit — building photo gallery is data-dependent (only cover currently uploaded).
+
+**Commit 6c0d050 — Contact affordances on BuildingCard + /zhk Застройщик card (S3)**
+Buyers had ZERO way to ask a question about a building before clicking through. BuildingCard had 3 buttons (stage tooltip / save / map) — no contact channel. /zhk Застройщик card had a dead "Все проекты застройщика" button (button with no href, no onClick — verified during audit). Two fixes: new `BuildingContactButton` block (small green WhatsApp pill in BuildingCard's top-right cluster, stop-propagation so the wrapping `<Link>` doesn't navigate away) + a primary "Связаться с застройщиком" CTA on the /zhk Застройщик card. Both funnel to FOUNDER_CONTACTS (no per-developer phone in V1) but the WhatsApp prefilled text carries the building/developer name so context lands in chat instantly.
+
+**Commit 544f3a7 — 3-USP home strip + developer filter on /novostroyki (S4)**
+3-USP strip on home answers Saidakbar's "what is this platform actually FOR?" question in 10 seconds. Three concrete proofs sit right under the search: ShieldCheck + "Проверенные застройщики · Команда вычитывает каждое объявление и подтверждает компанию по телефону офиса" / Camera + "Реальные фото со стройки · Ежемесячные снимки с площадки с верификацией метаданных съёмки" / Plane + "Покупка из-за границы · Видеообзор и проверка документов без поездки в Таджикистан". Each maps to something we actually do — mirrors Bayut / Property Finder / Krisha home-page proof strips.
+
+Plus: fixed the dead "Все проекты застройщика" button. `BuildingFilters.developerId` now narrows the SQL query; FilterParams gets a `developer` URL param; /novostroyki resolves the developer server-side via `getDeveloperById`, scopes the listings, and swaps the H1 to "Проекты от {Кофарнихон Девелопмент}" when filtered. The button on /zhk is now a real `<Link>` to `/novostroyki?developer={id}`.
+
+**Anti-pattern locked out:** "audit produces a 20-item list, ship it all." At zero-users we don't have data to validate guesses, so we can't afford to spread thin. Better to ship 4 cohesive items that feel polished than 20 that feel half-built. The "what to defer" decisions are as important as the "what to ship" decisions — each deferral is a bet on "this will only matter once we have real user signal."
+
+**Verified in browser:** all 4 ships confirmed live. /kvartira hero has Share + Save icons, photo carousel, lightbox via `<dialog>`. BuildingCard top-right shows Save + green WhatsApp contact stacked. /zhk Застройщик card has primary "Связаться с застройщиком" button + working "Все проекты застройщика" link. Home page has the 3-USP strip + working "Первый раз? Поможем подобрать" wizard CTA. /novostroyki?developer=… shows "Проекты от {name}" header with filtered count + price range.
+
+---
+
 ## 2026-05-04 · Faridun walkthrough → 6-commit fix batch
 
 **What changed:** I role-played a second persona — Faridun (28, taxi driver) + Zarrina (25, nurse), 200k TJS budget, mobile-first, WhatsApp-only, installment-decisive — and walked every public page. The audit surfaced ~20 items Madina hadn't (different demographic exposes different friction). Fixed in 6 focused commits:
