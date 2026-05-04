@@ -1,6 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMessage } from '@/lib/telegram/bot';
 import { formatMatchMessage, formatFounderRelayMessage } from './format';
+import { matchesListingFilters } from '@/lib/filters/listings';
+import { matchesBuildingFilters } from '@/lib/filters/buildings';
 
 /**
  * Pure-data check: does this listing satisfy the saved-search filter
@@ -36,84 +38,23 @@ export type ListingForMatch = {
 
 export type SavedSearchFilters = Record<string, string | string[] | undefined>;
 
-function csvList(v: string | string[] | undefined): string[] {
-  if (!v) return [];
-  if (Array.isArray(v)) return v;
-  return v.split(',').filter(Boolean);
-}
-
-/** Match logic for a single listing against a saved search row. */
+/** Match logic for a single listing against a saved search row.
+ *  Delegates to the shared per-page predicates in `lib/filters/*` so
+ *  the same filter rules are used both here AND when those filters
+ *  are added to the SQL bulk path in `services/{listings,buildings}.ts`.
+ *  Drift hazard: when adding a new filter, update both files.
+ */
 export function matchesSearch(
   listing: ListingForMatch,
   page: 'novostroyki' | 'kvartiry',
   filters: SavedSearchFilters,
 ): boolean {
-  if (listing.status !== 'active') return false;
-
-  // Both pages: district scope (when set, building must be in it).
-  // The filters store district SLUGS (URL-friendly); we have to look
-  // them up against the building. For V1 we resolve the slug at the
-  // caller (caller passes building.district_slug if needed). Skip
-  // district filtering here when the field isn't on the row — the
-  // caller's pre-filter handles it.
-
   if (page === 'kvartiry') {
-    const rooms = csvList(filters.rooms).map((r) => parseInt(r, 10));
-    if (rooms.length && !rooms.includes(listing.rooms_count)) return false;
-
-    const finishing = csvList(filters.finishing);
-    if (finishing.length && !finishing.includes(listing.finishing_type)) return false;
-
-    const source = csvList(filters.source);
-    if (source.length && !source.includes(listing.source_type)) return false;
-
-    const priceFromTjs = filters.price_from ? parseInt(filters.price_from as string, 10) : null;
-    const priceToTjs = filters.price_to ? parseInt(filters.price_to as string, 10) : null;
-    const priceDirams = BigInt(listing.price_total_dirams as string | number);
-    if (priceFromTjs != null && priceDirams < BigInt(priceFromTjs * 100)) return false;
-    if (priceToTjs != null && priceDirams > BigInt(priceToTjs * 100)) return false;
-
-    const sizeFrom = filters.size_from ? parseFloat(filters.size_from as string) : null;
-    const sizeTo = filters.size_to ? parseFloat(filters.size_to as string) : null;
-    if (sizeFrom != null && listing.size_m2 < sizeFrom) return false;
-    if (sizeTo != null && listing.size_m2 > sizeTo) return false;
-
-    const buildingScopeSlug = (filters.building as string | undefined) ?? null;
-    if (buildingScopeSlug && listing.building?.slug !== buildingScopeSlug) return false;
-  } else {
-    // novostroyki — match against the parent building.
-    const b = listing.building;
-    if (!b) return false;
-
-    const status = csvList(filters.status);
-    if (status.length && !status.includes(b.status)) return false;
-
-    const handover = csvList(filters.handover);
-    if (handover.length) {
-      const matchHandover = handover.some((y) => {
-        if (y === 'delivered') return b.status === 'delivered';
-        if (!b.handover_estimated_quarter) return false;
-        const year = parseInt(b.handover_estimated_quarter.slice(0, 4), 10);
-        if (y === '2028+') return year >= 2028;
-        return String(year) === y;
-      });
-      if (!matchHandover) return false;
-    }
-
-    const amenities = csvList(filters.amenities);
-    if (amenities.length) {
-      const haveAll = amenities.every((a) => (b.amenities ?? []).includes(a));
-      if (!haveAll) return false;
-    }
-
-    const perM2From = filters.price_per_m2_from ? parseInt(filters.price_per_m2_from as string, 10) : null;
-    const perM2To = filters.price_per_m2_to ? parseInt(filters.price_per_m2_to as string, 10) : null;
-    const perM2Dirams = BigInt(listing.price_per_m2_dirams as string | number);
-    if (perM2From != null && perM2Dirams < BigInt(perM2From * 100)) return false;
-    if (perM2To != null && perM2Dirams > BigInt(perM2To * 100)) return false;
+    return matchesListingFilters(listing, filters);
   }
-
-  return true;
+  // Building filters need a non-undefined building (not just null).
+  // Normalise to null when the caller didn't supply one.
+  return matchesBuildingFilters({ ...listing, building: listing.building ?? null }, filters);
 }
 
 interface NotifyOptions {
@@ -145,10 +86,12 @@ export async function notifyMatchingListing(
     .maybeSingle();
   if (!listing || listing.status !== 'active') return;
 
-  // Active saved searches with a notification destination set.
+  // Active saved searches with a notification destination set. We
+  // also fetch last_seen_listing_id so the per-search idempotency
+  // check below can skip duplicates.
   const { data: searches } = await supabase
     .from('saved_searches')
-    .select('id, page, filters, display_name, notify_chat_id, notify_phone')
+    .select('id, page, filters, display_name, notify_chat_id, notify_phone, last_seen_listing_id')
     .eq('active', true)
     .or('notify_chat_id.not.is.null,notify_phone.not.is.null');
   if (!searches || searches.length === 0) return;
@@ -188,8 +131,26 @@ export async function notifyMatchingListing(
 
   for (const s of searches) {
     try {
+      // Idempotency: if we already notified this search about this
+      // exact listing, skip. Stops duplicate Telegram messages when
+      // the publish/moderate endpoint is retried (double-click,
+      // browser retry, webhook replay). We CLAIM the row by writing
+      // last_seen_listing_id BEFORE sending — under low V1 concurrency
+      // this is enough; for higher load we'd switch to a SQL CLAIM
+      // (UPDATE ... WHERE last_seen IS DISTINCT FROM ... RETURNING).
+      if (s.last_seen_listing_id === listing.id) continue;
+
       const ok = matchesSearch(listingForMatch, s.page as 'novostroyki' | 'kvartiry', s.filters as SavedSearchFilters);
       if (!ok) continue;
+
+      // Mark before send. If sendMessage throws, we may end up with
+      // last_seen_listing_id set but no message delivered — acceptable
+      // failure mode (better than duplicates; the operator can re-fire
+      // manually if a buyer reports never receiving).
+      await supabase
+        .from('saved_searches')
+        .update({ last_seen_listing_id: listing.id })
+        .eq('id', s.id);
 
       const messageInput = {
         search_display_name: s.display_name as string,
@@ -214,11 +175,6 @@ export async function notifyMatchingListing(
           { disablePreview: false },
         );
       }
-
-      await supabase
-        .from('saved_searches')
-        .update({ last_seen_listing_id: listing.id })
-        .eq('id', s.id);
     } catch (err) {
       console.error(`saved-search match notify failed for search ${s.id}:`, err);
     }

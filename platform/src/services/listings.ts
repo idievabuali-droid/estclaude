@@ -17,6 +17,7 @@ import {
   LISTING_SELECT,
 } from './buildings';
 import { getDistrictBenchmark } from './benchmarks';
+import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
 import type { FinishingType, SourceType } from '@/types/domain';
 
 const ACTIVE_CITY = 'vahdat';
@@ -170,10 +171,18 @@ export async function getListing(slug: string): Promise<{
     : null;
 
   const similar = (similarRes.data ?? []).map(mapListing);
-  // Seller phone — falls back to a placeholder only if the user row is
-  // missing (which shouldn't happen in production but keeps the page
-  // renderable in degraded states).
-  const sellerPhone = sellerRes.data?.phone ?? '+992935563306';
+  // Seller phone — when the user row is missing (transferred listings,
+  // deleted users, mock data), fall back to the founder's number from
+  // founder-contacts.ts. The buyer reaches the founder, who then
+  // routes the conversation to the actual seller. We LOG when this
+  // fires so production data drift is visible — silently routing every
+  // contact attempt to the founder hides the underlying broken FK.
+  const sellerPhone = sellerRes.data?.phone ?? FOUNDER_CONTACTS.phone;
+  if (!sellerRes.data?.phone) {
+    console.warn(
+      `[getListing] listing ${listing.slug} (${listing.id}) has no seller phone — falling back to founder. seller_user_id=${lRow.seller_user_id}`,
+    );
+  }
 
   return { listing, building, developer, district, median, similar, sellerPhone };
 }
