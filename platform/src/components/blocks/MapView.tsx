@@ -68,13 +68,15 @@ function radiusPolygon(lat: number, lng: number, radiusM: number): GeoJSON.Featu
   };
 }
 
-// POI pin: orange landmark dot, distinct from the building price pills
-// and the focus-mode terracotta dot so the buyer instantly reads "this
-// is the place I searched for, not a building".
+// POI pin: BIGGER orange landmark with a strong star — distinct from
+// the building price pills and the focus-mode terracotta dot so the
+// buyer instantly reads "this is the place I searched for". Was 32px
+// and barely visible against the road tiles; now 40px with a deeper
+// shadow so it pops over both terrain and price-pill clutter.
 const NEAR_POI_DOT_STYLE =
-  'width:32px;height:32px;border-radius:9999px;background:#f97316;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;color:white;font-size:18px;cursor:default';
+  'width:40px;height:40px;border-radius:9999px;background:#f97316;border:4px solid white;box-shadow:0 4px 12px rgba(249,115,22,0.55),0 0 0 1px rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;color:white;font-size:22px;line-height:1;cursor:default;z-index:5';
 const NEAR_POI_LABEL_STYLE =
-  'position:absolute;top:34px;left:50%;transform:translateX(-50%);background:white;border:1px solid #f97316;color:#9a3412;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.1)';
+  'position:absolute;top:46px;left:50%;transform:translateX(-50%);background:#f97316;color:white;padding:3px 10px;border-radius:9999px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.15)';
 
 /**
  * MapView — Layer 7 spatial component.
@@ -432,7 +434,19 @@ export function MapView({
     if (buildings.length === 0 && !nearPoi) return;
 
     const bounds = new maplibregl.LngLatBounds();
-    if (nearPoi) bounds.extend([nearPoi.lng, nearPoi.lat]);
+    if (nearPoi) {
+      // Include the full radius circle in the camera fit, not just the
+      // POI center — otherwise the dashed-orange ring extends below
+      // the visible map area on mobile (mobile-screenshot showed the
+      // bottom of the circle clipped). Approximate corners using the
+      // same metres-to-degrees projection as radiusPolygon.
+      const R = 6371000;
+      const r = nearPoi.radiusM;
+      const dLat = (r / R) * (180 / Math.PI);
+      const dLng = (r / (R * Math.cos((nearPoi.lat * Math.PI) / 180))) * (180 / Math.PI);
+      bounds.extend([nearPoi.lng - dLng, nearPoi.lat - dLat]);
+      bounds.extend([nearPoi.lng + dLng, nearPoi.lat + dLat]);
+    }
     for (const b of buildings) {
       const root = document.createElement('div');
       root.className = PIN_WRAPPER_CLASS;
