@@ -1,18 +1,25 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Search, MapPin, School, Building2, ShoppingCart, Bus, Stethoscope, Pill, Trees, Landmark, UtensilsCrossed, Banknote, Fuel, Dumbbell, Star, Building } from 'lucide-react';
+import { Search, MapPin, School, Building2, ShoppingCart, Bus, Stethoscope, Pill, Trees, Landmark, UtensilsCrossed, Banknote, Fuel, Dumbbell, Star, Building, BadgeCheck, Hammer, Briefcase } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 
-interface PoiHit {
-  id: string;
-  name: string;
-  kind: string;
-  subkind: string | null;
-  district_slug: string | null;
-  latitude: number;
-  longitude: number;
-}
+// SearchHit shape mirrors services/search.ts. Pages can't import that
+// service module (admin client) so we duplicate the type minimally.
+type SearchHit =
+  | { sourceKind: 'district'; id: string; name: string; slug: string }
+  | { sourceKind: 'building'; id: string; name: string; slug: string; districtName: string | null }
+  | { sourceKind: 'developer'; id: string; name: string; isVerified: boolean }
+  | {
+      sourceKind: 'poi';
+      id: string;
+      name: string;
+      kind: string;
+      subkind: string | null;
+      district_slug: string | null;
+      latitude: number;
+      longitude: number;
+    };
 
 const KIND_ICON: Record<string, typeof MapPin> = {
   mosque: Landmark,
@@ -90,7 +97,7 @@ export function LocationSearch({
 }: LocationSearchProps) {
   const router = useRouter();
   const [q, setQ] = useState(initialQuery);
-  const [hits, setHits] = useState<PoiHit[]>([]);
+  const [hits, setHits] = useState<SearchHit[]>([]);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   // True after the user has interacted with the input. We skip the
@@ -114,8 +121,12 @@ export function LocationSearch({
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(async () => {
       try {
-        const res = await fetch(`/api/pois/search?q=${encodeURIComponent(q)}`);
-        const data = (await res.json()) as { hits: PoiHit[] };
+        // Multi-source autocomplete — districts + buildings +
+        // developers + POIs all in one merged dropdown. Server-side
+        // ranking puts the broadest matches first (district > ЖК >
+        // developer > POI).
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const data = (await res.json()) as { hits: SearchHit[] };
         setHits(data.hits ?? []);
         setOpen(true);
       } catch {
@@ -139,7 +150,28 @@ export function LocationSearch({
     return () => window.removeEventListener('mousedown', onClick);
   }, []);
 
-  function pick(hit: PoiHit) {
+  function pick(hit: SearchHit) {
+    setOpen(false);
+    if (hit.sourceKind === 'district') {
+      // District — narrow the destination list to that microdistrict.
+      router.push(`${destinationPath}?district=${encodeURIComponent(hit.slug)}`);
+      return;
+    }
+    if (hit.sourceKind === 'building') {
+      // Building — go straight to the detail page; the buyer was
+      // searching for this specific ЖК.
+      router.push(`/zhk/${hit.slug}`);
+      return;
+    }
+    if (hit.sourceKind === 'developer') {
+      // Developer — show all their projects (developer filter on
+      // /novostroyki). Not the destinationPath because /kvartiry has
+      // no developer filter today; building-list view is the right
+      // home for "all projects from X".
+      router.push(`/novostroyki?developer=${encodeURIComponent(hit.id)}`);
+      return;
+    }
+    // POI — radius filter on the destination page.
     const params = new URLSearchParams({
       near_lat: String(hit.latitude),
       near_lng: String(hit.longitude),
@@ -147,7 +179,33 @@ export function LocationSearch({
       radius: String(radiusMeters),
     });
     router.push(`${destinationPath}?${params.toString()}`);
-    setOpen(false);
+  }
+
+  function rowFor(hit: SearchHit): { Icon: typeof MapPin; primary: string; secondary: string; verified?: boolean } {
+    if (hit.sourceKind === 'district') {
+      return { Icon: MapPin, primary: hit.name, secondary: 'Район' };
+    }
+    if (hit.sourceKind === 'building') {
+      return {
+        Icon: Hammer,
+        primary: hit.name,
+        secondary: `ЖК${hit.districtName ? ` · ${hit.districtName}` : ''}`,
+      };
+    }
+    if (hit.sourceKind === 'developer') {
+      return {
+        Icon: Briefcase,
+        primary: hit.name,
+        secondary: 'Застройщик',
+        verified: hit.isVerified,
+      };
+    }
+    const Icon = KIND_ICON[hit.kind] ?? Building2;
+    return {
+      Icon,
+      primary: hit.name,
+      secondary: `${KIND_LABEL[hit.kind] ?? hit.kind}${hit.district_slug ? ` · ${hit.district_slug}` : ''}`,
+    };
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -218,10 +276,9 @@ export function LocationSearch({
       {open && hits.length > 0 ? (
         <ul className="absolute left-0 right-0 top-full z-30 mt-1 max-h-80 overflow-y-auto rounded-md border border-stone-200 bg-white shadow-lg">
           {hits.map((h, i) => {
-            const Icon = KIND_ICON[h.kind] ?? Building2;
-            const kindLabel = KIND_LABEL[h.kind] ?? h.kind;
+            const { Icon, primary, secondary, verified } = rowFor(h);
             return (
-              <li key={h.id}>
+              <li key={`${h.sourceKind}-${h.id}`}>
                 <button
                   type="button"
                   onClick={() => pick(h)}
@@ -233,11 +290,16 @@ export function LocationSearch({
                 >
                   <Icon className="size-4 shrink-0 text-stone-500" aria-hidden />
                   <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate font-medium text-stone-900">{h.name}</span>
-                    <span className="truncate text-caption text-stone-500">
-                      {kindLabel}
-                      {h.district_slug ? ` · ${h.district_slug}` : ''}
+                    <span className="inline-flex items-center gap-1.5 truncate font-medium text-stone-900">
+                      {primary}
+                      {verified ? (
+                        <BadgeCheck
+                          className="size-3.5 shrink-0 text-[color:var(--color-badge-tier-developer)]"
+                          aria-label="Проверенный застройщик"
+                        />
+                      ) : null}
                     </span>
+                    <span className="truncate text-caption text-stone-500">{secondary}</span>
                   </div>
                 </button>
               </li>
