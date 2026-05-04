@@ -10,9 +10,12 @@ export interface FilterRelaxSuggestionProps {
   pagePath: '/novostroyki' | '/kvartiry';
   /** All current URL search params, including the one we'll relax. */
   currentParams: Record<string, string | string[] | undefined>;
-  /** Map of relax-able param key → human label. The user is offered
-   *  one click per entry that drops that param entirely. */
-  relaxOptions: Array<{ paramKey: string; label: string }>;
+  /** Map of relax-able param key → human label + optional count.
+   *  When `count` is provided, it's shown in parentheses after the
+   *  label so Faridun can preview "Снять «Цена» (12)" before
+   *  tapping — Krisha pattern. Options with count === 0 are dropped
+   *  (no point suggesting a relax that yields no extra results). */
+  relaxOptions: Array<{ paramKey: string; label: string; count?: number }>;
   /** Used in copy: "{count} результат" — caller renders the surrounding
    *  context, this just nudges. */
   resultCount: number;
@@ -52,26 +55,34 @@ export function FilterRelaxSuggestion({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {relaxOptions.map((opt) => {
-              const next = { ...currentParams };
-              delete next[opt.paramKey];
-              const qs = new URLSearchParams();
-              for (const [k, v] of Object.entries(next)) {
-                if (v == null) continue;
-                if (Array.isArray(v)) qs.set(k, v.join(','));
-                else qs.set(k, String(v));
-              }
-              const href = qs.toString() ? `${pagePath}?${qs.toString()}` : pagePath;
-              return (
-                <Link
-                  key={opt.paramKey}
-                  href={href}
-                  className="inline-flex h-9 items-center gap-1 rounded-sm border border-stone-300 bg-white px-3 text-meta font-medium text-stone-800 transition-colors hover:border-terracotta-400 hover:bg-terracotta-50 hover:text-terracotta-700"
-                >
-                  Снять «{opt.label}»
-                </Link>
-              );
-            })}
+            {relaxOptions
+              // Drop options whose preview yields no MORE results than
+              // the current view — tapping them wouldn't help. count ===
+              // resultCount is the no-op case (the dropped filter was
+              // already non-binding). Options without a count show
+              // anyway (legacy callers).
+              .filter((opt) => opt.count == null || opt.count > resultCount)
+              .map((opt) => {
+                const next = { ...currentParams };
+                delete next[opt.paramKey];
+                const qs = new URLSearchParams();
+                for (const [k, v] of Object.entries(next)) {
+                  if (v == null) continue;
+                  if (Array.isArray(v)) qs.set(k, v.join(','));
+                  else qs.set(k, String(v));
+                }
+                const href = qs.toString() ? `${pagePath}?${qs.toString()}` : pagePath;
+                return (
+                  <Link
+                    key={opt.paramKey}
+                    href={href}
+                    className="inline-flex h-9 items-center gap-1 rounded-sm border border-stone-300 bg-white px-3 text-meta font-medium text-stone-800 tabular-nums transition-colors hover:border-terracotta-400 hover:bg-terracotta-50 hover:text-terracotta-700"
+                  >
+                    Снять «{opt.label}»
+                    {opt.count != null ? ` (${opt.count})` : null}
+                  </Link>
+                );
+              })}
           </div>
         </div>
       </AppCardContent>

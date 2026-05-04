@@ -237,7 +237,7 @@ export default async function KvartiryPage({
               pagePath="/kvartiry"
               currentParams={sp}
               resultCount={filtered.length}
-              relaxOptions={buildRelaxOptionsKvartiry(sp)}
+              relaxOptions={await buildRelaxOptionsKvartiryWithCounts(sp, scopedBuilding?.id)}
             />
           ) : null}
           {filtered.length === 0 ? (
@@ -337,5 +337,49 @@ function buildRelaxOptionsKvartiry(
     opts.push({ paramKey: sp.price_to ? 'price_to' : 'price_from', label: 'Цена' });
   }
   return opts.slice(0, 3);
+}
+
+/** Same as buildRelaxOptionsKvartiry but each option also includes
+ *  the result count after dropping that filter — Krisha pattern.
+ *  Runs a per-option listListings query (~3 extra queries on a relax
+ *  prompt, fine at V1 scale). The count is the listings the visitor
+ *  would see if they tapped the relax option. */
+async function buildRelaxOptionsKvartiryWithCounts(
+  sp: SearchParams,
+  scopedBuildingId?: string,
+): Promise<Array<{ paramKey: string; label: string; count?: number }>> {
+  const base = buildRelaxOptionsKvartiry(sp);
+  const counts = await Promise.all(
+    base.map(async (opt) => {
+      const next: SearchParams = { ...sp };
+      // Drop both halves of any range param so the relax UX matches
+      // what the chip's X actually does (clears both bounds).
+      if (opt.paramKey === 'price_from' || opt.paramKey === 'price_to') {
+        delete next.price_from;
+        delete next.price_to;
+      } else if (opt.paramKey === 'size_from' || opt.paramKey === 'size_to') {
+        delete next.size_from;
+        delete next.size_to;
+      } else {
+        delete (next as Record<string, unknown>)[opt.paramKey];
+      }
+      const list = await listListings({
+        rooms: next.rooms?.split(',').map((r) => parseInt(r, 10)),
+        source: next.source?.split(',') as SourceType[] | undefined,
+        finishing: next.finishing?.split(',') as FinishingType[] | undefined,
+        priceFrom: next.price_from ? BigInt(parseInt(next.price_from, 10) * 100) : null,
+        priceTo: next.price_to ? BigInt(parseInt(next.price_to, 10) * 100) : null,
+        sizeFrom: next.size_from ? parseFloat(next.size_from) : null,
+        sizeTo: next.size_to ? parseFloat(next.size_to) : null,
+        maxMonthlyDirams: next.monthly_to ? BigInt(parseInt(next.monthly_to, 10) * 100) : null,
+        buildingId: scopedBuildingId,
+        nearLat: next.near_lat ? parseFloat(next.near_lat) : null,
+        nearLng: next.near_lng ? parseFloat(next.near_lng) : null,
+        nearRadiusM: next.radius ? parseInt(next.radius, 10) : next.near_lat ? 1500 : null,
+      });
+      return { ...opt, count: list.length };
+    }),
+  );
+  return counts;
 }
 

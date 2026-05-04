@@ -344,7 +344,7 @@ export default async function NovostroykiPage({
                 pagePath="/novostroyki"
                 currentParams={sp}
                 resultCount={filtered.length}
-                relaxOptions={buildRelaxOptionsNovostroyki(sp)}
+                relaxOptions={await buildRelaxOptionsNovostroykiWithCounts(sp)}
               />
             ) : null}
             {filtered.length === 0 ? (
@@ -462,5 +462,50 @@ function buildRelaxOptionsNovostroyki(
     opts.push({ paramKey: 'price_per_m2_to', label: 'Цена за м²' });
   }
   return opts.slice(0, 3);
+}
+
+/** Adds per-option count previews. Per-option listBuildings re-runs
+ *  with the relax param dropped — small N, V1 OK. */
+async function buildRelaxOptionsNovostroykiWithCounts(
+  sp: FilterParams,
+): Promise<Array<{ paramKey: string; label: string; count?: number }>> {
+  const base = buildRelaxOptionsNovostroyki(sp);
+  const counts = await Promise.all(
+    base.map(async (opt) => {
+      const next: FilterParams = { ...sp };
+      if (opt.paramKey === 'price_to' || opt.paramKey === 'price_from') {
+        delete next.price_from;
+        delete next.price_to;
+      } else if (
+        opt.paramKey === 'price_per_m2_to' ||
+        opt.paramKey === 'price_per_m2_from'
+      ) {
+        delete next.price_per_m2_from;
+        delete next.price_per_m2_to;
+      } else {
+        delete (next as Record<string, unknown>)[opt.paramKey];
+      }
+      const list = await listBuildings({
+        district: next.district?.split(','),
+        status: next.status?.split(',') as BuildingStatus[] | undefined,
+        priceFrom: next.price_from ? BigInt(parseInt(next.price_from, 10) * 100) : null,
+        priceTo: next.price_to ? BigInt(parseInt(next.price_to, 10) * 100) : null,
+        pricePerM2From: next.price_per_m2_from
+          ? BigInt(parseInt(next.price_per_m2_from, 10) * 100)
+          : null,
+        pricePerM2To: next.price_per_m2_to
+          ? BigInt(parseInt(next.price_per_m2_to, 10) * 100)
+          : null,
+        handoverYears: next.handover?.split(','),
+        amenities: next.amenities?.split(','),
+        nearbyCategories: next.nearby?.split(',') as PoiCategory[] | undefined,
+        nearLat: next.near_lat ? parseFloat(next.near_lat) : null,
+        nearLng: next.near_lng ? parseFloat(next.near_lng) : null,
+        nearRadiusM: next.radius ? parseInt(next.radius, 10) : next.near_lat ? 1500 : null,
+      });
+      return { ...opt, count: list.length };
+    }),
+  );
+  return counts;
 }
 
