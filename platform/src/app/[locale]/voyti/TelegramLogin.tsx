@@ -84,6 +84,12 @@ export function TelegramLogin({ redirect }: { redirect: string }) {
           const pollData = (await pollRes.json()) as PollResponse;
           if (pollData.status === 'completed') {
             stopPolling();
+            // Lift any anonymous saves the visitor accumulated before
+            // logging in into their saved_items. Best-effort: doesn't
+            // block the redirect on success or failure. Idempotent on
+            // the server (saved_items unique indexes dedupe).
+            const { migrateAnonSavesToUser } = await import('@/lib/anon-saves');
+            void migrateAnonSavesToUser();
             // The cookie has been set server-side. Navigate; the
             // destination will render with the user's identity.
             router.push(redirect || '/');

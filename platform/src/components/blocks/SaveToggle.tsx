@@ -6,6 +6,7 @@ import { useRouter, usePathname } from '@/i18n/navigation';
 import { toast } from '@/components/primitives/AppToast';
 import { cn } from '@/lib/utils';
 import { track } from '@/lib/analytics/track';
+import { addAnonSave, hasAnonSave, removeAnonSave } from '@/lib/anon-saves';
 
 export interface SaveToggleProps {
   type: 'building' | 'listing';
@@ -44,11 +45,21 @@ export function SaveToggle({ type, id, className }: SaveToggleProps) {
       .then((r) => r.json())
       .then((data: { saved: boolean; authenticated: boolean }) => {
         if (cancelled) return;
-        setSaved(!!data.saved);
         setAuthenticated(!!data.authenticated);
+        // Saved state: server is source of truth for logged-in users;
+        // for anonymous, fall back to localStorage so the heart stays
+        // filled across sessions (and migrates up at login time).
+        if (data.authenticated) {
+          setSaved(!!data.saved);
+        } else {
+          setSaved(hasAnonSave(type, id));
+        }
       })
       .catch(() => {
-        // Network blip — leave defaults; user can still tap to toggle.
+        // Network blip — assume anon, read localStorage for the icon.
+        if (cancelled) return;
+        setAuthenticated(false);
+        setSaved(hasAnonSave(type, id));
       });
     return () => {
       cancelled = true;
@@ -60,14 +71,27 @@ export function SaveToggle({ type, id, className }: SaveToggleProps) {
     e.stopPropagation();
 
     if (authenticated === false) {
+      // Anonymous flow: persist to localStorage immediately so the
+      // bookmark sticks across sessions. We still fire the analytics
+      // event so the founder dashboard sees these as "save_attempt
+      // _logged_out" intent. A subtle toast on the FIRST anon save
+      // explains the migration story without being naggy.
       track('save_attempt_logged_out', { type, target_id: id });
-      toast.info('Войдите, чтобы сохранять', {
-        action: {
-          label: 'Войти через Telegram',
-          onClick: () =>
-            router.push(`/voyti?redirect=${encodeURIComponent(pathname)}`),
-        },
-      });
+      const next = !saved;
+      setSaved(next);
+      if (next) {
+        addAnonSave(type, id);
+        toast.info('Сохранено в этом браузере', {
+          description: 'Войдите через Telegram, чтобы синхронизировать с другими устройствами и получать уведомления.',
+          action: {
+            label: 'Войти',
+            onClick: () =>
+              router.push(`/voyti?redirect=${encodeURIComponent(pathname)}`),
+          },
+        });
+      } else {
+        removeAnonSave(type, id);
+      }
       return;
     }
 

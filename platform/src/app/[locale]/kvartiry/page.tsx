@@ -2,7 +2,7 @@ import { ChevronLeft } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
-import { ListingCard, SearchTracker, SaveSearchPrompt } from '@/components/blocks';
+import { ListingCard, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion } from '@/components/blocks';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { getExchangeRates } from '@/services/currency';
 import { listListings } from '@/services/listings';
@@ -180,6 +180,14 @@ export default async function KvartiryPage({
               noResults={filtered.length === 0}
             />
           ) : null}
+          {filtered.length <= 1 && countActiveFiltersK(sp) >= 2 ? (
+            <FilterRelaxSuggestion
+              pagePath="/kvartiry"
+              currentParams={sp}
+              resultCount={filtered.length}
+              relaxOptions={buildRelaxOptionsKvartiry(sp)}
+            />
+          ) : null}
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center gap-3 rounded-md border border-stone-200 bg-white p-7 text-center">
               <p className="text-h3 font-semibold text-stone-900">Ничего не найдено</p>
@@ -231,5 +239,31 @@ function hasActiveFiltersK(sp: SearchParams): boolean {
       sp.size_from ||
       sp.size_to,
   );
+}
+
+function countActiveFiltersK(sp: SearchParams): number {
+  let n = 0;
+  if (sp.rooms) n++;
+  if (sp.source) n++;
+  if (sp.finishing) n++;
+  if (sp.price_from || sp.price_to) n++;
+  if (sp.size_from || sp.size_to) n++;
+  return n;
+}
+
+function buildRelaxOptionsKvartiry(
+  sp: SearchParams,
+): Array<{ paramKey: string; label: string }> {
+  const opts: Array<{ paramKey: string; label: string }> = [];
+  if (sp.price_from || sp.price_to) {
+    opts.push({ paramKey: sp.price_to ? 'price_to' : 'price_from', label: 'Цена' });
+  }
+  if (sp.size_from || sp.size_to) {
+    opts.push({ paramKey: sp.size_to ? 'size_to' : 'size_from', label: 'Площадь' });
+  }
+  if (sp.finishing) opts.push({ paramKey: 'finishing', label: 'Отделка' });
+  if (sp.rooms) opts.push({ paramKey: 'rooms', label: 'Комнат' });
+  if (sp.source) opts.push({ paramKey: 'source', label: 'Источник' });
+  return opts.slice(0, 3);
 }
 

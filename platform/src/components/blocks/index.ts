@@ -49,3 +49,5 @@ export { SaveSearchPrompt } from './SaveSearchPrompt';
 export type { SaveSearchPromptProps } from './SaveSearchPrompt';
 export { CallbackWidget } from './CallbackWidget';
 export type { CallbackWidgetProps } from './CallbackWidget';
+export { FilterRelaxSuggestion } from './FilterRelaxSuggestion';
+export type { FilterRelaxSuggestionProps } from './FilterRelaxSuggestion';

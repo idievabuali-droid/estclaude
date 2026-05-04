@@ -2,7 +2,7 @@ import { Map as MapIcon, List, ArrowLeft } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
-import { BuildingCard, MapView, SearchTracker, SaveSearchPrompt } from '@/components/blocks';
+import { BuildingCard, MapView, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion } from '@/components/blocks';
 import {
   listBuildings,
   getBuildingBySlug,
@@ -274,6 +274,18 @@ export default async function NovostroykiPage({
                 noResults={filtered.length === 0}
               />
             ) : null}
+            {/* Filter-relax: when results are tight (0 or 1) and the
+                visitor has 2+ filters active, surface 1-tap relax
+                buttons. Faster than scrolling back to the chip bar
+                and toggling a filter off manually. */}
+            {filtered.length <= 1 && countActiveFilters(sp) >= 2 ? (
+              <FilterRelaxSuggestion
+                pagePath="/novostroyki"
+                currentParams={sp}
+                resultCount={filtered.length}
+                relaxOptions={buildRelaxOptionsNovostroyki(sp)}
+              />
+            ) : null}
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center gap-3 rounded-md border border-stone-200 bg-white p-7 text-center">
                 <p className="text-h3 font-semibold text-stone-900">Ничего не найдено</p>
@@ -324,5 +336,37 @@ function hasActiveFilters(sp: FilterParams): boolean {
       sp.price_per_m2_from ||
       sp.price_per_m2_to,
   );
+}
+
+/** Counts the number of distinct filter dimensions the visitor has
+ *  set. Used to decide whether the FilterRelaxSuggestion is worth
+ *  surfacing — one filter has nothing to relax that doesn't reset
+ *  the whole search. */
+function countActiveFilters(sp: FilterParams): number {
+  let n = 0;
+  if (sp.district) n++;
+  if (sp.status) n++;
+  if (sp.handover) n++;
+  if (sp.amenities) n++;
+  if (sp.nearby) n++;
+  if (sp.price_per_m2_from || sp.price_per_m2_to) n++;
+  return n;
+}
+
+/** Per-filter human label for the relax suggestion. Order = priority:
+ *  the filters most likely to be over-narrow appear first. */
+function buildRelaxOptionsNovostroyki(
+  sp: FilterParams,
+): Array<{ paramKey: string; label: string }> {
+  const opts: Array<{ paramKey: string; label: string }> = [];
+  if (sp.price_per_m2_from || sp.price_per_m2_to) {
+    opts.push({ paramKey: 'price_per_m2_to', label: 'Цена за м²' });
+  }
+  if (sp.amenities) opts.push({ paramKey: 'amenities', label: 'Удобства' });
+  if (sp.nearby) opts.push({ paramKey: 'nearby', label: 'Что рядом' });
+  if (sp.handover) opts.push({ paramKey: 'handover', label: 'Сдача' });
+  if (sp.status) opts.push({ paramKey: 'status', label: 'Стадия' });
+  if (sp.district) opts.push({ paramKey: 'district', label: 'Район' });
+  return opts.slice(0, 3);
 }
 
