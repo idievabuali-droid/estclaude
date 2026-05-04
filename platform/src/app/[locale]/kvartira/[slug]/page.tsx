@@ -10,7 +10,7 @@ import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppChip } from '@/components/primitives';
-import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget } from '@/components/blocks';
+import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle } from '@/components/blocks';
 import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo } from '@/lib/format';
@@ -154,6 +154,13 @@ export default async function ListingDetailPage({
           />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-stone-900/65 via-stone-900/15 to-transparent" />
+        {/* Save heart top-right of hero — was missing before, so deep-
+            link visitors had to scroll to "Похожие" cards 2000px down
+            to save. Same SaveToggle the cards use, so anon flow falls
+            through to localStorage automatically. */}
+        <div className="absolute right-3 top-3 z-10 md:right-5 md:top-5">
+          <SaveToggle type="listing" id={listing.id} />
+        </div>
         <div className="absolute bottom-0 left-0 right-0">
           <AppContainer className="pb-3 md:pb-4">
             <h1 className="text-h2 font-semibold leading-[var(--leading-h2)] text-white drop-shadow-sm md:text-h1">

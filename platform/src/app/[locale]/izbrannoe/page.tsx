@@ -1,4 +1,4 @@
-import { BookmarkPlus, MessageCircle, Sparkles } from 'lucide-react';
+import { BookmarkPlus, Sparkles } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import {
@@ -7,7 +7,7 @@ import {
   AppCard,
   AppCardContent,
 } from '@/components/primitives';
-import { ListingCard, BuildingCard, MarkSavedItemsSeen } from '@/components/blocks';
+import { ListingCard, BuildingCard, MarkSavedItemsSeen, AnonSavedView } from '@/components/blocks';
 import { getMySavedItems, type SavedChangeBadge } from '@/services/saved';
 import { getDistrictBenchmarks } from '@/services/benchmarks';
 import { getCurrentUser } from '@/lib/auth/session';
@@ -51,40 +51,42 @@ export default async function IzbrannoePage({
 
   const user = await getCurrentUser();
 
-  // Not logged in — show the prompt; don't fetch anything else.
+  // Not logged in — render the localStorage-backed AnonSavedView
+  // (which checks the browser for anon saves and renders cards if any
+  // are present), with the original "log in" prompt as a graceful
+  // fallback for visitors who have no saves yet. The tab UI mirrors
+  // the logged-in branch so muscle memory carries between states.
   if (!user) {
+    const anonTab: 'buildings' | 'listings' = sp.tab ?? 'listings';
     return (
       <>
         <section className="border-b border-stone-200 bg-white">
-          <AppContainer className="py-5">
+          <AppContainer className="flex flex-col gap-4 py-5">
             <h1 className="text-h1 font-semibold text-stone-900">{tNav('saved')}</h1>
+            <div className="inline-flex w-fit items-center rounded-md border border-stone-200 bg-white p-1">
+              <Link
+                href="/izbrannoe?tab=listings"
+                className={`inline-flex h-9 items-center rounded-sm px-4 text-meta font-medium transition-colors ${
+                  anonTab === 'listings' ? 'bg-stone-100 text-stone-900' : 'text-stone-600 hover:text-stone-900'
+                }`}
+              >
+                Квартиры
+              </Link>
+              <Link
+                href="/izbrannoe?tab=buildings"
+                className={`inline-flex h-9 items-center rounded-sm px-4 text-meta font-medium transition-colors ${
+                  anonTab === 'buildings' ? 'bg-stone-100 text-stone-900' : 'text-stone-600 hover:text-stone-900'
+                }`}
+              >
+                Новостройки
+              </Link>
+            </div>
           </AppContainer>
         </section>
         <section className="py-6">
-          <AppContainer>
-            <AppCard>
-              <AppCardContent>
-                <div className="flex flex-col items-center gap-4 py-8 text-center">
-                  <BookmarkPlus className="size-10 text-stone-400" aria-hidden />
-                  <div className="flex max-w-md flex-col gap-2">
-                    <h2 className="text-h2 font-semibold text-stone-900">
-                      Войдите, чтобы видеть сохранённое
-                    </h2>
-                    <p className="text-meta text-stone-600">
-                      Сохраняйте квартиры и ЖК, которые вам интересны. Мы пришлём
-                      сообщение в Telegram, когда у них изменится цена или появятся
-                      новые квартиры.
-                    </p>
-                  </div>
-                  <Link href="/voyti?redirect=/izbrannoe">
-                    <AppButton variant="primary" size="lg">
-                      <MessageCircle className="size-4" /> Войти через Telegram
-                    </AppButton>
-                  </Link>
-                </div>
-              </AppCardContent>
-            </AppCard>
-          </AppContainer>
+          {/* AnonSavedView renders cards if localStorage has anon
+              saves, or the "log in to view" empty-prompt otherwise. */}
+          <AnonSavedView tab={anonTab} />
         </section>
       </>
     );

@@ -76,15 +76,23 @@ export function LocationSearch({
   const [hits, setHits] = useState<PoiHit[]>([]);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
+  // True after the user has interacted with the input. We skip the
+  // debounced fetch + dropdown-open until then so a page that loads
+  // with the input pre-populated (e.g. /novostroyki?near_label=…)
+  // doesn't auto-open the dropdown showing the same item the user
+  // already picked.
+  const [touched, setTouched] = useState(false);
   const debounceRef = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Debounced fetch — 200ms is enough that a fast typer doesn't fire
   // 8 requests for "Гулистон" but slow enough to feel instant. Skip
-  // fetching when the query is too short; the onChange handler clears
-  // stale hits in that case so the effect never has to call setState
-  // synchronously (lint rule react-hooks/set-state-in-effect).
+  // fetching when the query is too short OR when the user hasn't
+  // interacted yet (initial pre-populated value); the onChange handler
+  // clears stale hits in that case so the effect never has to call
+  // setState synchronously (lint rule react-hooks/set-state-in-effect).
   useEffect(() => {
+    if (!touched) return;
     if (q.trim().length < 2) return;
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(async () => {
@@ -101,7 +109,7 @@ export function LocationSearch({
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
-  }, [q]);
+  }, [q, touched]);
 
   // Close dropdown on outside click.
   useEffect(() => {
@@ -170,6 +178,7 @@ export function LocationSearch({
             const next = e.target.value;
             setQ(next);
             setActiveIdx(-1);
+            if (!touched) setTouched(true);
             // Clear stale hits the moment the input falls below the
             // 2-char fetch threshold so the dropdown doesn't keep showing
             // the previous query's results while the user is typing back.
