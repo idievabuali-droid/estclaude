@@ -101,11 +101,13 @@ async function promptShareContact(chatId: number): Promise<void> {
 
 /**
  * /start [token]
- *   - With token: this is the QR/deep-link flow from /voyti. Persist
- *     the chat_id on the auth_session and ask for the user's phone
- *     via Share Contact.
- *   - Without token: somebody opened the bot directly. Send a friendly
- *     orientation message — we can't auth them without a session.
+ *   - With auth token: QR/deep-link flow from /voyti. Persist chat_id
+ *     on the auth_session and prompt for Share Contact.
+ *   - With `subscribe_<token>` token: deep-link from the
+ *     SaveSearchPrompt — bind the visitor's chat_id to the saved
+ *     search so future matches DM them directly. No phone needed
+ *     (this isn't an auth flow; we just need a delivery address).
+ *   - Without token: orientation message.
  */
 async function handleStartCommand(message: TgMessage): Promise<void> {
   const text = message.text ?? '';
@@ -118,6 +120,13 @@ async function handleStartCommand(message: TgMessage): Promise<void> {
       chatId,
       'Привет! Чтобы войти на ЖК.tj, откройте сайт и нажмите «Войти через Telegram» — затем вернитесь сюда по ссылке.',
     );
+    return;
+  }
+
+  // Saved-search subscribe flow uses the `subscribe_` prefix to keep
+  // the auth_sessions and subscribe_sessions tables cleanly separated.
+  if (token.startsWith('subscribe_')) {
+    await handleSubscribeStart(chatId, token.slice('subscribe_'.length));
     return;
   }
 
@@ -297,6 +306,57 @@ async function handleContactShare(message: TgMessage, contact: TgContact): Promi
     {
       replyMarkup: { remove_keyboard: true },
     },
+  );
+}
+
+/**
+ * /start subscribe_<token> — bind this Telegram chat to the saved
+ * search referenced by the token. Idempotent: re-tapping the same
+ * deep-link just re-confirms.
+ */
+async function handleSubscribeStart(chatId: number, token: string): Promise<void> {
+  const supabase = createAdminClient();
+
+  const { data: session } = await supabase
+    .from('subscribe_sessions')
+    .select('id, saved_search_id, status, expires_at')
+    .eq('token', token)
+    .maybeSingle();
+
+  if (!session) {
+    await sendMessage(
+      chatId,
+      'Ссылка для подписки не найдена. Откройте сайт ЖК.tj, выберите фильтры и нажмите «Подписаться» снова.',
+    );
+    return;
+  }
+  if (new Date(session.expires_at as string) < new Date()) {
+    await sendMessage(
+      chatId,
+      'Ссылка устарела. Вернитесь на сайт и нажмите «Подписаться» ещё раз.',
+    );
+    return;
+  }
+
+  // Bind the chat to the saved search. notify_phone gets cleared if
+  // the user happened to subscribe via WhatsApp first then via
+  // Telegram — Telegram wins (instant, free, our channel).
+  const { data: search } = await supabase
+    .from('saved_searches')
+    .update({ notify_chat_id: chatId, notify_phone: null })
+    .eq('id', session.saved_search_id)
+    .select('display_name')
+    .single();
+
+  await supabase
+    .from('subscribe_sessions')
+    .update({ status: 'completed', completed_at: new Date().toISOString() })
+    .eq('id', session.id);
+
+  const name = (search?.display_name as string | undefined) ?? 'сохранённому поиску';
+  await sendMessage(
+    chatId,
+    `✓ Готово! Я напишу вам, как только появится квартира по запросу: «${name}».`,
   );
 }
 

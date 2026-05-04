@@ -2,7 +2,7 @@ import { Map as MapIcon, List, ArrowLeft } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
-import { BuildingCard, MapView, SearchTracker } from '@/components/blocks';
+import { BuildingCard, MapView, SearchTracker, SaveSearchPrompt } from '@/components/blocks';
 import {
   listBuildings,
   getBuildingBySlug,
@@ -262,7 +262,18 @@ export default async function NovostroykiPage({
       {isMap && <MapView buildings={filtered} />}
       {!isMap && (
         <section className="py-6">
-          <AppContainer>
+          <AppContainer className="flex flex-col gap-5">
+            {/* "Save this search" prompt — always rendered when at
+                least one filter is active. The 0-results variant is
+                bigger and more directive (the buyer literally told us
+                what's missing from inventory). */}
+            {hasActiveFilters(sp) ? (
+              <SaveSearchPrompt
+                page="novostroyki"
+                filters={sp}
+                noResults={filtered.length === 0}
+              />
+            ) : null}
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center gap-3 rounded-md border border-stone-200 bg-white p-7 text-center">
                 <p className="text-h3 font-semibold text-stone-900">Ничего не найдено</p>
@@ -296,6 +307,22 @@ export default async function NovostroykiPage({
         </section>
       )}
     </>
+  );
+}
+
+/** True when the visitor has narrowed the result set in any way that
+ *  could be re-played as a notification trigger. View-mode toggles
+ *  (?view=karta) and focus pins (?focus=...) are navigation, not
+ *  search criteria, so they don't count. */
+function hasActiveFilters(sp: FilterParams): boolean {
+  return Boolean(
+    sp.district ||
+      sp.status ||
+      sp.handover ||
+      sp.amenities ||
+      sp.nearby ||
+      sp.price_per_m2_from ||
+      sp.price_per_m2_to,
   );
 }
 

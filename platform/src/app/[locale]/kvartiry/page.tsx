@@ -2,7 +2,7 @@ import { ChevronLeft } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
-import { ListingCard, SearchTracker } from '@/components/blocks';
+import { ListingCard, SearchTracker, SaveSearchPrompt } from '@/components/blocks';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { getExchangeRates } from '@/services/currency';
 import { listListings } from '@/services/listings';
@@ -167,7 +167,19 @@ export default async function KvartiryPage({
       </section>
 
       <section className="py-6">
-        <AppContainer>
+        <AppContainer className="flex flex-col gap-5">
+          {/* "Save this search" prompt — same affordance as on
+              /novostroyki. Skip when no filters are active (a bare
+              /kvartiry visit isn't a search worth saving) and when
+              the page is scoped to a single building (the buyer is
+              already on that building's set). */}
+          {hasActiveFiltersK(sp) && !scopedBuilding ? (
+            <SaveSearchPrompt
+              page="kvartiry"
+              filters={sp}
+              noResults={filtered.length === 0}
+            />
+          ) : null}
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center gap-3 rounded-md border border-stone-200 bg-white p-7 text-center">
               <p className="text-h3 font-semibold text-stone-900">Ничего не найдено</p>
@@ -203,6 +215,21 @@ export default async function KvartiryPage({
         </AppContainer>
       </section>
     </>
+  );
+}
+
+/** True when the visitor has narrowed the result set in a way that's
+ *  worth saving as an alert. The `building` scope is treated as
+ *  navigation, not a search criterion (see the call-site filter). */
+function hasActiveFiltersK(sp: SearchParams): boolean {
+  return Boolean(
+    sp.rooms ||
+      sp.source ||
+      sp.finishing ||
+      sp.price_from ||
+      sp.price_to ||
+      sp.size_from ||
+      sp.size_to,
   );
 }
 

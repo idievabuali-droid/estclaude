@@ -45,3 +45,5 @@ export type { PriceConversionProps } from './PriceConversion';
 export { PageView } from './PageView';
 export { SearchTracker } from './SearchTracker';
 export type { SearchTrackerProps } from './SearchTracker';
+export { SaveSearchPrompt } from './SaveSearchPrompt';
+export type { SaveSearchPromptProps } from './SaveSearchPrompt';

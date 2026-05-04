@@ -15,6 +15,7 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { isFounder } from '@/lib/auth/roles';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMessage } from '@/lib/telegram/bot';
+import { notifyMatchingListing } from '@/lib/saved-searches/match';
 
 interface ModerateBody {
   listing_id: string;
@@ -93,6 +94,14 @@ export async function POST(req: NextRequest) {
         console.error('building auto-publish failed (non-fatal):', pubErr);
       }
     }
+
+    // Saved-search match-on-publish: now that the listing is active,
+    // ping anyone subscribed to a matching search. Fire-and-forget;
+    // we don't block the moderation response on Telegram round-trips.
+    const origin = req.nextUrl.origin;
+    void notifyMatchingListing(listing.id, { origin }).catch((err) =>
+      console.error('notifyMatchingListing failed:', err),
+    );
   }
 
   // Notify the submitter via Telegram if they have a chat_id linked.

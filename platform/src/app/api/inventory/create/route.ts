@@ -28,6 +28,7 @@ import { isFounder } from '@/lib/auth/roles';
 import { createBuilding } from '@/services/buildings';
 import { createListing } from '@/services/listings';
 import { attachAndSetCover, type PendingPhoto } from '@/services/photos';
+import { notifyMatchingListing } from '@/lib/saved-searches/match';
 import type { BuildingStatus, FinishingType } from '@/types/domain';
 
 interface ApartmentInput {
@@ -233,6 +234,21 @@ export async function POST(req: NextRequest) {
       console.error(`createListing #${i} failed:`, err);
       failed.push({ index: i, error: String(err) });
     }
+  }
+
+  // Saved-search match-on-publish: only fires when the listing is
+  // active immediately (founder path). Non-founders post pending →
+  // the moderate endpoint handles notify after approval. Best-effort
+  // — failure here doesn't roll back the publish.
+  if (founder && created.length > 0) {
+    const origin = req.nextUrl.origin;
+    void Promise.all(
+      created.map((c) =>
+        notifyMatchingListing(c.id, { origin }).catch((err) =>
+          console.error(`notifyMatchingListing failed for ${c.id}:`, err),
+        ),
+      ),
+    );
   }
 
   return NextResponse.json({
