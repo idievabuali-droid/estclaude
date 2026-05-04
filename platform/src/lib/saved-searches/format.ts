@@ -66,6 +66,12 @@ export function displayNameFromFilters(
   const district = (filters.district as string)?.split(',').filter(Boolean) ?? [];
   if (district.length === 1) parts.push(district[0]!);
 
+  // LocationSearch state — when present, it's the most distinctive
+  // signal in the search and goes FIRST so the title reads naturally:
+  // "рядом с Школа №4 · 2-комн · до 350к TJS".
+  const nearLabel = filters.near_label as string | undefined;
+  if (nearLabel) parts.unshift(`рядом с ${nearLabel}`);
+
   return parts.length ? parts.join(' · ') : 'Сохранённый поиск';
 }
 

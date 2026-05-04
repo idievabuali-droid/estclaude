@@ -556,5 +556,36 @@ export async function updateListing(
     .eq('id', listingId);
   if (updateErr) throw updateErr;
 
+  // Fire a price-history event whenever the price changed by ANY
+  // amount. This powers the "Цена снижена на 200 000 TJS · 8 апреля"
+  // line on /kvartira detail (Cian-style transparency, our biggest
+  // missing trust signal). We only persist the price-change delta —
+  // other field changes don't get a history line in V1.
+  if (input.priceTotalDirams != null) {
+    const oldPrice = Number(existing.price_total_dirams);
+    const newPrice = Number(input.priceTotalDirams);
+    if (oldPrice !== newPrice) {
+      const deltaPct = oldPrice > 0 ? Math.round(((newPrice - oldPrice) / oldPrice) * 1000) / 10 : 0;
+      // Fire-and-forget: a missed price-history event is not worth
+      // failing the update. Errors are logged for visibility.
+      void supabase
+        .from('events')
+        .insert({
+          event_type: 'listing_price_changed',
+          anon_id: 'system',
+          properties: {
+            listing_id: listingId,
+            from_dirams: String(oldPrice),
+            to_dirams: String(newPrice),
+            delta_pct: deltaPct,
+            editor: options.editorIsFounder ? 'founder' : 'owner',
+          },
+        })
+        .then(({ error }) => {
+          if (error) console.error('listing_price_changed event failed:', error);
+        });
+    }
+  }
+
   return { reModerated: reModerate };
 }

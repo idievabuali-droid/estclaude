@@ -22,12 +22,26 @@ import {
   LISTING_SELECT,
 } from './buildings';
 
+/** Set on a saved item when something interesting changed since the
+ *  user last visited /izbrannoe — drives the "● Обновлено" pill on
+ *  the saved card. The label is intentionally vague in V1 (we don't
+ *  store a per-field history yet) but the count gives buildings
+ *  enough specificity to feel useful (`+ 2 квартиры`). */
+export interface SavedChangeBadge {
+  /** Short Russian phrase shown in the pill. */
+  label: string;
+  /** Timestamp of the most recent change — drives "5 ч. назад" subtext. */
+  changedAt: string;
+}
+
 export type SavedListing = {
   kind: 'listing';
   saved_at: string;
   listing: MockListing;
   building: MockBuilding;
   developer: MockDeveloper | null;
+  /** Set when listing.updated_at is newer than change_badges_seen_at. */
+  changeBadge: SavedChangeBadge | null;
 };
 
 export type SavedBuilding = {
@@ -37,6 +51,10 @@ export type SavedBuilding = {
   developer: MockDeveloper | null;
   district: MockDistrict | null;
   matchingUnits: MockListing[];
+  /** Set when building.updated_at OR a child listing's published_at is
+   *  newer than change_badges_seen_at. The label includes
+   *  "+ N квартир" when N new listings were added since last seen. */
+  changeBadge: SavedChangeBadge | null;
 };
 
 function mapDev(r: {
@@ -75,7 +93,7 @@ export async function getMySavedItems(userId: string): Promise<{
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('saved_items')
-    .select('saved_at, building_id, listing_id')
+    .select('saved_at, change_badges_seen_at, building_id, listing_id')
     .eq('user_id', userId)
     .order('saved_at', { ascending: false });
   if (error) throw error;
@@ -137,35 +155,114 @@ export async function getMySavedItems(userId: string): Promise<{
     matchingUnitsMap.set(b.id, (units ?? []).map(mapListing));
   }
 
-  const savedAtFor = (id: string, kind: 'building' | 'listing') =>
+  const savedRowFor = (id: string, kind: 'building' | 'listing') =>
     (data ?? []).find((r) =>
       kind === 'building' ? r.building_id === id : r.listing_id === id,
-    )?.saved_at ?? new Date().toISOString();
+    );
+
+  // Compute change badges per saved item. The "seen at" baseline is
+  // change_badges_seen_at (set on /izbrannoe load by mark-seen) or the
+  // saved_at if the user has never opened /izbrannoe. Anything updated
+  // strictly after that timestamp lights the badge.
+  //
+  // For buildings we also count newly-published listings — that's the
+  // single most useful retention signal ("ЖК you saved has 3 new
+  // apartments").
+  const newListingsByBuilding = new Map<string, { count: number; latestAt: string }>();
+  const buildingIdsToCheck = buildingsRaw.map((b) => b.id);
+  if (buildingIdsToCheck.length) {
+    const { data: childListings } = await supabase
+      .from('listings')
+      .select('building_id, published_at')
+      .in('building_id', buildingIdsToCheck)
+      .eq('status', 'active');
+    for (const cl of childListings ?? []) {
+      const savedRow = savedRowFor(cl.building_id as string, 'building');
+      if (!savedRow) continue;
+      const baseline = savedRow.change_badges_seen_at ?? savedRow.saved_at;
+      if (!cl.published_at || cl.published_at <= baseline) continue;
+      const prev = newListingsByBuilding.get(cl.building_id as string) ?? {
+        count: 0,
+        latestAt: cl.published_at as string,
+      };
+      newListingsByBuilding.set(cl.building_id as string, {
+        count: prev.count + 1,
+        latestAt: cl.published_at > prev.latestAt ? cl.published_at : prev.latestAt,
+      });
+    }
+  }
+
+  function listingChangeBadge(listing: MockListing): SavedChangeBadge | null {
+    const savedRow = savedRowFor(listing.id, 'listing');
+    if (!savedRow) return null;
+    const baseline = savedRow.change_badges_seen_at ?? savedRow.saved_at;
+    if (!listing.updated_at || listing.updated_at <= baseline) return null;
+    return { label: 'Обновлено', changedAt: listing.updated_at };
+  }
+
+  function buildingChangeBadge(b: MockBuilding): SavedChangeBadge | null {
+    const savedRow = savedRowFor(b.id, 'building');
+    if (!savedRow) return null;
+    const baseline = savedRow.change_badges_seen_at ?? savedRow.saved_at;
+    const newUnits = newListingsByBuilding.get(b.id);
+    const buildingChanged = b.updated_at != null && b.updated_at > baseline;
+    if (!newUnits && !buildingChanged) return null;
+    if (newUnits && newUnits.count > 0) {
+      const word = newUnits.count === 1 ? 'квартира' : newUnits.count < 5 ? 'квартиры' : 'квартир';
+      return {
+        label: `+ ${newUnits.count} ${word}`,
+        changedAt:
+          buildingChanged && b.updated_at != null && b.updated_at > newUnits.latestAt
+            ? b.updated_at
+            : newUnits.latestAt,
+      };
+    }
+    return { label: 'Обновлено', changedAt: b.updated_at ?? baseline };
+  }
 
   const listings: SavedListing[] = listingsRaw.map((l) => {
     const listing = mapListing(l);
     const building = buildingMap.get(listing.building_id)!;
+    const savedRow = savedRowFor(listing.id, 'listing');
     return {
       kind: 'listing',
-      saved_at: savedAtFor(listing.id, 'listing'),
+      saved_at: savedRow?.saved_at ?? new Date().toISOString(),
       listing,
       building,
       developer: devMap.get(building.developer_id) ?? null,
+      changeBadge: listingChangeBadge(listing),
     };
   });
 
   const buildings: SavedBuilding[] = buildingsRaw.map((b) => {
     const building = buildingMap.get(b.id)!;
+    const savedRow = savedRowFor(b.id, 'building');
     return {
       kind: 'building',
-      saved_at: savedAtFor(b.id, 'building'),
+      saved_at: savedRow?.saved_at ?? new Date().toISOString(),
       building,
       developer: devMap.get(building.developer_id) ?? null,
       district: distMap.get(building.district_id) ?? null,
       matchingUnits: matchingUnitsMap.get(b.id) ?? [],
+      changeBadge: buildingChangeBadge(building),
     };
   });
 
   return { listings, buildings };
+}
+
+/**
+ * Stamps `change_badges_seen_at = now()` on every saved_items row for
+ * the user. Called from a small client effect after /izbrannoe renders
+ * so the badge persists for the current visit but clears for the next
+ * one. Idempotent (safe to call repeatedly).
+ */
+export async function markSavedItemsSeen(userId: string): Promise<void> {
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from('saved_items')
+    .update({ change_badges_seen_at: new Date().toISOString() })
+    .eq('user_id', userId);
+  if (error) throw error;
 }
 

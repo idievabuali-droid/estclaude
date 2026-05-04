@@ -10,7 +10,8 @@ import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppChip } from '@/components/primitives';
-import { InstallmentDisplay, ListingCard, PriceConversion, CallbackWidget } from '@/components/blocks';
+import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget } from '@/components/blocks';
+import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo } from '@/lib/format';
 import { getListing } from '@/services/listings';
@@ -109,6 +110,10 @@ export default async function ListingDetailPage({
   // 24h, fail-soft) is wasted work otherwise.
   const rates = isDiaspora ? await getExchangeRates() : null;
   const pois = await getNearbyPOIs(building.latitude, building.longitude);
+  // Trust signals — view count + recent price-change line, sourced
+  // from the events table. Both are optional: zero views or no price
+  // history → the strip simply doesn't render.
+  const stats = await getListingStats(listing.id, listing.slug);
 
   // Pre-compute the compact nearby rows so the JSX stays readable.
   const compactNearby = COMPACT_POI_CATEGORIES.map((cat) => ({
@@ -278,6 +283,11 @@ export default async function ListingDetailPage({
           <span className="text-caption text-stone-400">
             Опубликовано {formatPostedAgo(listing.published_at)}
           </span>
+
+          {/* Trust signals: view count + most-recent price change.
+              Renders nothing when both are absent so a brand-new
+              listing doesn't look stale. */}
+          <ListingTrustSignals stats={stats} />
 
           {/* Contact bar: 4 channels + 1 intent CTA. Same client
               component renders the desktop layout here AND the mobile

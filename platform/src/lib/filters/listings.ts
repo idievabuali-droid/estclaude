@@ -27,7 +27,26 @@ export interface ListingForFilter {
   price_total_dirams: bigint | string | number;
   finishing_type: string;
   source_type: string;
-  building?: { slug: string } | null;
+  building?: {
+    slug: string;
+    /** Required for the LocationSearch radius filter (near_lat/near_lng).
+     *  The matcher passes them through from the parent building row. */
+    latitude?: number | null;
+    longitude?: number | null;
+  } | null;
+}
+
+/** Haversine distance in metres — duplicated from the service-layer
+ *  helper because this module is intentionally dependency-free. */
+function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
 }
 
 export type ListingFilters = Record<string, string | string[] | undefined>;
@@ -66,6 +85,20 @@ export function matchesListingFilters(
 
   const buildingScopeSlug = (filters.building as string | undefined) ?? null;
   if (buildingScopeSlug && listing.building?.slug !== buildingScopeSlug) return false;
+
+  // LocationSearch radius filter — when the saved search was created
+  // with a POI selected, only listings whose parent building falls
+  // within the radius pass. Defaults to 1500m when radius is missing
+  // (matches the page-side default in /novostroyki + /kvartiry).
+  const nearLat = filters.near_lat ? parseFloat(filters.near_lat as string) : null;
+  const nearLng = filters.near_lng ? parseFloat(filters.near_lng as string) : null;
+  if (nearLat != null && nearLng != null) {
+    const radius = filters.radius ? parseInt(filters.radius as string, 10) : 1500;
+    const blat = listing.building?.latitude;
+    const blng = listing.building?.longitude;
+    if (blat == null || blng == null) return false;
+    if (distanceMeters(nearLat, nearLng, Number(blat), Number(blng)) > radius) return false;
+  }
 
   return true;
 }

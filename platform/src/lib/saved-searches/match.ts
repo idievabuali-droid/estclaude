@@ -33,6 +33,10 @@ export type ListingForMatch = {
     handover_estimated_quarter: string | null;
     amenities: string[] | null;
     name: { ru: string };
+    /** Required by the LocationSearch radius filter so saved searches
+     *  with `near_lat / near_lng` only fire for in-radius listings. */
+    latitude: number | null;
+    longitude: number | null;
   } | null;
 };
 
@@ -80,7 +84,7 @@ export async function notifyMatchingListing(
   const { data: listing } = await supabase
     .from('listings')
     .select(
-      'id, slug, building_id, status, rooms_count, size_m2, price_total_dirams, price_per_m2_dirams, finishing_type, source_type, building:buildings!inner(id, slug, district_id, status, handover_estimated_quarter, amenities, name)',
+      'id, slug, building_id, status, rooms_count, size_m2, price_total_dirams, price_per_m2_dirams, finishing_type, source_type, building:buildings!inner(id, slug, district_id, status, handover_estimated_quarter, amenities, name, latitude, longitude)',
     )
     .eq('id', listingId)
     .maybeSingle();
@@ -112,7 +116,17 @@ export async function notifyMatchingListing(
   }
 
   const buildingArr = listing.building as unknown as
-    | { id: string; slug: string; district_id: string; status: string; handover_estimated_quarter: string | null; amenities: string[] | null; name: { ru: string } }
+    | {
+        id: string;
+        slug: string;
+        district_id: string;
+        status: string;
+        handover_estimated_quarter: string | null;
+        amenities: string[] | null;
+        name: { ru: string };
+        latitude: number | null;
+        longitude: number | null;
+      }
     | null;
   const buildingName = buildingArr?.name?.ru ?? 'Квартира';
   const listingForMatch: ListingForMatch = {

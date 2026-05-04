@@ -54,6 +54,10 @@ export type MockBuilding = {
   price_from_dirams: bigint | null;
   price_per_m2_from_dirams: bigint | null;
   description: Bilingual;
+  /** ISO timestamp of the last update — drives the "● Обновлено" badge
+   *  on /izbrannoe by comparing against saved_items.change_badges_seen_at.
+   *  Optional because mock fixtures don't set it; real Supabase rows do. */
+  updated_at?: string | null;
 };
 
 export type MockListing = {
@@ -90,6 +94,8 @@ export type MockListing = {
    * (legacy listings + sellers who skip the field).
    */
   bathroom_separate: boolean | null;
+  /** ISO timestamp of last edit — see MockBuilding.updated_at. */
+  updated_at?: string | null;
 };
 
 // Helpers

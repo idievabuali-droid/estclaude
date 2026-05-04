@@ -1,4 +1,4 @@
-import { BookmarkPlus, MessageCircle } from 'lucide-react';
+import { BookmarkPlus, MessageCircle, Sparkles } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import {
@@ -7,12 +7,13 @@ import {
   AppCard,
   AppCardContent,
 } from '@/components/primitives';
-import { ListingCard, BuildingCard } from '@/components/blocks';
-import { getMySavedItems } from '@/services/saved';
+import { ListingCard, BuildingCard, MarkSavedItemsSeen } from '@/components/blocks';
+import { getMySavedItems, type SavedChangeBadge } from '@/services/saved';
 import { getDistrictBenchmarks } from '@/services/benchmarks';
 import { getCurrentUser } from '@/lib/auth/session';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { getExchangeRates } from '@/services/currency';
+import { formatPostedAgo } from '@/lib/format';
 
 /**
  * /izbrannoe — saved buildings + listings.
@@ -100,14 +101,29 @@ export default async function IzbrannoePage({
   const districtIds = [...new Set(savedListings.map((s) => s.building.district_id))];
   const benchmarks = await getDistrictBenchmarks(districtIds);
 
+  // Headline change-summary — "У вас 3 обновления" — gives Madina an
+  // immediate "is there anything new for me?" answer without scanning
+  // every card. Counts both tabs since the header sits above them.
+  const totalChanges =
+    savedListings.filter((s) => s.changeBadge).length +
+    savedBuildings.filter((s) => s.changeBadge).length;
+
   return (
     <>
+      {/* Fire-and-forget effect: stamp change_badges_seen_at = now() so
+          the badges the user is looking at right now don't re-flag
+          themselves on the next visit. Page is already rendered, so
+          this doesn't affect what the user currently sees. */}
+      <MarkSavedItemsSeen />
       <section className="border-b border-stone-200 bg-white">
         <AppContainer className="flex flex-col gap-4 py-5">
           <div className="flex flex-col gap-1">
             <h1 className="text-h1 font-semibold text-stone-900">{tNav('saved')}</h1>
             <p className="text-meta text-stone-500 tabular-nums">
               {savedBuildings.length + savedListings.length} объектов
+              {totalChanges > 0
+                ? ` · ${totalChanges} ${totalChanges === 1 ? 'обновление' : totalChanges < 5 ? 'обновления' : 'обновлений'} с прошлого визита`
+                : ''}
             </p>
           </div>
 
@@ -147,18 +163,19 @@ export default async function IzbrannoePage({
                 {savedListings.map((s) => {
                   const benchmark = benchmarks.get(s.building.district_id);
                   return (
-                    <ListingCard
-                      key={s.listing.id}
-                      listing={s.listing}
-                      building={s.building}
-                      developerVerified={s.developer?.is_verified ?? false}
-                      currency={currency}
-                      rates={rates}
-                      districtMedianPerM2={
-                        benchmark ? Number(benchmark.median_per_m2_dirams) : null
-                      }
-                      districtSampleSize={benchmark?.sample_size ?? 0}
-                    />
+                    <SavedCardWrapper key={s.listing.id} badge={s.changeBadge}>
+                      <ListingCard
+                        listing={s.listing}
+                        building={s.building}
+                        developerVerified={s.developer?.is_verified ?? false}
+                        currency={currency}
+                        rates={rates}
+                        districtMedianPerM2={
+                          benchmark ? Number(benchmark.median_per_m2_dirams) : null
+                        }
+                        districtSampleSize={benchmark?.sample_size ?? 0}
+                      />
+                    </SavedCardWrapper>
                   );
                 })}
               </div>
@@ -175,15 +192,16 @@ export default async function IzbrannoePage({
               {savedBuildings.map((s) => {
                 if (!s.developer || !s.district) return null;
                 return (
-                  <BuildingCard
-                    key={s.building.id}
-                    building={s.building}
-                    developer={s.developer}
-                    district={s.district}
-                    matchingUnits={s.matchingUnits}
-                    currency={currency}
-                    rates={rates}
-                  />
+                  <SavedCardWrapper key={s.building.id} badge={s.changeBadge}>
+                    <BuildingCard
+                      building={s.building}
+                      developer={s.developer}
+                      district={s.district}
+                      matchingUnits={s.matchingUnits}
+                      currency={currency}
+                      rates={rates}
+                    />
+                  </SavedCardWrapper>
                 );
               })}
             </div>
@@ -191,6 +209,33 @@ export default async function IzbrannoePage({
         </AppContainer>
       </section>
     </>
+  );
+}
+
+/**
+ * Wraps a saved card in a relative container with an absolute-positioned
+ * "Обновлено" pill in the top-left corner. The pill sits above the
+ * card's photo with a soft emerald tone — calm trust signal, not a
+ * red-alert. When there's no change, the wrapper is a no-op (just the
+ * card). Two-line layout (label + relative time) so Madina can tell
+ * at a glance whether a change is fresh or week-old.
+ */
+function SavedCardWrapper({
+  badge,
+  children,
+}: {
+  badge: SavedChangeBadge | null;
+  children: React.ReactNode;
+}) {
+  if (!badge) return <>{children}</>;
+  return (
+    <div className="relative">
+      <span className="pointer-events-none absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-emerald-600/95 px-2.5 py-1 text-caption font-medium text-white shadow-sm ring-1 ring-emerald-700/30 backdrop-blur-sm">
+        <Sparkles className="size-3" aria-hidden />
+        {badge.label} · {formatPostedAgo(badge.changedAt)}
+      </span>
+      {children}
+    </div>
   );
 }
 

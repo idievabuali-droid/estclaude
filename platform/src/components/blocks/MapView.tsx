@@ -22,10 +22,59 @@ export interface MapViewProps {
    */
   focusedBuilding?: MockBuilding | null;
   focusPois?: PoiResult | null;
+  /**
+   * POI-near mode: when set (URL has ?view=karta&near_lat=…&near_lng=…),
+   * overlay a landmark pin at the POI plus a translucent radius circle.
+   * The `buildings` list is already pre-filtered server-side to those
+   * within the radius, so they render as normal price pins. Camera
+   * fits the POI + visible buildings together. Mutually exclusive with
+   * focusedBuilding (focus mode wins if both happen to be set).
+   */
+  nearPoi?: { lat: number; lng: number; label: string; radiusM: number } | null;
 }
 
 // Vahdat town center (V1 launch scope; was Dushanbe pre-Vahdat-only)
 const VAHDAT_CENTER: [number, number] = [69.0214, 38.5511];
+
+// MapLibre source/layer ids for the POI radius circle overlay. Using
+// constants so the cleanup pass on every effect re-run can reliably
+// remove them by name.
+const NEAR_RADIUS_SOURCE = 'near-poi-radius';
+const NEAR_RADIUS_FILL_LAYER = 'near-poi-radius-fill';
+const NEAR_RADIUS_LINE_LAYER = 'near-poi-radius-line';
+
+/**
+ * Builds a 64-vertex polygon approximating a circle of `radiusM` metres
+ * centred on (lat, lng). MapLibre paints geographic features in lat/lng
+ * so we project metres to degrees using the standard Earth-radius
+ * approximation. Good enough for visual radius indication at our scale
+ * — buyers don't need geodesic precision, they need "is this in the
+ * neighbourhood".
+ */
+function radiusPolygon(lat: number, lng: number, radiusM: number): GeoJSON.Feature {
+  const R = 6371000;
+  const points: Array<[number, number]> = [];
+  const n = 64;
+  for (let i = 0; i <= n; i++) {
+    const angle = (2 * Math.PI * i) / n;
+    const dx = (radiusM * Math.cos(angle)) / (R * Math.cos((lat * Math.PI) / 180));
+    const dy = (radiusM * Math.sin(angle)) / R;
+    points.push([lng + (dx * 180) / Math.PI, lat + (dy * 180) / Math.PI]);
+  }
+  return {
+    type: 'Feature',
+    properties: {},
+    geometry: { type: 'Polygon', coordinates: [points] },
+  };
+}
+
+// POI pin: orange landmark dot, distinct from the building price pills
+// and the focus-mode terracotta dot so the buyer instantly reads "this
+// is the place I searched for, not a building".
+const NEAR_POI_DOT_STYLE =
+  'width:32px;height:32px;border-radius:9999px;background:#f97316;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;color:white;font-size:18px;cursor:default';
+const NEAR_POI_LABEL_STYLE =
+  'position:absolute;top:34px;left:50%;transform:translateX(-50%);background:white;border:1px solid #f97316;color:#9a3412;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.1)';
 
 /**
  * MapView — Layer 7 spatial component.
@@ -108,6 +157,7 @@ export function MapView({
   buildings,
   focusedBuilding,
   focusPois,
+  nearPoi,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
@@ -308,9 +358,81 @@ export function MapView({
     }
 
     // ─── BROWSE MODE ──────────────────────────────────────────
-    if (buildings.length === 0) return;
+    // Clean up POI overlay from any prior render so we don't accumulate
+    // duplicate sources / layers across remounts. Safe to call even
+    // when none was added.
+    if (map.getLayer(NEAR_RADIUS_FILL_LAYER)) map.removeLayer(NEAR_RADIUS_FILL_LAYER);
+    if (map.getLayer(NEAR_RADIUS_LINE_LAYER)) map.removeLayer(NEAR_RADIUS_LINE_LAYER);
+    if (map.getSource(NEAR_RADIUS_SOURCE)) map.removeSource(NEAR_RADIUS_SOURCE);
+
+    // POI overlay (only in browse mode, when nearPoi is set). Adds the
+    // landmark pin + a translucent radius circle that frames which
+    // buildings the buyer is currently seeing.
+    if (nearPoi) {
+      const addOverlay = () => {
+        if (map.getSource(NEAR_RADIUS_SOURCE)) return;
+        map.addSource(NEAR_RADIUS_SOURCE, {
+          type: 'geojson',
+          data: radiusPolygon(nearPoi.lat, nearPoi.lng, nearPoi.radiusM),
+        });
+        // Insert beneath any symbol layer so building pins remain
+        // readable on top of the tinted radius. Falls back to default
+        // (top) when no symbol layer is found.
+        const layers = map.getStyle().layers ?? [];
+        const firstSymbol = layers.find((l) => l.type === 'symbol')?.id;
+        map.addLayer(
+          {
+            id: NEAR_RADIUS_FILL_LAYER,
+            type: 'fill',
+            source: NEAR_RADIUS_SOURCE,
+            paint: { 'fill-color': '#f97316', 'fill-opacity': 0.08 },
+          },
+          firstSymbol,
+        );
+        map.addLayer(
+          {
+            id: NEAR_RADIUS_LINE_LAYER,
+            type: 'line',
+            source: NEAR_RADIUS_SOURCE,
+            paint: {
+              'line-color': '#f97316',
+              'line-width': 2,
+              'line-dasharray': [2, 2],
+              'line-opacity': 0.7,
+            },
+          },
+          firstSymbol,
+        );
+      };
+      // Style may still be loading on first mount — defer until ready.
+      if (map.isStyleLoaded()) addOverlay();
+      else map.once('style.load', addOverlay);
+
+      // POI pin marker. Wraps the dot + the always-visible label so
+      // both move together on pan/zoom. Anchor center because the dot
+      // IS the POI location (no tip).
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;width:32px;height:32px';
+      wrap.setAttribute('aria-label', `${nearPoi.label} — место поиска`);
+      const dot = document.createElement('div');
+      dot.style.cssText = NEAR_POI_DOT_STYLE;
+      dot.textContent = '★';
+      dot.setAttribute('aria-hidden', 'true');
+      wrap.appendChild(dot);
+      const lbl = document.createElement('div');
+      lbl.style.cssText = NEAR_POI_LABEL_STYLE;
+      lbl.textContent = nearPoi.label;
+      wrap.appendChild(lbl);
+      const poiMarker = new maplibregl.Marker({ element: wrap, anchor: 'center' })
+        .setLngLat([nearPoi.lng, nearPoi.lat])
+        .addTo(map);
+      markersRef.current.push(poiMarker);
+    }
+
+    if (buildings.length === 0 && !nearPoi) return;
 
     const bounds = new maplibregl.LngLatBounds();
+    if (nearPoi) bounds.extend([nearPoi.lng, nearPoi.lat]);
     for (const b of buildings) {
       const root = document.createElement('div');
       root.className = PIN_WRAPPER_CLASS;
@@ -358,13 +480,20 @@ export function MapView({
         zoom: 15,
         duration: 600,
       });
-    } else if (buildings.length > 1) {
-      map.fitBounds(bounds, { padding: 60, maxZoom: 13, duration: 600 });
-    } else {
+    } else if (nearPoi && buildings.length === 0) {
+      // POI overlay with no surrounding buildings — centre on the POI
+      // at neighbourhood zoom so the buyer sees an empty radius
+      // surrounded by streets, not a confusing wide view.
+      map.flyTo({ center: [nearPoi.lng, nearPoi.lat], zoom: 15, duration: 600 });
+    } else if (buildings.length > 1 || (nearPoi && buildings.length > 0)) {
+      // POI + at least one building, or several buildings: fit bounds
+      // to include everything that's been added.
+      map.fitBounds(bounds, { padding: 80, maxZoom: 15, duration: 600 });
+    } else if (buildings.length === 1) {
       const only = buildings[0]!;
       map.flyTo({ center: [only.longitude, only.latitude], zoom: 14, duration: 600 });
     }
-  }, [buildings, selectedSlug, isFocusMode, focusedBuilding, focusPois, activeCategory]);
+  }, [buildings, selectedSlug, isFocusMode, focusedBuilding, focusPois, activeCategory, nearPoi]);
 
   // Restyle browse-mode building pins when selection changes.
   /* eslint-disable react-hooks/immutability */

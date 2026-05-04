@@ -298,7 +298,16 @@ export default async function NovostroykiPage({
         </AppContainer>
       </section>
 
-      {isMap && <MapView buildings={filtered} />}
+      {isMap && (
+        <MapView
+          buildings={filtered}
+          nearPoi={
+            nearLat != null && nearLng != null && sp.near_label && nearRadius
+              ? { lat: nearLat, lng: nearLng, label: sp.near_label, radiusM: nearRadius }
+              : null
+          }
+        />
+      )}
       {!isMap && (
         <section className="py-6">
           <AppContainer className="flex flex-col gap-5">

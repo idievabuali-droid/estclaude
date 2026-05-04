@@ -93,9 +93,15 @@ async function fetchOverpass() {
 );
 out tags center 800;`;
   console.log('Querying Overpass...');
+  // Overpass requires a User-Agent identifying the caller — anonymous
+  // fetches get 406 Not Acceptable on the public endpoint.
   const res = await fetch(OVERPASS_URL, {
     method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      'user-agent': 'zhk.tj-poi-seed/1.0 (+https://zhk.tj)',
+      accept: 'application/json',
+    },
     body: `data=${encodeURIComponent(query)}`,
   });
   if (!res.ok) throw new Error(`Overpass ${res.status}: ${await res.text()}`);

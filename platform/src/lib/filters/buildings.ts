@@ -16,11 +16,25 @@ export interface BuildingForFilter {
   status: string;
   handover_estimated_quarter: string | null;
   amenities: string[] | null;
+  /** Required by the LocationSearch radius filter (near_lat/near_lng). */
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface ListingForBuildingFilter {
   price_per_m2_dirams: bigint | string | number;
   building: BuildingForFilter | null;
+}
+
+function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
 }
 
 export type BuildingFilters = Record<string, string | string[] | undefined>;
@@ -64,6 +78,16 @@ export function matchesBuildingFilters(
   const perM2Dirams = BigInt(listing.price_per_m2_dirams as string | number);
   if (perM2From != null && perM2Dirams < BigInt(perM2From * 100)) return false;
   if (perM2To != null && perM2Dirams > BigInt(perM2To * 100)) return false;
+
+  const nearLat = filters.near_lat ? parseFloat(filters.near_lat as string) : null;
+  const nearLng = filters.near_lng ? parseFloat(filters.near_lng as string) : null;
+  if (nearLat != null && nearLng != null) {
+    const radius = filters.radius ? parseInt(filters.radius as string, 10) : 1500;
+    if (b.latitude == null || b.longitude == null) return false;
+    if (distanceMeters(nearLat, nearLng, Number(b.latitude), Number(b.longitude)) > radius) {
+      return false;
+    }
+  }
 
   return true;
 }

@@ -112,6 +112,7 @@ function rowToBuilding(row: BuildingRowWithJoins): MockBuilding {
     price_per_m2_from_dirams:
       row.price_per_m2_from_dirams != null ? BigInt(row.price_per_m2_from_dirams) : null,
     description: row.description ?? { ru: '', tg: '' },
+    updated_at: row.updated_at ?? null,
   };
 }
 
@@ -132,6 +133,7 @@ type BuildingRowWithJoins = {
   developer_id: string;
   district_id: string;
   city: string;
+  updated_at?: string | null;
   name: { ru: string; tg?: string };
   address: { ru: string; tg?: string };
   latitude: number;
@@ -526,6 +528,7 @@ function mapListing(r: {
   balcony: boolean | null;
   ceiling_height_cm: number | null;
   bathroom_separate?: boolean | null;
+  updated_at?: string | null;
   cover_photo?: { storage_path: string } | { storage_path: string }[] | null;
 }): MockListing {
   return {
@@ -558,6 +561,7 @@ function mapListing(r: {
     balcony: r.balcony,
     ceiling_height_cm: r.ceiling_height_cm,
     bathroom_separate: r.bathroom_separate ?? null,
+    updated_at: r.updated_at ?? null,
   };
 }
 

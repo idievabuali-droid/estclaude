@@ -6,6 +6,44 @@ Newest at top.
 
 ---
 
+## 2026-05-04 · Retention loop closed: Madina-walkthrough remaining fixes
+
+**What changed:** four follow-up commits closing the remaining friction points from the Madina walkthrough — every problem her persona hit on the first browse now has a concrete fix.
+
+1. **«Изменения» badge in /izbrannoe.** `saved_items.change_badges_seen_at` (already in schema 0004) now drives a small emerald "● Обновлено · 2 дня назад" pill in the top-left of each saved card when `listings.updated_at` (or for buildings: any child listing's `published_at` or the building's own `updated_at`) is newer than the user's last visit. Header reads "5 объектов · 2 обновления с прошлого визита" so Madina knows in 2 seconds whether anything changed. Uses jet-fresh client effect (`MarkSavedItemsSeen` → `/api/saved/mark-seen`) to stamp `change_badges_seen_at = now()` after page render — badges persist for the current visit but clear for the next. Reason this is non-trivial: the Cian/Avito-style "did anything happen since I left" signal is *the* feature that gives buyers a reason to come back.
+
+2. **View count + price history on /kvartira.** `getListingStats(listingId, slug)` aggregates from the existing `events` table: total page_view count + today's count → "247 просмотров · 12 за сегодня"; plus the most recent price-change event → "Цена снижена на 200 000 TJS · 8 апр". `updateListing` now fires `listing_price_changed` events with `{from_dirams, to_dirams, delta_pct}` properties for ANY price change (not just ≥10% as for re-moderation). `ListingTrustSignals` block renders both signals beneath the published-ago line — calm caption tier, emerald icon for drops, amber for raises. Renders nothing when both views and price-history are empty so brand-new listings don't look stale.
+
+3. **POI map view.** `MapView` gains a `nearPoi` prop. When `?view=karta&near_lat=…&near_lng=…&near_label=…&radius=…` is in the URL, the map overlays an orange ★ landmark pin at the POI plus a translucent dashed-orange radius polygon (64-vertex circle approximation in lat/lng). Camera fits POI + the in-radius buildings together. Closes the POI loop — when Madina searches "Школа №4" she lands on a list, taps map, and sees the school + the buildings around it in one view.
+
+4. **Saved-search by location.** The `near_lat / near_lng / radius` URL params already flowed into `saved_searches.filters`, but the matcher didn't use them — anyone subscribing to "near Гулистон школа" got every Vahdat match. Both `lib/filters/listings.ts` and `lib/filters/buildings.ts` now check distance against the building's lat/lng (haversine, default 1500m radius). The matcher's SELECT pulls `latitude, longitude` through. `displayNameFromFilters` prepends "рядом с {label}" so the saved-search title reads naturally: "рядом с Школа №4 · 2-комн · до 350к TJS".
+
+**Why:**
+- The «Изменения» badge was the missing 4th item from the Madina-walkthrough "smaller fixes" bundle. Without it, /izbrannoe has no new-content signal — there's no reason for a saved buyer to revisit.
+- View count + price history are the two trust signals Cian users said are most decisive when comparing two listings. We had the data; we weren't surfacing it.
+- POI map closes the map view's largest UX gap: searching by place but only seeing a list is half the magic moment.
+- Saved-search location filter prevents the trust-killing "I subscribed to alerts near my mom's house, you sent me listings on the other side of town" outcome.
+
+**What it affects:**
+- New columns surfaced (read-only) on the buyer side: `listings.updated_at`, `buildings.updated_at` (already populated by Postgres / our update flows; just plumbed through the type system + mappers in `services/buildings.ts`).
+- New event type fired: `listing_price_changed`. Server-side write, bypasses the API event-type whitelist.
+- New API endpoint: `POST /api/saved/mark-seen`.
+- New service: `services/listing-stats.ts`. Performance fine at V1 volume (<10k events); upgrade path noted in code (partial index on `properties->>listing_id` if/when needed).
+- New components: `MarkSavedItemsSeen`, `ListingTrustSignals`. SavedCardWrapper inline in /izbrannoe (no need for a separate block component).
+- MapView now has 3 modes: BROWSE / FOCUS / BROWSE+POI (POI overlay). FOCUS still wins if both `focusedBuilding` and `nearPoi` are set.
+
+**Anti-pattern locked out:** "ship the data, surface it later." The events table already had the signals for view count + price changes; they sat unused because the surfacing work was deferred. Insight only matters when it's visible to the user it's about.
+
+**Deferred (next batch):**
+- Multi-POI saved searches ("near X AND Y") — V1 keeps single-POI for clarity.
+- Full price-history timeline view (currently shows latest entry only). Sparkline + per-row table is a future expansion when listings start having 3+ price changes.
+- Building cover photo as the FOCUS mode anchor (currently a coloured dot).
+- Per-listing watch-button granularity (some buyers may want price-only alerts vs all-changes).
+- "Что значит «Проверенный застройщик»" tooltip (Madina paused on this; small polish).
+- Login page copy: "what login unlocks" (Madina paused at /voyti).
+
+---
+
 ## 2026-05-04 · Browse-by-location + anon-friendliness (commits 07a6a84 / c42f7e0 / TBD)
 
 **What changed:** three commits reshape how a first-time anonymous Madina actually starts looking.

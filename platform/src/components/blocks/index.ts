@@ -53,3 +53,6 @@ export { FilterRelaxSuggestion } from './FilterRelaxSuggestion';
 export type { FilterRelaxSuggestionProps } from './FilterRelaxSuggestion';
 export { LocationSearch } from './LocationSearch';
 export type { LocationSearchProps } from './LocationSearch';
+export { MarkSavedItemsSeen } from './MarkSavedItemsSeen';
+export { ListingTrustSignals } from './ListingTrustSignals';
+export type { ListingTrustSignalsProps } from './ListingTrustSignals';
