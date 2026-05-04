@@ -10,7 +10,8 @@ import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppChip } from '@/components/primitives';
-import { InstallmentDisplay, ListingCard, PriceConversion } from '@/components/blocks';
+import { InstallmentDisplay, ListingCard, PriceConversion, CallbackWidget } from '@/components/blocks';
+import { getCurrentUser } from '@/lib/auth/session';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo } from '@/lib/format';
 import { getListing } from '@/services/listings';
 import { getNearbyPOIs, POI_LABELS, type PoiCategory } from '@/services/poi';
@@ -94,6 +95,10 @@ export default async function ListingDetailPage({
   const data = await getListing(slug);
   if (!data) notFound();
   const { listing, building, developer, district, similar, sellerPhone } = data;
+  // Auth check used to decide whether to show the anonymous-only
+  // CallbackWidget (logged-in users have ContactBarWithModal, no
+  // need for a duplicate phone-capture surface).
+  const visitor = await getCurrentUser();
   // Diaspora context: when the buyer has set a foreign currency on
   // /diaspora, the contact-bar intent CTA switches from physical visit
   // to online showing.
@@ -282,6 +287,13 @@ export default async function ListingDetailPage({
             sellerPhone={sellerPhone}
             isDiaspora={isDiaspora}
           />
+
+          {/* Anonymous-friendly callback widget. Logged-in visitors
+              already have ContactBarWithModal as the primary surface
+              and we'd rather not double up; this widget exists so a
+              random visitor without a Telegram session can leave a
+              phone for the founder to follow up on WhatsApp. */}
+          {!visitor ? <CallbackWidget listingId={listing.id} /> : null}
         </AppContainer>
       </section>
 

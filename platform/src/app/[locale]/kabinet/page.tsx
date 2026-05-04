@@ -126,17 +126,34 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
             <div className="flex flex-col gap-1">
               <h1 className="text-h1 font-semibold text-stone-900">Кабинет</h1>
             </div>
-            {/* "Новое объявление" CTA is founder-only in V1: regular
-                sellers go through /post → ContactCard, where we ask
-                them to message us and we publish on their behalf. */}
-            {founder && isSeller ? (
-              <Link href="/post">
-                <AppButton variant="primary" size="md">
-                  <Plus className="size-4" />
-                  Новое объявление
+            <div className="flex items-center gap-2">
+              {/* Founder-only quick links to operator surfaces — kept
+                  next to the post CTA so the operator dashboard is a
+                  single click away from the kabinet landing. */}
+              {founder ? (
+                <Link href="/kabinet/analytics">
+                  <AppButton variant="secondary" size="md">
+                    Аналитика
+                  </AppButton>
+                </Link>
+              ) : null}
+              <Link href="/kabinet/saved-searches">
+                <AppButton variant="secondary" size="md">
+                  Сохранённые поиски
                 </AppButton>
               </Link>
-            ) : null}
+              {/* "Новое объявление" CTA is founder-only in V1: regular
+                  sellers go through /post → ContactCard, where we ask
+                  them to message us and we publish on their behalf. */}
+              {founder && isSeller ? (
+                <Link href="/post">
+                  <AppButton variant="primary" size="md">
+                    <Plus className="size-4" />
+                    Новое объявление
+                  </AppButton>
+                </Link>
+              ) : null}
+            </div>
           </div>
         </AppContainer>
       </section>

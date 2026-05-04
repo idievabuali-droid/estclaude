@@ -47,3 +47,5 @@ export { SearchTracker } from './SearchTracker';
 export type { SearchTrackerProps } from './SearchTracker';
 export { SaveSearchPrompt } from './SaveSearchPrompt';
 export type { SaveSearchPromptProps } from './SaveSearchPrompt';
+export { CallbackWidget } from './CallbackWidget';
+export type { CallbackWidgetProps } from './CallbackWidget';
