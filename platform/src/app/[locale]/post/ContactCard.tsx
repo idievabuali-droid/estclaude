@@ -1,6 +1,9 @@
+'use client';
+
 import { MessageCircle, Phone, Send } from 'lucide-react';
 import { AppCard, AppCardContent, AppButton } from '@/components/primitives';
 import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
+import { track } from '@/lib/analytics/track';
 
 /**
  * Shown at /post to non-founders (and unauthenticated visitors). V1
@@ -36,6 +39,7 @@ export function ContactCard() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Написать в WhatsApp на ${FOUNDER_CONTACTS.phoneDisplay}`}
+              onClick={() => track('contact_button_click', { channel: 'whatsapp', source: 'post' })}
             >
               <AppButton variant="primary" size="lg" className="w-full">
                 <MessageCircle className="size-4" />
@@ -47,6 +51,7 @@ export function ContactCard() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Написать в Telegram: @${FOUNDER_CONTACTS.telegramHandle}`}
+              onClick={() => track('contact_button_click', { channel: 'telegram', source: 'post' })}
             >
               <AppButton variant="secondary" size="lg" className="w-full">
                 <Send className="size-4" />
@@ -56,6 +61,7 @@ export function ContactCard() {
             <a
               href={`tel:${FOUNDER_CONTACTS.phone}`}
               aria-label={`Позвонить ${FOUNDER_CONTACTS.phoneDisplay}`}
+              onClick={() => track('contact_button_click', { channel: 'phone', source: 'post' })}
             >
               <AppButton variant="secondary" size="lg" className="w-full">
                 <Phone className="size-4" />

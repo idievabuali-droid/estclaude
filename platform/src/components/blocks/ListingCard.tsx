@@ -12,6 +12,7 @@ import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
 import { FEATURES } from '@/lib/feature-flags';
 import { PriceConversion } from './PriceConversion';
+import { track } from '@/lib/analytics/track';
 import type { MockListing, MockBuilding } from '@/lib/mock';
 import type { ExchangeRates, SupportedCurrency } from '@/services/currency';
 
@@ -82,6 +83,13 @@ export function ListingCard({
   return (
     <Link
       href={`/kvartira/${listing.slug}`}
+      onClick={() =>
+        track('listing_card_click', {
+          listing_id: listing.id,
+          listing_slug: listing.slug,
+          building_id: building.id,
+        })
+      }
       className={cn(
         'group flex flex-col overflow-hidden rounded-md border border-stone-200 bg-white transition-colors',
         'hover:border-stone-300 hover:shadow-sm',

@@ -17,6 +17,7 @@ import {
   SESSION_COOKIE,
   sessionCookieOptions,
 } from '@/lib/auth/session';
+import { readAnonIdServer } from '@/lib/analytics/anon-id';
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token');
@@ -56,6 +57,31 @@ export async function GET(req: NextRequest) {
   // Burn the auth_session so it can't be reused — the web cookie is
   // now the proof of identity.
   await supabase.from('auth_sessions').delete().eq('id', data.id);
+
+  // Stitch: bind every prior anonymous event + saved_search this
+  // browser fired to the now-known user. This is what makes the
+  // founder's per-visitor view show "this anonymous person looked at
+  // 5 listings BEFORE signing up". Best-effort — failures here don't
+  // block login.
+  const anonId = await readAnonIdServer();
+  if (anonId) {
+    try {
+      await Promise.all([
+        supabase
+          .from('events')
+          .update({ user_id: data.user_id })
+          .eq('anon_id', anonId)
+          .is('user_id', null),
+        supabase
+          .from('saved_searches')
+          .update({ user_id: data.user_id })
+          .eq('anon_id', anonId)
+          .is('user_id', null),
+      ]);
+    } catch (err) {
+      console.error('anon→user stitch failed (non-fatal):', err);
+    }
+  }
 
   const res = NextResponse.json({ status: 'completed' });
   res.cookies.set(SESSION_COOKIE, sessionId, sessionCookieOptions());

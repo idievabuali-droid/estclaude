@@ -12,6 +12,7 @@ import { SaveToggle } from './SaveToggle';
 import { FEATURES } from '@/lib/feature-flags';
 import { PriceConversion } from './PriceConversion';
 import { StageInfoPopover } from './StageInfoPopover';
+import { track } from '@/lib/analytics/track';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import type { ExchangeRates, SupportedCurrency } from '@/services/currency';
 
@@ -62,6 +63,12 @@ export function BuildingCard({
   return (
     <Link
       href={`/zhk/${building.slug}`}
+      onClick={() =>
+        track('building_card_click', {
+          building_id: building.id,
+          building_slug: building.slug,
+        })
+      }
       className={cn(
         'group flex flex-col overflow-hidden rounded-md border border-stone-200 bg-white transition-colors',
         'hover:border-stone-300 hover:shadow-sm',

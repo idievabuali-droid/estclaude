@@ -42,3 +42,6 @@ export { CurrencyPicker } from './CurrencyPicker';
 export type { CurrencyPickerProps } from './CurrencyPicker';
 export { PriceConversion } from './PriceConversion';
 export type { PriceConversionProps } from './PriceConversion';
+export { PageView } from './PageView';
+export { SearchTracker } from './SearchTracker';
+export type { SearchTrackerProps } from './SearchTracker';

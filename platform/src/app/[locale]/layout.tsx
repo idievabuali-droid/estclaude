@@ -5,8 +5,9 @@ import { routing } from '@/i18n/routing';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
-import { CompareBar } from '@/components/blocks';
+import { CompareBar, PageView } from '@/components/blocks';
 import { AppToaster } from '@/components/primitives';
+import { Suspense } from 'react';
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -35,6 +36,13 @@ export default async function LocaleLayout({
       <MobileBottomNav />
       <CompareBar />
       <AppToaster />
+      {/* PageView fires `page_view` analytics events on every route
+          change. Wrapped in Suspense because useSearchParams() needs
+          a suspense boundary in the App Router for static rendering
+          to keep working. */}
+      <Suspense fallback={null}>
+        <PageView />
+      </Suspense>
     </NextIntlClientProvider>
   );
 }

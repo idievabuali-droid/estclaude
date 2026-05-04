@@ -2,7 +2,7 @@ import { ChevronLeft } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
-import { ListingCard } from '@/components/blocks';
+import { ListingCard, SearchTracker } from '@/components/blocks';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { getExchangeRates } from '@/services/currency';
 import { listListings } from '@/services/listings';
@@ -103,6 +103,11 @@ export default async function KvartiryPage({
 
   return (
     <>
+      {/* Same purpose as the SearchTracker on /novostroyki — fires
+          search_run + search_no_results when the user lands on a
+          filtered URL. Skips bare /kvartiry visits (page_view covers
+          those). */}
+      <SearchTracker page="kvartiry" filters={sp} resultCount={filtered.length} />
       <section className="border-b border-stone-200 bg-white">
         <AppContainer className="flex flex-col gap-4 py-5">
           {/* Breadcrumb back to the building detail page — only shown

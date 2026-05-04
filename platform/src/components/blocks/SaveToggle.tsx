@@ -5,6 +5,7 @@ import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { useRouter, usePathname } from '@/i18n/navigation';
 import { toast } from '@/components/primitives/AppToast';
 import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/track';
 
 export interface SaveToggleProps {
   type: 'building' | 'listing';
@@ -59,6 +60,7 @@ export function SaveToggle({ type, id, className }: SaveToggleProps) {
     e.stopPropagation();
 
     if (authenticated === false) {
+      track('save_attempt_logged_out', { type, target_id: id });
       toast.info('Войдите, чтобы сохранять', {
         action: {
           label: 'Войти через Telegram',

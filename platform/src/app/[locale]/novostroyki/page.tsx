@@ -2,7 +2,7 @@ import { Map as MapIcon, List, ArrowLeft } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
-import { BuildingCard, MapView } from '@/components/blocks';
+import { BuildingCard, MapView, SearchTracker } from '@/components/blocks';
 import {
   listBuildings,
   getBuildingBySlug,
@@ -171,6 +171,11 @@ export default async function NovostroykiPage({
 
   return (
     <>
+      {/* Fire search_run / search_no_results events for analytics. The
+          tracker dedupes via JSON of (filters + count) so React strict
+          mode doesn't double-fire, and skips when no filters are set
+          (a bare /novostroyki visit is a page_view, not a search). */}
+      <SearchTracker page="novostroyki" filters={sp} resultCount={filtered.length} />
       <section className="border-b border-stone-200 bg-white">
         <AppContainer className="flex flex-col gap-4 py-5">
           <div className="flex items-end justify-between gap-3">
