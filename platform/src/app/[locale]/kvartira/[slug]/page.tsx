@@ -10,7 +10,7 @@ import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppChip } from '@/components/primitives';
-import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle, MiniMap } from '@/components/blocks';
+import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle, ShareButton, MiniMap } from '@/components/blocks';
 import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgoLong } from '@/lib/format';
@@ -49,11 +49,34 @@ export async function generateMetadata({
   const data = await getListing(slug);
   if (!data) return {};
   const { listing, building } = data;
-  const title = `${listing.rooms_count}-комн ${formatM2(listing.size_m2)} в ${building.name.ru}`;
+  // Title carries the price up front — WhatsApp/Telegram link previews
+  // are most useful when the price is visible without tapping. Saidakbar
+  // forwards to Hilola; the preview itself should answer "is this in
+  // budget?" before she opens the link.
+  const priceTjs = Math.round(Number(listing.price_total_dirams) / 100);
+  const priceFmt = new Intl.NumberFormat('ru-RU').format(priceTjs);
+  const title = `${listing.rooms_count}-комн ${formatM2(listing.size_m2)} · ${priceFmt} TJS · ${building.name.ru}`;
+  const description = listing.unit_description.ru || `${listing.rooms_count}-комн в ${building.name.ru}, ${formatM2(listing.size_m2)}, ${formatFloor(listing.floor_number, listing.total_floors)}.`;
+  // OG image: cover photo when uploaded, falls back to nothing (the
+  // chat client will use its default behaviour). next-intl + Next 16
+  // resolve relative URLs against the metadataBase, so an absolute URL
+  // is needed here for cross-app previews.
+  const ogImages = listing.cover_photo_url ? [{ url: listing.cover_photo_url }] : undefined;
   return {
     title,
-    description: listing.unit_description.ru,
-    openGraph: { title, description: listing.unit_description.ru },
+    description,
+    openGraph: {
+      title,
+      description,
+      images: ogImages,
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: ogImages?.map((i) => i.url),
+    },
   };
 }
 
@@ -154,11 +177,17 @@ export default async function ListingDetailPage({
           />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-stone-900/65 via-stone-900/15 to-transparent" />
-        {/* Save heart top-right of hero — was missing before, so deep-
-            link visitors had to scroll to "Похожие" cards 2000px down
-            to save. Same SaveToggle the cards use, so anon flow falls
-            through to localStorage automatically. */}
-        <div className="absolute right-3 top-3 z-10 md:right-5 md:top-5">
+        {/* Save + Share top-right of hero. Share was the biggest
+            multi-decision-maker friction (Saidakbar→Hilola, Madina→
+            parents, Faridun→Zarrina): URL had to be copied by hand
+            because there was no share affordance anywhere. Native share
+            sheet on mobile, WhatsApp/Telegram/copy menu on desktop. */}
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-2 md:right-5 md:top-5">
+          <ShareButton
+            compact
+            text={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} в ${building.name.ru}`}
+            title={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
+          />
           <SaveToggle type="listing" id={listing.id} />
         </div>
         <div className="absolute bottom-0 left-0 right-0">

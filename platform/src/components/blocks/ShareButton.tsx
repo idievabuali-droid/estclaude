@@ -5,12 +5,18 @@ import { Share2, MessageCircle, Send, Link2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface ShareButtonProps {
-  /** Absolute URL to share. Should include https://. */
-  url: string;
+  /** Absolute URL to share. Should include https://. When omitted, the
+   *  button reads `window.location.href` at click time so callers can
+   *  drop it on any page without plumbing the URL through. */
+  url?: string;
   /** Pre-filled text for chat apps that accept it. */
   text?: string;
   /** Title for native share sheet. */
   title?: string;
+  /** Compact icon-only round button — used in /kvartira + /zhk hero
+   *  next to SaveToggle so the two visual weights match. Default false
+   *  shows the labeled "Поделиться" button used in toolbar contexts. */
+  compact?: boolean;
   className?: string;
 }
 
@@ -30,7 +36,16 @@ export interface ShareButtonProps {
  * popular but has no public deep-link spec — buyers using IMO pick it
  * from the native share sheet on mobile.
  */
-export function ShareButton({ url, text = '', title, className }: ShareButtonProps) {
+export function ShareButton({ url: urlProp, text = '', title, compact = false, className }: ShareButtonProps) {
+  // Resolve the URL at click time when the caller didn't pass one — lets
+  // server components drop <ShareButton compact /> in a hero without
+  // having to plumb the absolute URL through. Using window.location is
+  // safe here because the menu opens on user interaction, never on SSR.
+  function resolveUrl(): string {
+    if (urlProp) return urlProp;
+    if (typeof window !== 'undefined') return window.location.href;
+    return '';
+  }
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -55,6 +70,7 @@ export function ShareButton({ url, text = '', title, className }: ShareButtonPro
   }, [copied]);
 
   async function handleClick() {
+    const url = resolveUrl();
     // Try the native share sheet first — best UX on mobile because the
     // buyer picks any installed app (IMO, WhatsApp, Telegram, SMS, mail).
     if (typeof navigator !== 'undefined' && 'share' in navigator) {
@@ -70,6 +86,7 @@ export function ShareButton({ url, text = '', title, className }: ShareButtonPro
   }
 
   async function handleCopy() {
+    const url = resolveUrl();
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
@@ -80,11 +97,13 @@ export function ShareButton({ url, text = '', title, className }: ShareButtonPro
     }
   }
 
-  // Build the channel deep-links once so the menu render is cheap.
+  // Build the channel deep-links lazily inside the render so each open
+  // reads the current URL — caller-less ShareButton picks up SPA route
+  // changes without re-mounting.
+  const url = resolveUrl();
   const encodedUrl = encodeURIComponent(url);
   const encodedText = encodeURIComponent(text ? `${text}\n${url}` : url);
   const whatsappHref = `https://wa.me/?text=${encodedText}`;
-  // Telegram's /share/url accepts both url and text params.
   const telegramHref = `https://t.me/share/url?url=${encodedUrl}&text=${encodeURIComponent(text || title || '')}`;
 
   return (
@@ -94,10 +113,15 @@ export function ShareButton({ url, text = '', title, className }: ShareButtonPro
         onClick={handleClick}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="inline-flex h-9 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-meta font-medium text-stone-900 transition-colors hover:border-stone-400 hover:bg-stone-50"
+        aria-label={compact ? 'Поделиться' : undefined}
+        className={
+          compact
+            ? 'inline-flex size-9 items-center justify-center rounded-full bg-white/90 text-stone-700 transition-colors hover:bg-white hover:text-terracotta-600'
+            : 'inline-flex h-9 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-meta font-medium text-stone-900 transition-colors hover:border-stone-400 hover:bg-stone-50'
+        }
       >
         <Share2 className="size-4" aria-hidden />
-        <span>Поделиться</span>
+        {compact ? null : <span>Поделиться</span>}
       </button>
 
       {open ? (

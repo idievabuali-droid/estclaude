@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { MapPin, Calendar, Layers, Users, Camera, ArrowUpRight, BadgeCheck } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
@@ -15,6 +16,8 @@ import {
   BuildingStageProgress,
   PriceConversion,
   MiniMap,
+  ShareButton,
+  SaveToggle,
 } from '@/components/blocks';
 import { getBuilding, getDeveloperStats } from '@/services/buildings';
 import { getDistrictBenchmark } from '@/services/benchmarks';
@@ -54,6 +57,44 @@ const APARTMENTS_PREVIEW_LIMIT = 6;
  * and description was removed — three surfaces of the same info read
  * as defensive, and "Trust block" duplicated the developer card below.
  */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const data = await getBuilding(slug);
+  if (!data) return {};
+  const { building, developer, district } = data;
+  // Title carries enough info for a useful WhatsApp/Telegram preview:
+  // building name + district + price floor (if known) tells Hilola
+  // whether to bother opening the link.
+  const priceFromTjs = building.price_from_dirams
+    ? Math.round(Number(building.price_from_dirams) / 100)
+    : null;
+  const priceFmt = priceFromTjs
+    ? new Intl.NumberFormat('ru-RU').format(priceFromTjs)
+    : null;
+  const title = priceFmt
+    ? `${building.name.ru} · ${district.name.ru} · от ${priceFmt} TJS`
+    : `${building.name.ru} · ${district.name.ru}`;
+  const description = `${developer.display_name.ru}${
+    developer.is_verified ? ' (проверенный застройщик)' : ''
+  }. ${building.address.ru}.`;
+  const ogImages = building.cover_photo_url ? [{ url: building.cover_photo_url }] : undefined;
+  return {
+    title,
+    description,
+    openGraph: { title, description, images: ogImages, type: 'website' },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: ogImages?.map((i) => i.url),
+    },
+  };
+}
+
 export default async function BuildingDetailPage({
   params,
 }: {
@@ -104,6 +145,17 @@ export default async function BuildingDetailPage({
           <span className="inline-flex w-fit items-center gap-1 rounded-sm bg-white/90 px-2 py-1 text-caption font-medium text-stone-900">
             {STAGE_INFO[building.status].label}
           </span>
+        </div>
+        {/* Save + Share top-right of hero — same pattern as /kvartira
+            so multi-decision-maker buyers (couples, families abroad)
+            can save AND share with one tap, no URL copy-paste. */}
+        <div className="absolute right-3 top-3 flex items-center gap-2 md:right-5 md:top-5">
+          <ShareButton
+            compact
+            text={`ЖК ${building.name.ru} · ${district.name.ru}`}
+            title={building.name.ru}
+          />
+          <SaveToggle type="building" id={building.id} />
         </div>
         <div className="absolute bottom-0 left-0 right-0">
           <AppContainer className="pb-4 md:pb-5">
