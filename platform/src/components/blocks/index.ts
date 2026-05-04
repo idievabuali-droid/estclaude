@@ -57,3 +57,5 @@ export { MarkSavedItemsSeen } from './MarkSavedItemsSeen';
 export { ListingTrustSignals } from './ListingTrustSignals';
 export type { ListingTrustSignalsProps } from './ListingTrustSignals';
 export { AnonSavedView } from './AnonSavedView';
+export { SortChip } from './SortChip';
+export type { SortMode } from './SortChip';

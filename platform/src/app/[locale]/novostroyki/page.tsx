@@ -2,7 +2,7 @@ import { Map as MapIcon, List, ArrowLeft, X } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
-import { BuildingCard, LocationSearch, MapView, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion } from '@/components/blocks';
+import { BuildingCard, LocationSearch, MapView, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion, SortChip } from '@/components/blocks';
 import {
   listBuildings,
   getBuildingBySlug,
@@ -158,6 +158,7 @@ export default async function NovostroykiPage({
     nearLat,
     nearLng,
     nearRadiusM: nearRadius,
+    sort: sp.sort,
   });
 
   const cards = await Promise.all(
@@ -304,6 +305,7 @@ export default async function NovostroykiPage({
                 options={AMENITIES_FILTERS}
                 current={sp}
               />
+              <SortChip pagePath="/novostroyki" current={sp} />
             </div>
           </div>
         </AppContainer>

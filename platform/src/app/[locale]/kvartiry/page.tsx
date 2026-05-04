@@ -2,7 +2,7 @@ import { ChevronLeft, X } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
-import { ListingCard, LocationSearch, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion } from '@/components/blocks';
+import { ListingCard, LocationSearch, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion, SortChip, type SortMode } from '@/components/blocks';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { getExchangeRates } from '@/services/currency';
 import { listListings } from '@/services/listings';
@@ -13,6 +13,7 @@ import type { FinishingType, SourceType } from '@/types/domain';
 import { PriceChip } from './PriceChip';
 import { SizeChip } from './SizeChip';
 import { MultiSelectChip } from './MultiSelectChip';
+import { MonthlyChip } from './MonthlyChip';
 
 // Source filter (developer/owner/intermediary) hidden in V1 — every
 // listing currently comes from the founder, so the filter has nothing
@@ -51,6 +52,11 @@ type SearchParams = {
   near_lng?: string;
   near_label?: string;
   radius?: string;
+  /** Max monthly installment payment in TJS — installment-decisive
+   *  buyers think in monthly, not total. */
+  monthly_to?: string;
+  /** Sort mode — see SortChip / ListingFilters.sort. */
+  sort?: SortMode;
 };
 
 export default async function KvartiryPage({
@@ -84,10 +90,14 @@ export default async function KvartiryPage({
     priceTo: sp.price_to ? BigInt(parseInt(sp.price_to, 10) * 100) : null,
     sizeFrom: sp.size_from ? parseFloat(sp.size_from) : null,
     sizeTo: sp.size_to ? parseFloat(sp.size_to) : null,
+    maxMonthlyDirams: sp.monthly_to
+      ? BigInt(parseInt(sp.monthly_to, 10) * 100)
+      : null,
     buildingId: scopedBuilding?.id,
     nearLat,
     nearLng,
     nearRadiusM: nearRadius,
+    sort: sp.sort,
   });
 
   // Pre-fetch building + developer + benchmark for each card
@@ -194,6 +204,7 @@ export default async function KvartiryPage({
                 current={sp}
               />
               <PriceChip current={sp} />
+              <MonthlyChip current={sp} />
               <SizeChip current={sp} />
               <MultiSelectChip
                 label="Отделка"
@@ -201,6 +212,7 @@ export default async function KvartiryPage({
                 options={FINISHING_FILTERS}
                 current={sp}
               />
+              <SortChip pagePath="/kvartiry" current={sp} />
             </div>
           </div>
         </AppContainer>
@@ -277,7 +289,8 @@ function hasActiveFiltersK(sp: SearchParams): boolean {
       sp.price_from ||
       sp.price_to ||
       sp.size_from ||
-      sp.size_to,
+      sp.size_to ||
+      sp.monthly_to,
   );
 }
 
@@ -288,6 +301,7 @@ function countActiveFiltersK(sp: SearchParams): number {
   if (sp.finishing) n++;
   if (sp.price_from || sp.price_to) n++;
   if (sp.size_from || sp.size_to) n++;
+  if (sp.monthly_to) n++;
   return n;
 }
 
@@ -308,16 +322,20 @@ function buildKvartiryQueryWithoutNear(sp: SearchParams): string {
 function buildRelaxOptionsKvartiry(
   sp: SearchParams,
 ): Array<{ paramKey: string; label: string }> {
+  // Same priority as /novostroyki — soft preferences before hard
+  // constraints (price/rooms). Faridun won't relax his price ceiling
+  // by accident.
   const opts: Array<{ paramKey: string; label: string }> = [];
-  if (sp.price_from || sp.price_to) {
-    opts.push({ paramKey: sp.price_to ? 'price_to' : 'price_from', label: 'Цена' });
-  }
+  if (sp.finishing) opts.push({ paramKey: 'finishing', label: 'Отделка' });
   if (sp.size_from || sp.size_to) {
     opts.push({ paramKey: sp.size_to ? 'size_to' : 'size_from', label: 'Площадь' });
   }
-  if (sp.finishing) opts.push({ paramKey: 'finishing', label: 'Отделка' });
-  if (sp.rooms) opts.push({ paramKey: 'rooms', label: 'Комнат' });
+  if (sp.monthly_to) opts.push({ paramKey: 'monthly_to', label: 'В рассрочку' });
   if (sp.source) opts.push({ paramKey: 'source', label: 'Источник' });
+  if (sp.rooms) opts.push({ paramKey: 'rooms', label: 'Комнат' });
+  if (sp.price_from || sp.price_to) {
+    opts.push({ paramKey: sp.price_to ? 'price_to' : 'price_from', label: 'Цена' });
+  }
   return opts.slice(0, 3);
 }
 

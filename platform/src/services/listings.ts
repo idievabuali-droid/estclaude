@@ -34,12 +34,21 @@ export type ListingFilters = {
   sizeFrom?: number | null;
   /** Max apartment size in m². */
   sizeTo?: number | null;
+  /** Max monthly installment payment in dirams. Filters to listings
+   *  with installment_available=true AND monthly_amount ≤ cap. Faridun
+   *  thinks "I can pay 4 000 TJS/month" — that's the actual mental
+   *  model for installment-decisive buyers. */
+  maxMonthlyDirams?: bigint | null;
   buildingId?: string;
   /** Lat/lng + radius from LocationSearch. Resolved at the service
    *  by pre-filtering buildings, then scoping listings to those ids. */
   nearLat?: number | null;
   nearLng?: number | null;
   nearRadiusM?: number | null;
+  /** Result ordering. Default 'recommended' = the existing trust-tier
+   *  cascade. 'cheapest' / 'expensive' sort by price_total_dirams.
+   *  'newest' sorts by published_at desc. */
+  sort?: 'recommended' | 'cheapest' | 'expensive' | 'newest';
 };
 
 const TIER_RANK: Record<string, number> = {
@@ -68,6 +77,11 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
   if (filters.priceTo) q = q.lte('price_total_dirams', Number(filters.priceTo));
   if (filters.sizeFrom != null) q = q.gte('size_m2', filters.sizeFrom);
   if (filters.sizeTo != null) q = q.lte('size_m2', filters.sizeTo);
+  if (filters.maxMonthlyDirams != null) {
+    q = q
+      .eq('installment_available', true)
+      .lte('installment_monthly_amount_dirams', Number(filters.maxMonthlyDirams));
+  }
   if (filters.buildingId) q = q.eq('building_id', filters.buildingId);
 
   // Radius filter: pre-resolve which buildings are within the radius
@@ -128,6 +142,26 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
       .map((d) => d.id),
   );
 
+  // Sort:
+  //   - 'cheapest' / 'expensive' → strict price order (no trust tier)
+  //   - 'newest' → published_at descending
+  //   - default 'recommended' → trust tier first, then newest
+  const sortMode = filters.sort ?? 'recommended';
+  if (sortMode === 'cheapest') {
+    return [...listings].sort((a, b) =>
+      a.price_total_dirams < b.price_total_dirams ? -1 : 1,
+    );
+  }
+  if (sortMode === 'expensive') {
+    return [...listings].sort((a, b) =>
+      a.price_total_dirams > b.price_total_dirams ? -1 : 1,
+    );
+  }
+  if (sortMode === 'newest') {
+    return [...listings].sort((a, b) =>
+      a.published_at < b.published_at ? 1 : -1,
+    );
+  }
   return [...listings].sort((a, b) => {
     const aDevVer =
       a.source_type === 'developer' && verifiedDevs.has(buildingToDevId.get(a.building_id) ?? '');

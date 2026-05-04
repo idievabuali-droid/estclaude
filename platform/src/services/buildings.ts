@@ -67,6 +67,10 @@ export type BuildingFilters = {
   nearLat?: number | null;
   nearLng?: number | null;
   nearRadiusM?: number | null;
+  /** Result ordering for /novostroyki. Default = current "featured
+   *  first" cascade. 'cheapest' / 'expensive' use price_from_dirams
+   *  (the cheapest unit's total). 'newest' uses created_at desc. */
+  sort?: 'recommended' | 'cheapest' | 'expensive' | 'newest';
   city?: 'dushanbe' | 'vahdat';
   q?: string;
 };
@@ -274,6 +278,24 @@ export async function listBuildings(filters: BuildingFilters = {}): Promise<Mock
       });
     });
   }
+
+  // Sort override. Default keeps the SQL order (featured_rank first).
+  const sortMode = filters.sort ?? 'recommended';
+  if (sortMode === 'cheapest') {
+    buildings = [...buildings].sort((a, b) => {
+      const ap = a.price_from_dirams ?? BigInt(Number.MAX_SAFE_INTEGER);
+      const bp = b.price_from_dirams ?? BigInt(Number.MAX_SAFE_INTEGER);
+      return ap < bp ? -1 : 1;
+    });
+  } else if (sortMode === 'expensive') {
+    buildings = [...buildings].sort((a, b) => {
+      const ap = a.price_from_dirams ?? BigInt(0);
+      const bp = b.price_from_dirams ?? BigInt(0);
+      return ap > bp ? -1 : 1;
+    });
+  }
+  // 'newest' would need created_at on buildings; deferred until the
+  // rowToBuilding mapper plumbs it through. Sort 'recommended' = SQL.
 
   return buildings;
 }

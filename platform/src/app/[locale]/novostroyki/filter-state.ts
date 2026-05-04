@@ -48,6 +48,8 @@ export type FilterParams = {
   near_lng?: string;
   near_label?: string;
   radius?: string;
+  /** Sort mode for the result list — see SortChip + BuildingFilters.sort. */
+  sort?: 'recommended' | 'cheapest' | 'expensive' | 'newest';
 };
 
 /** Read a CSV param as a Set for membership checks + toggling. */
