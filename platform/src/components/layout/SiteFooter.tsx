@@ -97,6 +97,23 @@ export function SiteFooter() {
             Команда платформы вычитывает каждое объявление перед публикацией.
           </span>
         </div>
+        {/* License-compliant attribution. We removed the in-map (i)
+            indicator on every embedded map (it confused buyers on
+            real iPhone). OpenStreetMap's ODbL requires "reasonable
+            means" of attribution — a single discrete footer line
+            visible site-wide qualifies and keeps the maps clean. */}
+        <p className="text-caption text-stone-400">
+          Карты —{' '}
+          <a
+            href="https://www.openstreetmap.org/copyright"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-stone-600 hover:underline"
+          >
+            данные © OpenStreetMap
+          </a>
+          , плитки © OpenFreeMap.
+        </p>
       </AppContainer>
     </footer>
   );

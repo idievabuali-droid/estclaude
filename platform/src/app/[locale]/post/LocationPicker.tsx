@@ -65,7 +65,9 @@ export function LocationPicker({
       style: 'https://tiles.openfreemap.org/styles/liberty',
       center: [startLng, startLat],
       zoom: 14,
-      attributionControl: { compact: true },
+      // In-map (i) attribution removed — license attribution lives
+      // in the SiteFooter alongside the © year.
+      attributionControl: false,
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 

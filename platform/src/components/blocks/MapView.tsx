@@ -226,7 +226,10 @@ export function MapView({
       style: 'https://tiles.openfreemap.org/styles/liberty',
       center: VAHDAT_CENTER,
       zoom: 13,
-      attributionControl: { compact: true },
+      // No in-map (i) attribution — the user flagged the icon as
+      // confusing on real iPhone. License-compliant attribution
+      // lives in the SiteFooter ("Карты — OpenStreetMap").
+      attributionControl: false,
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     mapRef.current = map;

@@ -42,8 +42,8 @@ export function NearbyPois({ pois }: NearbyPoisProps) {
       <div className="flex flex-col gap-1">
         <h2 className="text-h2 font-semibold text-stone-900">Что рядом</h2>
         <p className="text-meta text-stone-500">
-          Ближайшие места рядом с домом. Расстояния по прямой; время — пешком.
-          Источник — OpenStreetMap.
+          Ближайшие места рядом с домом. Расстояния по прямой, время —
+          пешком.
         </p>
       </div>
 
