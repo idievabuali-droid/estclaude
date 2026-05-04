@@ -6,6 +6,41 @@ Newest at top.
 
 ---
 
+## 2026-05-04 · Audit-driven fixes (commits 5b6a5b2 / 07473af / d79c4f4)
+
+**What changed:** ran a full audit + walkthrough vs `CLAUDE.md` + `AI_CONTRACT.md`, then shipped three commits of fixes.
+
+**Why:** the audit found that long-standing code (header, mobile nav, cards, V1-cut routes) had been treated as "must be fine" while only my recent work was being critiqued. Once I actually browsed every page as the relevant role, real bugs appeared.
+
+**What it affects:**
+- **Auth-aware nav**: `SiteHeader` is now an async server component that branches on `getCurrentUser()` — anonymous see Войти, logged-in see Кабинет. Mobile-only Search button stub deleted (V1 doesn't need site-wide search). `MobileBottomNav` takes `isAuthenticated` prop from layout — anonymous see Войти + LogIn icon instead of Кабинет (which would just bounce to /voyti).
+- **V1-cut routes return 404**: `/verifikatsiya/tier-2`, `/verifikatsiya/tier-3` now `notFound()` server-side instead of rendering full multi-step flows. Code preserved for re-enable.
+- **Founder Telegram handle fixed**: was `@zhk_tj_bot` (the auth bot, no human reads it) → now `@idievabuali`. ContactCard's Telegram CTA now lands in a real conversation.
+- **Mobile card overflow fixed**: ListingCard + BuildingCard address chips had `w-fit` only, causing internal horizontal scroll inside cards on 375px. Added `max-w-full` + `min-w-0` on the truncate wrapper.
+- **Analytics dashboard hardening**:
+  - `/api/events` adds event_type whitelist + per-anon in-memory rate limit (60/min)
+  - `/api/saved-searches/save` adds 30-search cap per anon (returns 429 above)
+  - Funnel split: was one bucket "Связались / сохранили" lumping save-search / callback / contact-click. Now three sub-counters because they represent very different intent levels.
+  - Top quartira / Top ЖК / "Чаще всего смотрели" / district list in buyer profile all show human Russian names instead of slugs (batched lookups in the server component).
+  - 0-result rows are now `<Link>`s to `/novostroyki?<filters>` so the operator can jump straight to "what we currently have for these filters".
+- **Filter logic extracted to `lib/filters/{listings,buildings}.ts`**: matcher (lib/saved-searches/match.ts) used to inline the per-row predicates, creating a drift hazard with the SQL bulk path in services/. Now both can call into the same predicates as services adopts them.
+- **`notifyMatchingListing` is idempotent**: was sending Telegram messages then updating `last_seen_listing_id`. A retry sent duplicates. Now claims the row first, then sends. Trade: a send failure after the claim means the buyer doesn't get that match (acceptable at V1 volume).
+- **Seller phone fallback**: services/listings.ts no longer hardcodes the founder's number — reads `FOUNDER_CONTACTS.phone` and logs a console.warn when the fallback fires (so silent FK breakage becomes visible).
+
+**Anti-pattern locked out**: "audit by reading code, not by browsing." `CLAUDE.md` now says: navigate the rendered app as the relevant user role, do mobile resize tests, compare to mature platforms with their pages actually open. Skipping the navigation step misses whole-page bugs (header auth state, mobile-bottom-nav vs desktop nav, card-scroll-overflow at 375px).
+
+**Deferred (intentionally — track for next batch):**
+- RangeInput primitive to replace raw `<input>` in PriceChip / SizeChip (audit finding 9)
+- Slim SiteFooter → fuller (contact info, terms/privacy, "О нас")
+- Card structure overhaul vs Cian (photo carousel + counter, total-price hierarchy on building card, inline contact CTAs, posted-ago + absolute date) — these are bigger refactors, ship after we see real user behaviour
+- View count + price history exposed to buyers (audit findings 0k + 0l) — high-value trust signals but multi-step
+- /izbrannoe "Все" tab (audit finding 0i)
+- /kvartira sticky sub-section nav (audit finding 0j)
+- Per-page metadata exports / SEO titles (audit finding 0n)
+- Components from cut features (VerificationBadge, CompareBar, etc.) still in `components/blocks/` — move or delete in a cleanup pass
+
+---
+
 ## 2026-05-04 · Analytics rebuild: decision-ready, not data-dump
 
 **What changed:** First analytics dashboard (commits `47cc956` / `e72edee` / `0ba13e1`) shipped raw counts + JSON event blobs. Replaced with a decision-ready operator view (`bf32fc7`).
