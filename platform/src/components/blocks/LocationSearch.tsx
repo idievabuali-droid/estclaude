@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Search, MapPin, School, Building2, ShoppingCart, Bus, Stethoscope, Pill, Trees, Landmark } from 'lucide-react';
+import { Search, MapPin, School, Building2, ShoppingCart, Bus, Stethoscope, Pill, Trees, Landmark, UtensilsCrossed, Banknote, Fuel, Dumbbell, Star, Building } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 
 interface PoiHit {
@@ -25,6 +25,16 @@ const KIND_ICON: Record<string, typeof MapPin> = {
   park: Trees,
   square: Landmark,
   street: MapPin,
+  // Added in the second-seed pass for the Saidakbar/Faridun audit
+  // gaps — buyers couldn't find "Модар" statue, restaurants,
+  // stations, banks, gas, gyms by name.
+  restaurant: UtensilsCrossed,
+  bank: Banknote,
+  fuel: Fuel,
+  sport: Dumbbell,
+  landmark: Star,
+  culture: Star,
+  government: Building,
 };
 
 const KIND_LABEL: Record<string, string> = {
@@ -38,6 +48,13 @@ const KIND_LABEL: Record<string, string> = {
   park: 'Парк',
   square: 'Площадь',
   street: 'Улица',
+  restaurant: 'Кафе / ресторан',
+  bank: 'Банк',
+  fuel: 'Заправка',
+  sport: 'Спорт',
+  landmark: 'Достопримечательность',
+  culture: 'Культура',
+  government: 'Госучреждение',
 };
 
 export interface LocationSearchProps {
