@@ -35,6 +35,14 @@ export type FilterParams = {
    *  default back-link goes to the building itself. */
   from?: string;
   fromSlug?: string;
+  /** LocationSearch state — when present, results are filtered to a
+   *  radius around the given lat/lng. `near_label` is the human name
+   *  rendered in the "Рядом с X" header. `radius` defaults to 1500m
+   *  if missing. */
+  near_lat?: string;
+  near_lng?: string;
+  near_label?: string;
+  radius?: string;
 };
 
 /** Read a CSV param as a Set for membership checks + toggling. */

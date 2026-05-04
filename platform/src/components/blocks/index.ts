@@ -51,3 +51,5 @@ export { CallbackWidget } from './CallbackWidget';
 export type { CallbackWidgetProps } from './CallbackWidget';
 export { FilterRelaxSuggestion } from './FilterRelaxSuggestion';
 export type { FilterRelaxSuggestionProps } from './FilterRelaxSuggestion';
+export { LocationSearch } from './LocationSearch';
+export type { LocationSearchProps } from './LocationSearch';

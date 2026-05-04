@@ -6,6 +6,39 @@ Newest at top.
 
 ---
 
+## 2026-05-04 · Browse-by-location + anon-friendliness (commits 07a6a84 / c42f7e0 / TBD)
+
+**What changed:** three commits reshape how a first-time anonymous Madina actually starts looking.
+
+1. **Demo photos seed** (`07a6a84`). Buildings + listings had placeholder cards. Wired Unsplash CDN URLs through `supabasePublicUrl` (it now passes `http(s)://` URLs through unchanged) and seeded 6 buildings + 25 listings with real-looking photos via `scripts/seed-mock-photos.mjs`. Also flipped `BuildingCard` to lead with the total "от X TJS" instead of per-m² (Cian comparison: total is what first-time browsers think in). Removable when real seller uploads dominate.
+
+2. **Anonymous saves via localStorage** (`c42f7e0`). Hearts on cards used to require login — anonymous taps lost the save. Now `SaveToggle` writes to `localStorage` (`zhktj.anon_saves.v1`) when no user; the heart stays filled across reloads, a toast says "Сохранено в этом браузере" with a "Войти" action. On login `/api/auth/poll` triggers `migrateAnonSavesToUser()` which POSTs to `/api/saved/migrate-anon`, dedupes via the existing unique constraint on `saved_items`. Acceptable V1 limitation: single-device only. Also added `FilterRelaxSuggestion` block — when results ≤1 with ≥2 filters active, surfaces 1-tap "Снять «X»" buttons.
+
+3. **POI search end-to-end** (TBD). Replaces the "Новостройки vs Квартиры" entry-point confusion with a search-first hero. Schema: `pois` table (`0017_pois.sql`) with `pg_trgm` GIN index on `name->>'ru'` for fast substring autocomplete. Seed: one-shot Overpass query for the Vahdat bbox (`scripts/seed-vahdat-pois.mjs`) — mosques / schools / markets / hospitals / pharmacies / parks / squares / named streets, with popularity boosts for known landmarks (Дусти, Гулистон, Истиқлол, Сомони, Айни, Бухоро). Service: `searchPois()` and `getPoiById()`. Endpoint: `/api/pois/search?q=`. Component: `LocationSearch` with debounced fetch, keyboard nav, two variants (hero on `/`, compact on `/novostroyki` and `/kvartiry`). Filter wiring: `BuildingFilters` and `ListingFilters` gain `nearLat / nearLng / nearRadiusM`; pages translate URL `near_lat / near_lng / near_label / radius` (defaults 1500m ≈ 15-min walk). On list pages the title swaps to "Рядом с «X»" with `· в радиусе 1.5 км` subtitle and a "× Убрать «X»" link.
+
+**Why:**
+- **Photos**: Madina-the-buyer walkthrough flagged "no photos" as the single biggest trust-killer on browse cards.
+- **Anon saves**: same walkthrough flagged that the auth wall on the heart drops out shopping intent at the cheapest possible action.
+- **POI search**: Madina (and the audit) flagged that "Новостройки" / "Квартиры" / "Все ЖК" speak product-language, not buyer-language. Buyers think "near my mom in Гулистон" not "I want a 2BR under 800K". Cian's hero search box does the same job.
+
+**What it affects:**
+- New table `pois`, new public endpoint `/api/pois/search`, new `services/pois-search.ts`. Storage cost negligible (a few thousand rows, all of Vahdat).
+- Service-layer filter: building radius is computed in-memory after the city scope (V1 has ~50 buildings, fine); listings pre-resolve in-radius building ids then SQL-filter `building_id IN (...)`.
+- Home hero now leads with `LocationSearch` + secondary "или просто:" chip row. The 3 direction chips moved below the search.
+- `/novostroyki` + `/kvartiry` mount `LocationSearch` (compact) above the chip bar; building-scoped `/kvartiry?building=...` hides it (location filter is moot inside one project).
+- `seed-mock-photos.mjs` is a one-shot — re-running is idempotent (already-set covers are skipped).
+- `migrate-anon` endpoint caps at 50 saves per request to bound abuse.
+
+**Anti-pattern locked out:** "speak product taxonomy at the buyer." The browse entry should match how the buyer phrases their need (place names) before falling back to attribute filters.
+
+**Deferred (next batch):**
+- POI map view: render the picked POI as a pin with a 1.5 km radius circle on `?view=karta`.
+- Save the location as part of a saved search (currently `near_*` flows through but the matcher doesn't filter by it — anyone subscribing to "рядом с Гулистон школа" gets all matches in Vahdat).
+- Multi-POI ("near Гулистон школа AND рядом с парком") — V1 keeps single-POI for clarity.
+- Ingest POIs for Dushanbe + other cities when scope expands.
+
+---
+
 ## 2026-05-04 · Audit-driven fixes (commits 5b6a5b2 / 07473af / d79c4f4)
 
 **What changed:** ran a full audit + walkthrough vs `CLAUDE.md` + `AI_CONTRACT.md`, then shipped three commits of fixes.

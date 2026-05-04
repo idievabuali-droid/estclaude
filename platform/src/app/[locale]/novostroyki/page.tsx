@@ -1,8 +1,8 @@
-import { Map as MapIcon, List, ArrowLeft } from 'lucide-react';
+import { Map as MapIcon, List, ArrowLeft, X } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
-import { BuildingCard, MapView, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion } from '@/components/blocks';
+import { BuildingCard, LocationSearch, MapView, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion } from '@/components/blocks';
 import {
   listBuildings,
   getBuildingBySlug,
@@ -135,6 +135,9 @@ export default async function NovostroykiPage({
   // the URL param is still honoured at the service layer so old bookmarks
   // still narrow the result. listDistricts() is no longer needed for
   // rendering since the filter UI is gone.
+  const nearLat = sp.near_lat ? parseFloat(sp.near_lat) : null;
+  const nearLng = sp.near_lng ? parseFloat(sp.near_lng) : null;
+  const nearRadius = sp.radius ? parseInt(sp.radius, 10) : nearLat != null ? 1500 : null;
   const filtered = await listBuildings({
     district: sp.district?.split(','),
     status: sp.status?.split(',') as BuildingStatus[] | undefined,
@@ -148,6 +151,9 @@ export default async function NovostroykiPage({
     handoverYears: sp.handover?.split(','),
     amenities: sp.amenities?.split(','),
     nearbyCategories: sp.nearby?.split(',') as PoiCategory[] | undefined,
+    nearLat,
+    nearLng,
+    nearRadiusM: nearRadius,
   });
 
   const cards = await Promise.all(
@@ -179,10 +185,15 @@ export default async function NovostroykiPage({
       <section className="border-b border-stone-200 bg-white">
         <AppContainer className="flex flex-col gap-4 py-5">
           <div className="flex items-end justify-between gap-3">
-            <div className="flex flex-col gap-1">
-              <h1 className="text-h1 font-semibold text-stone-900">{t('buildings')}</h1>
+            <div className="flex min-w-0 flex-col gap-1">
+              <h1 className="text-h1 font-semibold text-stone-900">
+                {sp.near_label ? `Рядом с «${sp.near_label}»` : t('buildings')}
+              </h1>
               <p className="text-meta text-stone-500 tabular-nums">
                 {filtered.length} {filtered.length === 1 ? 'проект' : 'проектов'}
+                {sp.near_label && nearRadius
+                  ? ` · в радиусе ${(nearRadius / 1000).toFixed(1)} км`
+                  : ''}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -221,6 +232,34 @@ export default async function NovostroykiPage({
               which feels broken. District info still shows on every
               building card (address chip), so buyers can see where
               each project is without needing the filter. */}
+          {/* LocationSearch — same affordance as the home hero. When a
+              POI is already selected the input is pre-populated with the
+              label so the visitor sees what they searched for, and a
+              one-tap "× убрать место" link strips the radius filter
+              without touching the rest of the URL. */}
+          <div className="flex flex-col gap-2">
+            <LocationSearch
+              destinationPath="/novostroyki"
+              variant="compact"
+              initialQuery={sp.near_label ?? ''}
+            />
+            {sp.near_label ? (
+              <Link
+                href={`/novostroyki${buildQuery({
+                  ...sp,
+                  near_lat: undefined,
+                  near_lng: undefined,
+                  near_label: undefined,
+                  radius: undefined,
+                })}`}
+                className="inline-flex w-fit items-center gap-1 text-caption text-stone-500 hover:text-terracotta-700"
+              >
+                <X className="size-3" />
+                Убрать «{sp.near_label}»
+              </Link>
+            ) : null}
+          </div>
+
           {/* Cian-style category chip bar. One chip per filter category
               (Цена / Стадия / Сдача / Удобства / Что рядом). Each chip
               shows its current value summary inline and opens a bottom

@@ -1,7 +1,7 @@
 import { Building, Home as HomeIcon, Globe2 } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { AppContainer } from '@/components/primitives';
-import { BuildingCard, ListingCard } from '@/components/blocks';
+import { BuildingCard, ListingCard, LocationSearch } from '@/components/blocks';
 import { Link } from '@/i18n/navigation';
 import {
   listFeaturedBuildings,
@@ -77,31 +77,34 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
   return (
     <>
-      {/* ─── Hero — slim. Title only, no subtitle, no search. ── */}
-      <section className="border-b border-stone-200 bg-stone-50 py-5">
-        <AppContainer className="flex flex-col gap-4">
+      {/* ─── Hero — title + LocationSearch as the primary entry
+           point. The Madina walkthrough showed buyers got stuck on
+           "what's the difference between Новостройки and Квартиры?"
+           when those were the only entry points. The search box
+           cuts straight to "I want a place near X" which is how
+           buyers actually think. The 3 direction chips remain as a
+           secondary "browse" row underneath for visitors who don't
+           know what to type. */}
+      <section className="border-b border-stone-200 bg-stone-50 py-6 md:py-8">
+        <AppContainer className="flex flex-col gap-5">
           <h1 className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display">
             {t('heroTitle')}
           </h1>
-
-          {/* Direction chips — replaces the previous 3 huge cards.
-              Same icons + labels but compact, inline, no per-chip
-              subtitle / CTA. The labels are self-explanatory and
-              there's only 3 of them, so a chip row is plenty. */}
-          <div className="flex flex-wrap gap-2">
+          <div className="max-w-2xl">
+            <LocationSearch destinationPath="/novostroyki" variant="hero" />
+            <p className="mt-2 text-caption text-stone-500">
+              Введите название района, ЖК, школы, мечети или адрес — мы покажем квартиры рядом.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-caption font-medium text-stone-500">или просто:</span>
             <DirectionChip
               href="/novostroyki"
               Icon={Building}
-              label="Новостройки"
+              label="Все новостройки"
               tone="terracotta"
             />
-            <DirectionChip href="/kvartiry" Icon={HomeIcon} label="Квартиры" tone="stone" />
-            {/* Label is "Я за границей" — first-person, no jargon, so
-                a Tajik abroad immediately reads "that's me, that's
-                where I should click". Earlier drafts ("Из-за рубежа",
-                "Для диаспоры") either sounded like real estate FROM
-                abroad or used a word ("диаспора") that everyday
-                buyers don't always parse on first read. */}
+            <DirectionChip href="/kvartiry" Icon={HomeIcon} label="Все квартиры" tone="stone" />
             <DirectionChip href="/diaspora" Icon={Globe2} label={tNav('diaspora')} tone="stone" />
           </div>
         </AppContainer>

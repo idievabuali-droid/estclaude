@@ -56,9 +56,29 @@ export type BuildingFilters = {
    *  POI of EACH category within NEARBY_THRESHOLD_M. Uses the live
    *  Overpass data (same source as the "Что рядом" section). */
   nearbyCategories?: PoiCategory[];
+  /** Lat/lng anchor + radius (meters) from the LocationSearch
+   *  autocomplete. Buildings whose centroid is within `nearRadiusM`
+   *  of the point are kept; others dropped. JS-side filter using
+   *  haversine — fast at our V1 scale. */
+  nearLat?: number | null;
+  nearLng?: number | null;
+  nearRadiusM?: number | null;
   city?: 'dushanbe' | 'vahdat';
   q?: string;
 };
+
+/** Haversine distance in meters between two lat/lng points. Used for
+ *  the radius filter and ordering. */
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
 
 const BUILDING_COVER: Record<BuildingStatus, string> = {
   announced: 'oklch(0.525 0.145 145)',
@@ -204,6 +224,20 @@ export async function listBuildings(filters: BuildingFilters = {}): Promise<Mock
     buildings = buildings.filter((b) =>
       required.every((a) => (b.amenities ?? []).includes(a)),
     );
+  }
+
+  // Radius filter from LocationSearch — keep only buildings within
+  // `nearRadiusM` of the chosen point, then sort by distance ascending
+  // so the closest one is first.
+  if (filters.nearLat != null && filters.nearLng != null && filters.nearRadiusM != null) {
+    const lat = filters.nearLat;
+    const lng = filters.nearLng;
+    const r = filters.nearRadiusM;
+    buildings = buildings
+      .map((b) => ({ b, d: haversineMeters(lat, lng, b.latitude, b.longitude) }))
+      .filter((x) => x.d <= r)
+      .sort((a, b) => a.d - b.d)
+      .map((x) => x.b);
   }
 
   // Nearby POI categories — applied last (and only when needed) because

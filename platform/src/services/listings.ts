@@ -35,6 +35,11 @@ export type ListingFilters = {
   /** Max apartment size in m². */
   sizeTo?: number | null;
   buildingId?: string;
+  /** Lat/lng + radius from LocationSearch. Resolved at the service
+   *  by pre-filtering buildings, then scoping listings to those ids. */
+  nearLat?: number | null;
+  nearLng?: number | null;
+  nearRadiusM?: number | null;
 };
 
 const TIER_RANK: Record<string, number> = {
@@ -64,6 +69,37 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
   if (filters.sizeFrom != null) q = q.gte('size_m2', filters.sizeFrom);
   if (filters.sizeTo != null) q = q.lte('size_m2', filters.sizeTo);
   if (filters.buildingId) q = q.eq('building_id', filters.buildingId);
+
+  // Radius filter: pre-resolve which buildings are within the radius
+  // and constrain the listings query to those ids. Done before the
+  // main query so we don't fetch listings we'll throw away.
+  if (filters.nearLat != null && filters.nearLng != null && filters.nearRadiusM != null) {
+    const { data: buildingsForRadius } = await supabase
+      .from('buildings')
+      .select('id, latitude, longitude')
+      .eq('city', ACTIVE_CITY);
+    const lat = filters.nearLat;
+    const lng = filters.nearLng;
+    const r = filters.nearRadiusM;
+    const inRadiusIds = (buildingsForRadius ?? [])
+      .filter((b) => {
+        const blat = Number(b.latitude);
+        const blng = Number(b.longitude);
+        // Inline haversine — same formula as services/buildings.ts.
+        const R = 6371000;
+        const toRad = (d: number) => (d * Math.PI) / 180;
+        const dLat = toRad(blat - lat);
+        const dLng = toRad(blng - lng);
+        const aa =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(lat)) * Math.cos(toRad(blat)) * Math.sin(dLng / 2) ** 2;
+        const distM = 2 * R * Math.asin(Math.sqrt(aa));
+        return distM <= r;
+      })
+      .map((b) => b.id as string);
+    if (inRadiusIds.length === 0) return [];
+    q = q.in('building_id', inRadiusIds);
+  }
 
   const { data, error } = await q;
   if (error) throw error;

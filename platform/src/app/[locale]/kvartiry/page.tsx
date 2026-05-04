@@ -1,8 +1,8 @@
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, X } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
-import { ListingCard, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion } from '@/components/blocks';
+import { ListingCard, LocationSearch, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion } from '@/components/blocks';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { getExchangeRates } from '@/services/currency';
 import { listListings } from '@/services/listings';
@@ -44,6 +44,13 @@ type SearchParams = {
    *  building detail page. The header changes to "Квартиры в ЖК X"
    *  and a breadcrumb back to /zhk/<slug> appears. */
   building?: string;
+  /** LocationSearch radius filter — see filter-state.ts on /novostroyki
+   *  for the same field set. Defaults to 1500m when near_lat is set
+   *  but radius is missing. */
+  near_lat?: string;
+  near_lng?: string;
+  near_label?: string;
+  radius?: string;
 };
 
 export default async function KvartiryPage({
@@ -64,6 +71,9 @@ export default async function KvartiryPage({
   const scopedBuilding = sp.building ? await getBuildingBySlug(sp.building) : null;
 
   // listListings already applies trust-weighted ranking per Tech Spec §9.4
+  const nearLat = sp.near_lat ? parseFloat(sp.near_lat) : null;
+  const nearLng = sp.near_lng ? parseFloat(sp.near_lng) : null;
+  const nearRadius = sp.radius ? parseInt(sp.radius, 10) : nearLat != null ? 1500 : null;
   const filtered = await listListings({
     rooms: sp.rooms?.split(',').map((r) => parseInt(r, 10)),
     source: sp.source?.split(',') as SourceType[] | undefined,
@@ -75,6 +85,9 @@ export default async function KvartiryPage({
     sizeFrom: sp.size_from ? parseFloat(sp.size_from) : null,
     sizeTo: sp.size_to ? parseFloat(sp.size_to) : null,
     buildingId: scopedBuilding?.id,
+    nearLat,
+    nearLng,
+    nearRadiusM: nearRadius,
   });
 
   // Pre-fetch building + developer + benchmark for each card
@@ -127,13 +140,40 @@ export default async function KvartiryPage({
             <h1 className="text-h1 font-semibold text-stone-900">
               {scopedBuilding
                 ? `Квартиры в ${scopedBuilding.name.ru}`
-                : t('apartments')}
+                : sp.near_label
+                  ? `Рядом с «${sp.near_label}»`
+                  : t('apartments')}
             </h1>
             <p className="text-meta text-stone-500 tabular-nums">
               {filtered.length}{' '}
               {pluralRu(filtered.length, ['объявление', 'объявления', 'объявлений'])}
+              {sp.near_label && nearRadius
+                ? ` · в радиусе ${(nearRadius / 1000).toFixed(1)} км`
+                : ''}
             </p>
           </div>
+
+          {/* LocationSearch — same pattern as /novostroyki. Hidden when
+              the page is scoped to a building (the buyer is already
+              inside that project's units, location filter is moot). */}
+          {!scopedBuilding ? (
+            <div className="flex flex-col gap-2">
+              <LocationSearch
+                destinationPath="/kvartiry"
+                variant="compact"
+                initialQuery={sp.near_label ?? ''}
+              />
+              {sp.near_label ? (
+                <Link
+                  href={`/kvartiry${buildKvartiryQueryWithoutNear(sp)}`}
+                  className="inline-flex w-fit items-center gap-1 text-caption text-stone-500 hover:text-terracotta-700"
+                >
+                  <X className="size-3" />
+                  Убрать «{sp.near_label}»
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* Cian-style category chip bar. One chip per filter category
               (Комнат / Цена / Отделка); each chip shows its current
@@ -249,6 +289,20 @@ function countActiveFiltersK(sp: SearchParams): number {
   if (sp.price_from || sp.price_to) n++;
   if (sp.size_from || sp.size_to) n++;
   return n;
+}
+
+/** Strips the LocationSearch params from the current URL while
+ *  preserving every other filter, building scope, etc. Used by the
+ *  "× Убрать «X»" link under the search input. */
+function buildKvartiryQueryWithoutNear(sp: SearchParams): string {
+  const search = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp)) {
+    if (!v) continue;
+    if (k === 'near_lat' || k === 'near_lng' || k === 'near_label' || k === 'radius') continue;
+    search.set(k, v);
+  }
+  const s = search.toString();
+  return s ? `?${s}` : '';
 }
 
 function buildRelaxOptionsKvartiry(
