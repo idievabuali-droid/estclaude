@@ -16,6 +16,6 @@ export const FOUNDER_CONTACTS = {
   phone: '+992935563306',
   phoneDisplay: '+992 93 556 33 06',
   whatsappLink: 'https://wa.me/992935563306',
-  telegramHandle: 'zhk_tj_admin',
+  telegramHandle: '@zhk_tj_bot',
   telegramLink: 'https://t.me/zhk_tj_admin',
 } as const;

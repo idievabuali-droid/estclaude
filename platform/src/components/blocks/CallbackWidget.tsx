@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Phone } from 'lucide-react';
 import { AppCard, AppCardContent, AppButton, AppInput } from '@/components/primitives';
 import { toast } from '@/components/primitives/AppToast';
+import { track } from '@/lib/analytics/track';
 
 export interface CallbackWidgetProps {
   listingId: string;
@@ -23,6 +24,34 @@ export function CallbackWidget({ listingId }: CallbackWidgetProps) {
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+
+  // Friction signal: visitor typed something but never submitted.
+  // We capture intent-without-conversion so the founder can see "this
+  // person almost asked for a callback". Refs avoid re-firing on
+  // every keystroke; we send exactly one event per session.
+  const typedSomethingRef = useRef(false);
+  const firedRef = useRef(false);
+  useEffect(() => {
+    if (phone.trim() || name.trim()) typedSomethingRef.current = true;
+  }, [phone, name]);
+  useEffect(() => {
+    function fireIfStranded() {
+      if (firedRef.current) return;
+      if (!typedSomethingRef.current) return;
+      if (done) return;
+      firedRef.current = true;
+      track('callback_widget_typed_no_submit', { listing_id: listingId });
+    }
+    // Tab close / navigation away while we have unsent typing.
+    window.addEventListener('pagehide', fireIfStranded);
+    return () => {
+      window.removeEventListener('pagehide', fireIfStranded);
+      // Component unmount (e.g. SPA navigation) is ALSO a stranded
+      // signal — fire here too. The refs prevent double-firing if
+      // pagehide already triggered.
+      fireIfStranded();
+    };
+  }, [done, listingId]);
 
   async function handleSubmit() {
     if (submitting) return;

@@ -38,9 +38,16 @@ export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   const supabase = createAdminClient();
 
+  // anon_id stored alongside buyer_user_id so the per-visitor
+  // analytics drill-down can show this callback for an anonymous
+  // visitor too — without anon_id, anonymous callbacks are orphans
+  // (buyer_user_id is null, no other join key exists).
+  const anonIdEarly = await readAnonIdServer();
+
   const { error: insertErr } = await supabase.from('contact_requests').insert({
     listing_id: body.listing_id,
     buyer_user_id: user?.id ?? null,
+    anon_id: anonIdEarly,
     buyer_phone: body.phone.trim(),
     buyer_name: body.name?.trim() || null,
     // V1 callback widget always implies WhatsApp — that's the dominant
@@ -54,7 +61,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Tracking event — ties to the visitor's timeline in /kabinet/analytics.
-  const anonId = await readAnonIdServer();
+  const anonId = anonIdEarly;
   if (anonId) {
     void supabase
       .from('events')
