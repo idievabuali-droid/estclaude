@@ -225,7 +225,13 @@ export default async function KvartiryPage({
               /kvartiry visit isn't a search worth saving) and when
               the page is scoped to a single building (the buyer is
               already on that building's set). */}
-          {hasActiveFiltersK(sp) && !scopedBuilding ? (
+          {/* Same deferral as /novostroyki — only show this when the
+              search is "serious" (≥2 filters or 0 results), so single-
+              chip browsing isn't interrupted. Building scope is treated
+              as navigation, not a filter (already excluded). */}
+          {(countActiveFiltersK(sp) >= 2 || filtered.length === 0) &&
+          hasActiveFiltersK(sp) &&
+          !scopedBuilding ? (
             <SaveSearchPrompt
               page="kvartiry"
               filters={sp}

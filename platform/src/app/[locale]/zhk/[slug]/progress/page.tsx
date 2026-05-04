@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { Camera, Calendar, ChevronLeft, ShieldCheck } from 'lucide-react';
+import { Camera, Calendar, ChevronLeft, ShieldCheck, Bell } from 'lucide-react';
 import { setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import {
@@ -7,6 +7,7 @@ import {
   AppCard,
   AppCardContent,
 } from '@/components/primitives';
+import { SaveToggle } from '@/components/blocks';
 import { getBuilding } from '@/services/buildings';
 import { getBuildingProgress } from '@/services/progress';
 
@@ -51,6 +52,26 @@ export default async function ProgressPage({
               Реальные фото с площадки. Загружает {developer.display_name.ru}; платформа
               сверяет дату и метаданные перед публикацией.
             </p>
+          </div>
+          {/* Subscribe-to-progress affordance. Reuses SaveToggle on
+              the building — saving the building already wires it up
+              for monthly construction-photo notifications via the
+              «Изменения» badge / Telegram (whichever channel the user
+              picks at login). The card framing makes the implicit
+              subscription explicit so buyers know they can opt in. */}
+          <div className="mt-2 flex items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50/60 px-4 py-3">
+            <div className="flex items-start gap-3">
+              <Bell className="mt-0.5 size-5 shrink-0 text-emerald-700" aria-hidden />
+              <div className="flex flex-col gap-0.5">
+                <p className="text-meta font-semibold text-stone-900">
+                  Получать новые фото стройки
+                </p>
+                <p className="text-caption text-stone-600">
+                  Сохраните ЖК — пришлём, когда застройщик загрузит свежие фото.
+                </p>
+              </div>
+            </div>
+            <SaveToggle type="building" id={building.id} />
           </div>
         </AppContainer>
       </section>

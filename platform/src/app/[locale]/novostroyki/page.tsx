@@ -328,7 +328,12 @@ export default async function NovostroykiPage({
                 least one filter is active. The 0-results variant is
                 bigger and more directive (the buyer literally told us
                 what's missing from inventory). */}
-            {hasActiveFilters(sp) ? (
+            {/* Defer SaveSearchPrompt until ≥2 filters OR 0 results.
+                Earlier it fired on any filter at all and the 25% of
+                viewport it eats pushed results below the fold for a
+                visitor who hadn't even narrowed seriously yet. ≥2 is
+                "serious enough to be worth saving as an alert." */}
+            {(countActiveFilters(sp) >= 2 || filtered.length === 0) && hasActiveFilters(sp) ? (
               <SaveSearchPrompt
                 page="novostroyki"
                 filters={sp}

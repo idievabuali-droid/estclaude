@@ -1,4 +1,4 @@
-import { Building, Home as HomeIcon, Globe2 } from 'lucide-react';
+import { Building, Home as HomeIcon, Globe2, Sparkles } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { AppContainer } from '@/components/primitives';
 import { BuildingCard, ListingCard, LocationSearch } from '@/components/blocks';
@@ -92,9 +92,22 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           </h1>
           <div className="max-w-2xl">
             <LocationSearch destinationPath="/novostroyki" variant="hero" />
-            <p className="mt-2 text-caption text-stone-500">
-              Введите название района, ЖК, школы, мечети или адрес — мы покажем квартиры рядом.
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <p className="text-caption text-stone-500">
+                Введите район, ЖК, школу, мечеть или адрес — покажем квартиры рядом.
+              </p>
+              {/* Surfaces /pomoshch-vybora — the 5-step wizard buyers
+                  never found because the home had no link to it. The
+                  "Первый раз?" framing speaks to the same buyer that
+                  needs the most help. */}
+              <Link
+                href="/pomoshch-vybora"
+                className="inline-flex items-center gap-1 text-caption font-medium text-terracotta-700 hover:text-terracotta-800"
+              >
+                <Sparkles className="size-3.5" />
+                Первый раз? Поможем подобрать за 2 минуты
+              </Link>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-caption font-medium text-stone-500">или просто:</span>

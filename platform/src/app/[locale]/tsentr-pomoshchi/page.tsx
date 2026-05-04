@@ -1,6 +1,7 @@
 import { setRequestLocale } from 'next-intl/server';
-import { ChevronDown } from 'lucide-react';
-import { AppContainer } from '@/components/primitives';
+import { ChevronDown, MessageCircle, Phone } from 'lucide-react';
+import { AppContainer, AppCard, AppCardContent, AppButton } from '@/components/primitives';
+import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
 
 /**
  * Help center — V1 simplified version.
@@ -107,7 +108,8 @@ export default async function HelpCenterPage({
       </section>
 
       <section className="py-6 pb-9">
-        <AppContainer className="flex flex-col gap-3">
+        <AppContainer className="flex flex-col gap-5">
+          <div className="flex flex-col gap-3">
           {FAQ.map((item) => (
             // Native <details> for server-rendered, JS-free accordion.
             // Tailwind's `group/details` modifier + open: variant
@@ -131,6 +133,38 @@ export default async function HelpCenterPage({
               </div>
             </details>
           ))}
+          </div>
+
+          {/* "Не нашли ответ?" CTA — was a dead end before; this turns
+              the help center into a conversation starter. WhatsApp
+              first since the local market skews that way; Telegram
+              second for diaspora. */}
+          <AppCard>
+            <AppCardContent>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-h3 font-semibold text-stone-900">
+                    Не нашли ответ?
+                  </h3>
+                  <p className="text-meta text-stone-600">
+                    Напишите — поможем разобраться с вашим вопросом.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 md:flex-row">
+                  <a href={FOUNDER_CONTACTS.whatsappLink} target="_blank" rel="noopener noreferrer">
+                    <AppButton variant="primary" size="md">
+                      <Phone className="size-4" /> WhatsApp
+                    </AppButton>
+                  </a>
+                  <a href={FOUNDER_CONTACTS.telegramLink} target="_blank" rel="noopener noreferrer">
+                    <AppButton variant="secondary" size="md">
+                      <MessageCircle className="size-4" /> Telegram
+                    </AppButton>
+                  </a>
+                </div>
+              </div>
+            </AppCardContent>
+          </AppCard>
         </AppContainer>
       </section>
     </>

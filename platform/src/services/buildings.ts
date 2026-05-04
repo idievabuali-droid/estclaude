@@ -486,11 +486,17 @@ export async function getBuildingsByIds(ids: string[]): Promise<MockBuilding[]> 
 
 export async function getListingsForBuildingId(buildingId: string): Promise<MockListing[]> {
   const supabase = await createClient();
+  // Order ascending by total price so the BuildingCard preview slice
+  // (units.slice(0, 2-3)) leads with the CHEAPEST units in the
+  // building. Faridun's budget makes the floor unit the only viable
+  // option; showing him the largest first told him "out of reach"
+  // before he could see anything else.
   const { data, error } = await supabase
     .from('listings')
     .select(LISTING_SELECT)
     .eq('building_id', buildingId)
-    .eq('status', 'active');
+    .eq('status', 'active')
+    .order('price_total_dirams', { ascending: true });
   if (error) throw error;
   return (data ?? []).map(mapListing);
 }
