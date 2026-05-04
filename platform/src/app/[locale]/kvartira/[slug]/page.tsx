@@ -10,7 +10,7 @@ import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppChip } from '@/components/primitives';
-import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle } from '@/components/blocks';
+import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle, MiniMap } from '@/components/blocks';
 import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgoLong } from '@/lib/format';
@@ -397,11 +397,21 @@ export default async function ListingDetailPage({
           карте" pill, AND the developer name. A repeat card here was
           duplicate visual real estate. */}
 
-      {/* ─── 7. COMPACT NEARBY (4 chips + link to full list) ────── */}
+      {/* ─── 7. COMPACT NEARBY (mini-map + 4 chips + link to full list) ────── */}
       {compactNearby.length > 0 ? (
         <section className="border-t border-stone-200 py-6">
           <AppContainer className="flex flex-col gap-3">
             <h3 className="text-h3 font-semibold text-stone-900">Что рядом</h3>
+            {/* Mini-map preview — was missing entirely; buyers had to
+                tap "На карте" to see where the building actually is.
+                Now the spatial answer is inline. The full focus-mode
+                map (with POI category chips) is still one tap away
+                via the address pill in the title block. */}
+            <MiniMap
+              latitude={building.latitude}
+              longitude={building.longitude}
+              label={building.name.ru}
+            />
             <div className="flex flex-wrap gap-2">
               {compactNearby.map(({ cat, item }) => (
                 <span

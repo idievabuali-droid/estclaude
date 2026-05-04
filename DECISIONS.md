@@ -6,6 +6,65 @@ Newest at top.
 
 ---
 
+## 2026-05-04 · Faridun walkthrough → 6-commit fix batch
+
+**What changed:** I role-played a second persona — Faridun (28, taxi driver) + Zarrina (25, nurse), 200k TJS budget, mobile-first, WhatsApp-only, installment-decisive — and walked every public page. The audit surfaced ~20 items Madina hadn't (different demographic exposes different friction). Fixed in 6 focused commits:
+
+**Commit 95a06e9 — Critical anonymity + save fixes**
+- C1. Anon saves now render on /izbrannoe via new `AnonSavedView` client component + `/api/anon-saves/hydrate` endpoint. Was the lie of the platform: localStorage saves stuck on cards but the saved page kept saying "Войдите чтобы видеть сохранённое". Banner: "Сохранения только в этом браузере" + "Войти через Telegram" CTA. Bigint price columns serialised over the wire as strings, revived client-side.
+- C2. SaveToggle in /kvartira hero (top-right of cover photo). Was missing entirely — deep-link visitors couldn't save without scrolling 2000px to "Похожие" cards.
+- C4. Russian custom 404 page (`app/[locale]/not-found.tsx`) — the generic English Next 404 read as broken; now Russian copy + 3 CTAs inside the [locale] layout so SiteHeader/Footer persist.
+- M17. LocationSearch dropdown no longer auto-opens on pre-populated input — gated behind a `touched` state so `?near_label=…` page loads don't reopen the same POI dropdown.
+
+**Commit c1b205d — WhatsApp acquisition unlock**
+- C3. /voyti was Telegram-only: hard wall for WhatsApp-first Tajik market. Now: "Что вы получите" benefits panel + Telegram card + "или" divider + new `WhatsAppCallback` card backed by new `/api/login-callback` endpoint. Captures phone, fires founder Telegram nudge for manual onboarding. By design not an automated login — V1 leverages the founder relationship.
+- H5. SaveSearchPrompt: WhatsApp option promoted from buried "У меня нет Telegram" link to a second equal-weight button. New event type `login_callback_submitted` whitelisted.
+
+**Commit 31d66af — Price chip overhaul + chip reorder + range hint**
+- M12. PriceChip on /novostroyki retargeted from per-m² to total price. Faridun thinks "до 220k", not "до 4 000 TJS/м²". URL params: `price_from`/`price_to`. Sheet copy: "Общая цена" with friendly placeholders + 5 quick-pick "до X TJS" presets. Per-m² preserved at the service layer for future advanced UI.
+- H1. Filter chip order: was Цена·Стадия·Сдача·Удобства·Что рядом — most-distinctive chip ("Что рядом", our POI search magic) was hidden behind horizontal scroll. New: Цена·Что рядом·Стадия·Сдача·Удобства.
+- H8. Result-count line shows price range — "7 проектов · от 142К до 422К TJS · в радиусе 1.5 км". BigInt min/max from filtered set.
+
+**Commit 6fef211 — Sort + monthly-payment filter**
+- H3. SortChip on /novostroyki + /kvartiry: 4 modes (recommended/cheapest/expensive/newest). `?sort=…` URL param.
+- H2. New MonthlyChip on /kvartiry: "В рассрочку · до X TJS / мес". Filters listings to `installment_available=true AND monthly_amount ≤ ceiling`. Quick-pick presets 2K–7K. Wired through `ListingFilters.maxMonthlyDirams`.
+- Bonus: relax-options reordered to "soft preferences first" so the suggestion never tells Faridun to drop his price ceiling.
+
+**Commit 06ef401 — Relax-button counts + drop no-op options**
+- H7. Each relax-suggestion button now shows the count after dropping that filter — "Снять «Цена» (5)". Server-side per-option `listListings`/`listBuildings` re-runs (~3 extra queries on the prompt; V1 fine). Options where count ≤ resultCount are dropped (no value in suggesting a no-op relax).
+
+**Commit 848005f — Magic moments surfaced + retention loops**
+- H4. Home wizard CTA: "✨ Первый раз? Поможем подобрать за 2 минуты" near the search-box hint, pointing to /pomoshch-vybora. Wizard existed but home had no link.
+- H6. SaveSearchPrompt deferred: now fires only when ≥2 filters active OR 0 results, not on a single chip.
+- H9. /zhk/.../progress: emerald "Получать новые фото стройки" callout with building-scoped SaveToggle. Reuses the existing «Изменения» badge pipeline (saved building + monthly upload bumps `updated_at` → badge fires on /izbrannoe).
+- H10. `getListingsForBuildingId` orders ASC by `price_total_dirams` so building-card previews lead with the cheapest unit. Faridun (200k) used to see "2-комн 285k" and bounce.
+- M11. /tsentr-pomoshchi gains "Не нашли ответ?" card with WhatsApp + Telegram CTAs.
+
+**Commit a2ad238 — Detail-page polish**
+- M4. /kvartira "Похожие в этом ЖК" header gains "Все квартиры в ЖК →" link to `/kvartiry?building=<slug>`.
+- M5. /zhk Застройщик stat tiles (Сдано/Строится/Котлован) drill into `/novostroyki?status=…`. Zero-value stats stay non-clickable.
+- M6. "Что значит «Проверенный»?" badges Link to `/tsentr-pomoshchi#verified-developer`. FAQ entries gain id anchors; new `FaqAutoOpen` client effect opens the targeted `<details>`.
+- M7. StickyContactBar: 4 secondary buttons gain icon+label stacks ("TG/IMO/Звонок/Визит"). WhatsApp keeps the labeled-primary slot.
+- M8. /kvartira posted-ago shows BOTH relative AND absolute date — "Опубликовано 2 дня назад · 2 мая". New `formatPostedAgoLong` helper.
+- M9. CallbackWidget moved from above-fold to below the description section.
+
+**Commit 32d7238 — Fuller footer + POI map polish**
+- M14. SiteFooter rewritten as 4-column layout: Поиск/Помощь/О платформе/Связаться. Direct contact channels (WhatsApp/Telegram/phone), about tagline, links to centre помощи + wizard + post.
+- M15. POI map pin upgraded from 32px barely-visible dot to 40px orange star with deeper shadow + colored label pill. Camera fit-bounds includes the full radius circle so the dashed ring no longer clips on mobile.
+
+**Audit false alarms (verified, no work needed):**
+- D1 desktop layout cap: `AppContainer` already 1200px max — earlier audit screenshots looked narrow because of low-res capture, not actual layout.
+- D2 MobileBottomNav: already `md:hidden` (display: none at md+).
+
+**Deferred (still real, separate commit):**
+- M2 mini-map embed on /zhk + /kvartira detail — needs a compact `MiniMap` component or `MapView` refactor.
+- M16 hide chips in POI mode — judged unnecessary; the "Рядом с «X»" header establishes POI primacy and keeping chips lets buyer narrow further.
+
+**Method change locked in CLAUDE.md** (will write next time we touch it):
+- Re-verify "audit findings" by inspecting the actual DOM (computed widths / display values), not just by screenshot interpretation. D1 + D2 in this batch were both screenshot-misinterpretation false alarms — saved a commit's worth of unnecessary work by checking via `getBoundingClientRect` first.
+
+---
+
 ## 2026-05-04 · Retention loop closed: Madina-walkthrough remaining fixes
 
 **What changed:** four follow-up commits closing the remaining friction points from the Madina walkthrough — every problem her persona hit on the first browse now has a concrete fix.

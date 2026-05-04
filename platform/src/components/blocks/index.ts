@@ -59,3 +59,5 @@ export type { ListingTrustSignalsProps } from './ListingTrustSignals';
 export { AnonSavedView } from './AnonSavedView';
 export { SortChip } from './SortChip';
 export type { SortMode } from './SortChip';
+export { MiniMap } from './MiniMap';
+export type { MiniMapProps } from './MiniMap';

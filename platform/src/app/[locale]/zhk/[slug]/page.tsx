@@ -14,6 +14,7 @@ import {
   NearbyPois,
   BuildingStageProgress,
   PriceConversion,
+  MiniMap,
 } from '@/components/blocks';
 import { getBuilding, getDeveloperStats } from '@/services/buildings';
 import { getDistrictBenchmark } from '@/services/benchmarks';
@@ -322,7 +323,16 @@ export default async function BuildingDetailPage({
 
       {/* ─── 6. LOCATION + NEARBY POIs ───────────────────────────── */}
       <section id="nearby" className="scroll-mt-28 border-t border-stone-200 py-6">
-        <AppContainer>
+        <AppContainer className="flex flex-col gap-4">
+          {/* Inline mini-map preview — was missing entirely; the
+              spatial answer ("where is this building?") used to
+              require tapping "На карте" to enter focus mode. */}
+          <MiniMap
+            latitude={building.latitude}
+            longitude={building.longitude}
+            label={building.name.ru}
+            height={260}
+          />
           <NearbyPois pois={pois} />
         </AppContainer>
       </section>
