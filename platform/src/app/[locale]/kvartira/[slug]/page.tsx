@@ -10,12 +10,12 @@ import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppChip } from '@/components/primitives';
-import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle, ShareButton, MiniMap, PhotoGallery } from '@/components/blocks';
+import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle, ShareButton, NearbyChips, PhotoGallery } from '@/components/blocks';
 import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgoLong } from '@/lib/format';
 import { getListing } from '@/services/listings';
-import { getNearbyPOIs, POI_LABELS, type PoiCategory } from '@/services/poi';
+import { getNearbyPOIs, type PoiCategory } from '@/services/poi';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { getExchangeRates } from '@/services/currency';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -432,40 +432,27 @@ export default async function ListingDetailPage({
           карте" pill, AND the developer name. A repeat card here was
           duplicate visual real estate. */}
 
-      {/* ─── 7. COMPACT NEARBY (mini-map + 4 chips + link to full list) ────── */}
+      {/* ─── 7. COMPACT NEARBY (interactive chips + mini-map) ─────
+          Tapping a chip now drops an orange star on the map at that
+          POI's location and re-fits the camera. Tapping the same
+          chip again clears the highlight. Closes the "I see chips
+          but can't see WHERE" gap the user flagged on real iPhone. */}
       {compactNearby.length > 0 ? (
         <section className="border-t border-stone-200 py-6">
-          <AppContainer className="flex flex-col gap-3">
-            <h3 className="text-h3 font-semibold text-stone-900">Что рядом</h3>
-            {/* Mini-map preview — was missing entirely; buyers had to
-                tap "На карте" to see where the building actually is.
-                Now the spatial answer is inline. The full focus-mode
-                map (with POI category chips) is still one tap away
-                via the address pill in the title block. */}
-            <MiniMap
-              latitude={building.latitude}
-              longitude={building.longitude}
-              label={building.name.ru}
+          <AppContainer>
+            <NearbyChips
+              anchorLat={building.latitude}
+              anchorLng={building.longitude}
+              anchorLabel={building.name.ru}
+              items={compactNearby.map((c) => ({
+                cat: c.cat,
+                name: c.item!.name,
+                latitude: c.item!.lat,
+                longitude: c.item!.lng,
+                distanceM: c.item!.distanceM,
+              }))}
+              allNearbyHref={`/zhk/${building.slug}#nearby`}
             />
-            <div className="flex flex-wrap gap-2">
-              {compactNearby.map(({ cat, item }) => (
-                <span
-                  key={cat}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-stone-50 px-2 py-1 text-meta"
-                >
-                  <span aria-hidden>{POI_LABELS[cat].emoji}</span>
-                  <span className="font-medium text-stone-700">{POI_LABELS[cat].ru}</span>
-                  <span className="text-stone-500 tabular-nums">· {item!.distanceM} м</span>
-                </span>
-              ))}
-            </div>
-            <Link
-              href={`/zhk/${building.slug}#nearby`}
-              className="inline-flex w-fit items-center gap-1 self-start text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
-            >
-              Все рядом
-              <ArrowUpRight className="size-3.5" />
-            </Link>
           </AppContainer>
         </section>
       ) : null}
