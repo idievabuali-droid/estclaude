@@ -7,6 +7,7 @@ import { SiteFooter } from '@/components/layout/SiteFooter';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { CompareBar, PageView } from '@/components/blocks';
 import { AppToaster } from '@/components/primitives';
+import { getCurrentUser } from '@/lib/auth/session';
 import { Suspense } from 'react';
 
 export function generateStaticParams() {
@@ -26,6 +27,13 @@ export default async function LocaleLayout({
   }
   setRequestLocale(locale);
 
+  // Auth state is read once per request and threaded down to the
+  // header + mobile bottom nav so they can render the right-side CTAs
+  // (Кабинет vs Войти) for the actual visitor. Without this both
+  // surfaces always show "Войти" — confusing for logged-in users.
+  const user = await getCurrentUser();
+  const isAuthenticated = !!user;
+
   return (
     <NextIntlClientProvider locale={locale}>
       <div className="flex min-h-dvh flex-col">
@@ -33,7 +41,7 @@ export default async function LocaleLayout({
         <main className="flex-1 pb-16 md:pb-0">{children}</main>
         <SiteFooter />
       </div>
-      <MobileBottomNav />
+      <MobileBottomNav isAuthenticated={isAuthenticated} />
       <CompareBar />
       <AppToaster />
       {/* PageView fires `page_view` analytics events on every route

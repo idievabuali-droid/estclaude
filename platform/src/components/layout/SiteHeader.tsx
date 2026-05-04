@@ -1,10 +1,22 @@
-import { Search } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { getTranslations } from 'next-intl/server';
 import { AppContainer } from '@/components/primitives';
 import { Link } from '@/i18n/navigation';
+import { getCurrentUser } from '@/lib/auth/session';
 
-export function SiteHeader() {
-  const t = useTranslations('Nav');
+/**
+ * Global header. Server component so it can read the auth state and
+ * branch the right side of the nav: anonymous → "Войти"; logged-in →
+ * "Кабинет". Without this, every authenticated user sees a "Войти"
+ * link (broken UX — seen by the founder in the analytics walkthrough).
+ *
+ * The mobile-only Search icon-button used to live here as a stub with
+ * no onClick. Removed — V1 doesn't have site-wide search; the filter
+ * pages cover it. Re-add as a real command palette when buyer behaviour
+ * shows the need.
+ */
+export async function SiteHeader() {
+  const t = await getTranslations('Nav');
+  const user = await getCurrentUser();
 
   return (
     <header className="sticky top-0 z-30 border-b border-stone-200 bg-white">
@@ -32,19 +44,21 @@ export function SiteHeader() {
           >
             {t('post')}
           </Link>
-          <Link
-            href="/voyti"
-            className="inline-flex h-9 items-center rounded-md bg-terracotta-600 px-4 text-meta font-semibold text-white hover:bg-terracotta-700"
-          >
-            {t('login')}
-          </Link>
-          <button
-            type="button"
-            aria-label="Search"
-            className="inline-flex size-9 items-center justify-center rounded-md text-stone-700 hover:bg-stone-100 md:hidden"
-          >
-            <Search className="size-4" />
-          </button>
+          {user ? (
+            <Link
+              href="/kabinet"
+              className="inline-flex h-9 items-center rounded-md bg-terracotta-600 px-4 text-meta font-semibold text-white hover:bg-terracotta-700"
+            >
+              Кабинет
+            </Link>
+          ) : (
+            <Link
+              href="/voyti"
+              className="inline-flex h-9 items-center rounded-md bg-terracotta-600 px-4 text-meta font-semibold text-white hover:bg-terracotta-700"
+            >
+              {t('login')}
+            </Link>
+          )}
         </div>
       </AppContainer>
     </header>

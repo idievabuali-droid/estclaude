@@ -1,7 +1,11 @@
+import { notFound } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
-import { AppContainer } from '@/components/primitives';
-import { Tier3Flow } from './Tier3Flow';
 
+/**
+ * V1-cut: Tier 3 (on-site) verification flow is not part of launch
+ * (see DECISIONS.md). 404 here keeps the code (so we can re-enable
+ * later) without exposing a half-real flow that has no nav back.
+ */
 export default async function Tier3Page({
   params,
 }: {
@@ -9,11 +13,5 @@ export default async function Tier3Page({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  return (
-    <section className="bg-stone-50 py-5 md:py-7">
-      <AppContainer className="lg:max-w-2xl">
-        <Tier3Flow />
-      </AppContainer>
-    </section>
-  );
+  notFound();
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { Home, Bookmark, User, GitCompare } from 'lucide-react';
+import { Home, Bookmark, User, GitCompare, LogIn } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { Link, usePathname } from '@/i18n/navigation';
 import { useCompareStore } from '@/lib/compare-store';
@@ -16,34 +16,30 @@ interface NavItem {
   badge?: number;
 }
 
-const BASE_ITEMS: NavItem[] = [
-  { href: '/', Icon: Home, label: 'Главная' },
-  { href: '/izbrannoe', Icon: Bookmark, label: 'Избранное' },
-  { href: '/kabinet', Icon: User, label: 'Кабинет' },
-];
-
 /**
  * Mobile bottom navigation.
  *
- * Three permanent items (Главная / Избранное / Кабинет) — and a fourth
- * dynamic "Сравнение (N)" item that appears only when the buyer has
- * 1+ items in their compare set.
+ * Three permanent items (Главная / Избранное / Кабинет or Войти) — and
+ * a fourth dynamic "Сравнение (N)" item that appears only when the
+ * buyer has 1+ items in their compare set.
  *
- * The dynamic slot keeps the nav un-cluttered for the 95% of visits
- * where compare isn't being used, while giving an obvious top-level
- * entry point for the buyers who are mid-comparison. The CompareBar
- * still appears when items are selected — they're complementary
- * surfaces (bar = preview + remove; nav = jump-to-table).
+ * The third slot is auth-aware: anonymous visitors see "Войти" (LogIn
+ * icon) so tapping it doesn't land them on /kabinet → bounce to /voyti
+ * three-step dead end. Logged-in users see "Кабинет".
+ *
+ * `isAuthenticated` is passed as a prop from the layout (server-side
+ * `getCurrentUser()` result) — keeping this a client component so we
+ * can still read the compare store + pathname.
  */
-export function MobileBottomNav() {
+export function MobileBottomNav({ isAuthenticated }: { isAuthenticated: boolean }) {
   return (
     <Suspense fallback={null}>
-      <MobileBottomNavInner />
+      <MobileBottomNavInner isAuthenticated={isAuthenticated} />
     </Suspense>
   );
 }
 
-function MobileBottomNavInner() {
+function MobileBottomNavInner({ isAuthenticated }: { isAuthenticated: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [hydrated, setHydrated] = useState(false);
@@ -55,6 +51,14 @@ function MobileBottomNavInner() {
   useEffect(() => {
     Promise.resolve(useCompareStore.persist.rehydrate()).then(() => setHydrated(true));
   }, []);
+
+  const baseItems: NavItem[] = [
+    { href: '/', Icon: Home, label: 'Главная' },
+    { href: '/izbrannoe', Icon: Bookmark, label: 'Избранное' },
+    isAuthenticated
+      ? { href: '/kabinet', Icon: User, label: 'Кабинет' }
+      : { href: '/voyti', Icon: LogIn, label: 'Войти' },
+  ];
 
   // Hide on flow pages where the sticky bottom is reserved for actions
   const isFlow = pathname.startsWith('/post') || pathname.startsWith('/verifikatsiya');
@@ -79,12 +83,12 @@ function MobileBottomNavInner() {
   const items: NavItem[] =
     FEATURES.compare && compareCount > 0
       ? [
-          BASE_ITEMS[0]!,
-          BASE_ITEMS[1]!,
+          baseItems[0]!,
+          baseItems[1]!,
           { href: compareHref, Icon: GitCompare, label: 'Сравнение', badge: compareCount },
-          BASE_ITEMS[2]!,
+          baseItems[2]!,
         ]
-      : BASE_ITEMS;
+      : baseItems;
 
   // Tailwind needs the class to be statically known; pre-compute the
   // grid-cols class explicitly rather than building it from a number.

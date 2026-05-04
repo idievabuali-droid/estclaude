@@ -16,6 +16,9 @@ export const FOUNDER_CONTACTS = {
   phone: '+992935563306',
   phoneDisplay: '+992 93 556 33 06',
   whatsappLink: 'https://wa.me/992935563306',
-  telegramHandle: '@zhk_tj_bot',
-  telegramLink: 'https://t.me/zhk_tj_admin',
+  // Personal Telegram handle for buyer outreach (NOT @zhk_tj_bot —
+  // that's the auth bot; messages there go nowhere). Confirmed via
+  // founder's own tg_username in the analytics drill-down.
+  telegramHandle: 'idievabuali',
+  telegramLink: 'https://t.me/idievabuali',
 } as const;

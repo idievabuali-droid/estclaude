@@ -58,6 +58,23 @@ export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
 
   const supabase = createAdminClient();
+
+  // Per-anon cap on total saved searches. Without this, an attacker
+  // (or a buggy client) could create thousands tied to one anon_id.
+  // 30 is generous — typical buyer saves 1–5; 30+ smells like abuse.
+  // Counted server-side because the admin client bypasses RLS, so
+  // there's no other gate on quantity.
+  const { count: existingCount } = await supabase
+    .from('saved_searches')
+    .select('id', { count: 'exact', head: true })
+    .eq('anon_id', anonId);
+  if ((existingCount ?? 0) >= 30) {
+    return NextResponse.json(
+      { error: 'too many saved searches', max: 30 },
+      { status: 429 },
+    );
+  }
+
   const displayName = displayNameFromFilters(body.page, body.filters);
 
   // For an already-logged-in Telegram user we can attach their

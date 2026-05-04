@@ -1,7 +1,13 @@
+import { notFound } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
-import { AppContainer } from '@/components/primitives';
-import { Tier2Flow } from './Tier2Flow';
 
+/**
+ * V1-cut: Tier 2 verification flow is not part of the launch surface
+ * (see DECISIONS.md). Direct URL access used to render the full
+ * multi-step flow with no nav back (MobileBottomNav also hides on
+ * /verifikatsiya/*). 404 here keeps the code (so we can re-enable
+ * later by removing this guard) without exposing the dead route.
+ */
 export default async function Tier2Page({
   params,
 }: {
@@ -9,11 +15,5 @@ export default async function Tier2Page({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  return (
-    <section className="bg-stone-50 py-5 md:py-7">
-      <AppContainer className="lg:max-w-2xl">
-        <Tier2Flow />
-      </AppContainer>
-    </section>
-  );
+  notFound();
 }

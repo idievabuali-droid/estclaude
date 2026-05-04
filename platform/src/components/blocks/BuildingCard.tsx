@@ -138,10 +138,12 @@ export function BuildingCard({
             type="button"
             onClick={openMap}
             aria-label={`Показать на карте: ${district.name.ru}, ${building.address.ru}`}
-            className="group inline-flex w-fit items-center gap-1.5 rounded-sm border border-stone-200 bg-stone-50 px-2 py-1 text-left text-meta text-stone-700 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50 hover:text-terracotta-700 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
+            // max-w-full caps the chip at the card width on mobile so
+            // the truncated address has something to truncate against.
+            className="group inline-flex w-fit max-w-full items-center gap-1.5 rounded-sm border border-stone-200 bg-stone-50 px-2 py-1 text-left text-meta text-stone-700 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50 hover:text-terracotta-700 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
           >
             <MapPin className="size-3.5 shrink-0 text-terracotta-600" />
-            <span className="truncate">{district.name.ru} · {building.address.ru}</span>
+            <span className="min-w-0 truncate">{district.name.ru} · {building.address.ru}</span>
             <ArrowUpRight className="size-3 shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
           </button>
           {developer.is_verified ? (
