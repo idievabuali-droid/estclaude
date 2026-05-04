@@ -20,9 +20,18 @@ const PHOTO_BUCKET = 'listing-photos';
  *
  * Reads NEXT_PUBLIC_SUPABASE_URL — same env var the browser SDK uses,
  * so dev/staging/prod all get the right host automatically.
+ *
+ * Pass-through for full external URLs: if the value already starts
+ * with `http`, return as-is. This lets the demo seed script populate
+ * mock listings with Unsplash URLs without round-tripping through
+ * Supabase Storage. Real uploads (via /api/storage/upload) always
+ * write a relative path — they hit the SUPABASE_URL branch.
  */
 export function supabasePublicUrl(storagePath: string | null | undefined): string | null {
   if (!storagePath) return null;
+  if (storagePath.startsWith('http://') || storagePath.startsWith('https://')) {
+    return storagePath;
+  }
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!base) return null;
   return `${base}/storage/v1/object/public/${PHOTO_BUCKET}/${storagePath}`;

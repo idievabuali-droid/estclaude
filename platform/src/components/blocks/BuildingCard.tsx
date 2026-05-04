@@ -153,30 +153,43 @@ export function BuildingCard({
           ) : null}
         </div>
 
-        {/* Price + handover. Per-m² is the headline because total
-            price varies wildly with apartment size — per-m² is the
-            real fair-comparison metric (and matches our fairness
-            indicator). Smallest total stays as a secondary line. */}
+        {/* Price + handover. Total price is the headline (what shoppers
+            actually think in); per-m² stays as a smaller secondary
+            line for the comparison-savvy. Reversed from the earlier
+            per-m²-first layout because Madina-the-buyer was doing
+            arithmetic on the card to figure out what a 60m² unit
+            actually costs. */}
         <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-stone-200 pt-3">
-          {building.price_per_m2_from_dirams ? (
+          {building.price_from_dirams ? (
             <div className="flex flex-col">
               <span className="text-caption text-stone-500">{tCommon('from')}</span>
-              {/* Inline pair: TJS price + foreign-currency
-                  conversion on the same baseline. flex-wrap drops
-                  the conversion to a new line on narrow cards. */}
               <div className="flex flex-wrap items-baseline gap-x-2">
                 <span className="text-h2 font-semibold tabular-nums text-stone-900">
-                  {formatPriceNumber(building.price_per_m2_from_dirams)} TJS / м²
+                  {formatPriceNumber(building.price_from_dirams)} TJS
                 </span>
                 {showConversion ? (
                   <PriceConversion
-                    priceDirams={building.price_per_m2_from_dirams}
+                    priceDirams={building.price_from_dirams}
                     target={currency}
                     rates={rates}
-                    perM2
                   />
                 ) : null}
               </div>
+              {building.price_per_m2_from_dirams ? (
+                <span className="text-caption tabular-nums text-stone-500">
+                  {formatPriceNumber(building.price_per_m2_from_dirams)} TJS / м²
+                </span>
+              ) : null}
+            </div>
+          ) : building.price_per_m2_from_dirams ? (
+            // Edge case: have per-m² but not total. Shouldn't happen
+            // in practice (price_from is computed at read time too)
+            // but keep a sane fallback.
+            <div className="flex flex-col">
+              <span className="text-caption text-stone-500">{tCommon('from')}</span>
+              <span className="text-h3 font-semibold tabular-nums text-stone-900">
+                {formatPriceNumber(building.price_per_m2_from_dirams)} TJS / м²
+              </span>
             </div>
           ) : (
             <span className="text-meta text-stone-500">Цены уточняйте</span>
