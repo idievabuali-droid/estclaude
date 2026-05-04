@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, usePathname, useRouter } from 'next/navigation';
+import { X } from 'lucide-react';
 import maplibregl, { type Map as MaplibreMap, type Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Link } from '@/i18n/navigation';
@@ -182,6 +183,26 @@ export function MapView({
   // ?selected=<slug> deep-link from a card's address row (browse mode).
   const searchParams = useSearchParams();
   const selectedSlug = searchParams.get('selected');
+  const pathname = usePathname();
+  const router = useRouter();
+
+  // Close handler — bulletproof escape from map mode. Real-iPhone
+  // testing flagged "the map breaks sometimes, hard to leave, have
+  // to close the browser." A fixed-position close button on top of
+  // the map canvas is guaranteed to be tappable even if the maplibre
+  // canvas hangs / fails to load tiles. We strip view=karta + focus
+  // + from + fromSlug from the URL (preserves filters) so the
+  // buyer lands on the list view they came from.
+  function closeMap() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('view');
+    params.delete('focus');
+    params.delete('from');
+    params.delete('fromSlug');
+    params.delete('selected');
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  }
 
   const isFocusMode = focusedBuilding != null;
 
@@ -547,6 +568,22 @@ export function MapView({
       style={{ height: mapHeight, minHeight: '32rem' }}
     >
       <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
+
+      {/* ALWAYS-VISIBLE close button overlay. Lives at the same DOM
+          level as the maplibre canvas with a higher z-index, so even
+          if the canvas hangs / fails to load tiles, this button stays
+          tappable and the buyer can escape map mode. Real-iPhone
+          testing flagged "the map breaks, can't leave, have to close
+          the browser" — this is the bulletproof escape hatch. */}
+      <button
+        type="button"
+        onClick={closeMap}
+        aria-label="Закрыть карту"
+        className="absolute right-3 top-3 z-50 inline-flex h-10 items-center gap-1.5 rounded-full bg-white px-3 text-meta font-medium text-stone-900 shadow-lg ring-1 ring-stone-200 hover:bg-stone-50 active:bg-stone-100 md:right-4 md:top-4"
+      >
+        <X className="size-4" aria-hidden />
+        Закрыть
+      </button>
 
       {/* Browse-mode building preview card (hidden in focus mode). */}
       {!isFocusMode && selected ? (
