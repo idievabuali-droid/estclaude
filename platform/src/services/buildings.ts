@@ -39,6 +39,9 @@ const ACTIVE_CITY = 'vahdat';
 export type BuildingFilters = {
   district?: string[];
   status?: BuildingStatus[];
+  /** Filter to a single developer by id. Drives the "Все проекты
+   *  застройщика" CTA on /zhk Застройщик card. */
+  developerId?: string | null;
   /** Total-price floor in dirams. Filters buildings whose cheapest
    *  unit (price_from_dirams) is at least this. */
   priceFrom?: bigint | null;
@@ -170,6 +173,7 @@ export async function listBuildings(filters: BuildingFilters = {}): Promise<Mock
     .eq('city', ACTIVE_CITY);
   if (filters.status?.length) q = q.in('status', filters.status);
   if (filters.q) q = q.ilike('name->>ru', `%${filters.q}%`);
+  if (filters.developerId) q = q.eq('developer_id', filters.developerId);
 
   if (filters.district?.length) {
     const { data: dRows } = await supabase

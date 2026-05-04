@@ -138,9 +138,16 @@ export default async function NovostroykiPage({
   const nearLat = sp.near_lat ? parseFloat(sp.near_lat) : null;
   const nearLng = sp.near_lng ? parseFloat(sp.near_lng) : null;
   const nearRadius = sp.radius ? parseInt(sp.radius, 10) : nearLat != null ? 1500 : null;
+  // Developer scope — when ?developer={id} is set, narrow to that
+  // developer's projects. Looked up server-side so we can render
+  // their display name in the contextual header. Anything that
+  // doesn't resolve falls back to no-filter (better than 404).
+  const scopedDeveloper = sp.developer ? await getDeveloperById(sp.developer) : null;
+
   const filtered = await listBuildings({
     district: sp.district?.split(','),
     status: sp.status?.split(',') as BuildingStatus[] | undefined,
+    developerId: scopedDeveloper?.id,
     // Total-price filters (TJS strings → dirams).
     priceFrom: sp.price_from ? BigInt(parseInt(sp.price_from, 10) * 100) : null,
     priceTo: sp.price_to ? BigInt(parseInt(sp.price_to, 10) * 100) : null,
@@ -192,7 +199,11 @@ export default async function NovostroykiPage({
           <div className="flex items-end justify-between gap-3">
             <div className="flex min-w-0 flex-col gap-1">
               <h1 className="text-h1 font-semibold text-stone-900">
-                {sp.near_label ? `Рядом с «${sp.near_label}»` : t('buildings')}
+                {scopedDeveloper
+                  ? `Проекты от ${scopedDeveloper.display_name.ru}`
+                  : sp.near_label
+                    ? `Рядом с «${sp.near_label}»`
+                    : t('buildings')}
               </h1>
               <p className="text-meta text-stone-500 tabular-nums">
                 {filtered.length} {filtered.length === 1 ? 'проект' : 'проектов'}

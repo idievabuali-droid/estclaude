@@ -1,4 +1,4 @@
-import { Building, Home as HomeIcon, Globe2, Sparkles } from 'lucide-react';
+import { Building, Home as HomeIcon, Globe2, Sparkles, ShieldCheck, Camera, Plane } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { AppContainer } from '@/components/primitives';
 import { BuildingCard, ListingCard, LocationSearch } from '@/components/blocks';
@@ -109,6 +109,31 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               </Link>
             </div>
           </div>
+          {/* 3-USP strip — answers the "what is this platform actually
+              FOR?" question Saidakbar asked in 10 seconds. Three
+              concrete, verifiable proofs of value: trust signal,
+              construction transparency, diaspora-friendly. Replaces
+              the previous brand-identity gap where the home page only
+              said "with confidence" but didn't show why. Mirrors the
+              Bayut / Property Finder / Krisha home-page proof strips. */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <UspCard
+              Icon={ShieldCheck}
+              title="Проверенные застройщики"
+              body="Команда вычитывает каждое объявление и подтверждает компанию по телефону офиса."
+            />
+            <UspCard
+              Icon={Camera}
+              title="Реальные фото со стройки"
+              body="Ежемесячные снимки с площадки с верификацией метаданных съёмки."
+            />
+            <UspCard
+              Icon={Plane}
+              title="Покупка из-за границы"
+              body="Видеообзор и проверка документов без поездки в Таджикистан."
+            />
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-caption font-medium text-stone-500">или просто:</span>
             <DirectionChip
@@ -227,6 +252,28 @@ const DIRECTION_TONE: Record<DirectionTone, string> = {
   stone:
     'border-stone-300 bg-white text-stone-800 hover:border-stone-400 hover:bg-stone-100',
 };
+
+function UspCard({
+  Icon,
+  title,
+  body,
+}: {
+  Icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-md border border-stone-200 bg-white px-3 py-3">
+      <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-terracotta-50 text-terracotta-700">
+        <Icon className="size-4" aria-hidden />
+      </span>
+      <div className="flex flex-col gap-0.5">
+        <p className="text-meta font-semibold text-stone-900">{title}</p>
+        <p className="text-caption text-stone-600">{body}</p>
+      </div>
+    </div>
+  );
+}
 
 function DirectionChip({
   href,

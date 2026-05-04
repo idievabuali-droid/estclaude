@@ -50,6 +50,9 @@ export type FilterParams = {
   radius?: string;
   /** Sort mode for the result list — see SortChip + BuildingFilters.sort. */
   sort?: 'recommended' | 'cheapest' | 'expensive' | 'newest';
+  /** Filter to a single developer by id. Set by the "Все проекты
+   *  застройщика" CTA on /zhk Застройщик card. */
+  developer?: string;
 };
 
 /** Read a CSV param as a Set for membership checks + toggling. */

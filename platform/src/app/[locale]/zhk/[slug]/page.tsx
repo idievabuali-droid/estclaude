@@ -451,7 +451,14 @@ export default async function BuildingDetailPage({
                         <MessageCircle className="size-4" /> Связаться с застройщиком
                       </AppButton>
                     </a>
-                    <AppButton variant="secondary">Все проекты застройщика</AppButton>
+                    {/* Was a dead <button> with no href / no onClick.
+                        Now links to /novostroyki?developer={id}, which
+                        reads the param server-side, scopes the result
+                        list, and renders "Проекты от {Кофарнихон
+                        Девелопмент}" as the page title. */}
+                    <Link href={`/novostroyki?developer=${developer.id}`}>
+                      <AppButton variant="secondary">Все проекты застройщика</AppButton>
+                    </Link>
                   </div>
                 </div>
 
