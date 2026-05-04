@@ -48,6 +48,7 @@ const ALLOWED_EVENT_TYPES = new Set([
   'callback_request_submitted',
   'callback_widget_typed_no_submit',
   'listing_revisit',
+  'login_callback_submitted',
 ]);
 
 /** Soft per-anon rate limit. In-memory map (per serverless instance);

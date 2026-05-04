@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bell, Send } from 'lucide-react';
+import { Bell, Send, Phone } from 'lucide-react';
 import { AppCard, AppCardContent, AppButton, AppInput } from '@/components/primitives';
 import { toast } from '@/components/primitives/AppToast';
 import { track } from '@/lib/analytics/track';
@@ -136,44 +136,47 @@ export function SaveSearchPrompt({ page, filters, noResults }: SaveSearchPromptP
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 md:flex-row md:items-start">
+          {/* Two equal-weight buttons. Tajik buyers skew WhatsApp, so
+              hiding it behind a "У меня нет Telegram" link (the old
+              UX) treated the dominant local channel as a fallback.
+              Now both methods are visible at first sight; tapping
+              WhatsApp expands the phone-input row inline. */}
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             <AppButton
               variant="primary"
               onClick={subscribeViaTelegram}
               loading={submitting && !showWhatsApp}
-              className="md:w-auto"
             >
               <Send className="size-4" />
-              Подписаться через Telegram
+              Через Telegram
             </AppButton>
-            {showWhatsApp ? (
-              <div className="flex flex-col gap-2 md:flex-row">
-                <AppInput
-                  type="tel"
-                  inputMode="tel"
-                  placeholder="+992 93 ..."
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="md:w-44"
-                />
-                <AppButton
-                  variant="secondary"
-                  onClick={subscribeViaWhatsApp}
-                  loading={submitting && showWhatsApp}
-                >
-                  Сохранить номер
-                </AppButton>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowWhatsApp(true)}
-                className="self-start text-meta font-medium text-terracotta-700 underline-offset-2 hover:underline md:self-center md:px-3"
-              >
-                У меня нет Telegram — оставлю WhatsApp
-              </button>
-            )}
+            <AppButton
+              variant={showWhatsApp ? 'primary' : 'secondary'}
+              onClick={() => setShowWhatsApp((v) => !v)}
+            >
+              <Phone className="size-4" />
+              Через WhatsApp
+            </AppButton>
           </div>
+          {showWhatsApp ? (
+            <div className="flex flex-col gap-2 md:flex-row md:items-start">
+              <AppInput
+                type="tel"
+                inputMode="tel"
+                placeholder="+992 93 ..."
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="md:flex-1"
+              />
+              <AppButton
+                variant="primary"
+                onClick={subscribeViaWhatsApp}
+                loading={submitting && showWhatsApp}
+              >
+                Сохранить номер
+              </AppButton>
+            </div>
+          ) : null}
         </div>
       </AppCardContent>
     </AppCard>
