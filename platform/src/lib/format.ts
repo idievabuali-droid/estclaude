@@ -121,3 +121,26 @@ export function formatPostedAgo(iso: string): string {
     ? `${postedParts.day} ${monthShort}`
     : `${postedParts.day} ${monthShort} ${postedParts.year}`;
 }
+
+/**
+ * Both relative AND absolute date — "5 дней назад · 12 окт" — so a
+ * detail-page reader can spot stale listings (relative for casual scan,
+ * absolute for trust check). For listing/building cards keep
+ * `formatPostedAgo` because space is tight there.
+ *
+ * Falls back to just the absolute form for ≥30-day-old items, since
+ * the relative form ("…назад") becomes the absolute date anyway.
+ */
+export function formatPostedAgoLong(iso: string): string {
+  const relative = formatPostedAgo(iso);
+  const postedParts = tajikParts(new Date(iso));
+  const nowParts = tajikParts(new Date());
+  const postedMidnight = Date.UTC(postedParts.year, postedParts.month, postedParts.day);
+  const nowMidnight = Date.UTC(nowParts.year, nowParts.month, nowParts.day);
+  const dayDiff = Math.floor((nowMidnight - postedMidnight) / 86_400_000);
+  if (dayDiff < 2) return relative; // сегодня/вчера already include time
+  if (dayDiff >= 30) return relative; // already absolute
+  // 2–29 days: append the absolute date as a secondary cue.
+  const monthShort = RU_MONTHS_SHORT[postedParts.month]!;
+  return `${relative} · ${postedParts.day} ${monthShort}`;
+}

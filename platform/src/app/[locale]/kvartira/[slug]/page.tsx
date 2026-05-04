@@ -13,7 +13,7 @@ import { AppContainer, AppChip } from '@/components/primitives';
 import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle } from '@/components/blocks';
 import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
-import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo } from '@/lib/format';
+import { formatPriceNumber, formatM2, formatFloor, formatPostedAgoLong } from '@/lib/format';
 import { getListing } from '@/services/listings';
 import { getNearbyPOIs, POI_LABELS, type PoiCategory } from '@/services/poi';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
@@ -288,7 +288,7 @@ export default async function ListingDetailPage({
           {/* Tertiary signal — small + muted so it doesn't compete with
               price or building info above. */}
           <span className="text-caption text-stone-400">
-            Опубликовано {formatPostedAgo(listing.published_at)}
+            Опубликовано {formatPostedAgoLong(listing.published_at)}
           </span>
 
           {/* Trust signals: view count + most-recent price change.
@@ -304,13 +304,10 @@ export default async function ListingDetailPage({
             sellerPhone={sellerPhone}
             isDiaspora={isDiaspora}
           />
-
-          {/* Anonymous-friendly callback widget. Logged-in visitors
-              already have ContactBarWithModal as the primary surface
-              and we'd rather not double up; this widget exists so a
-              random visitor without a Telegram session can leave a
-              phone for the founder to follow up on WhatsApp. */}
-          {!visitor ? <CallbackWidget listingId={listing.id} /> : null}
+          {/* CallbackWidget moved BELOW the description (see end of
+              page) so it doesn't interrupt the price → specs flow.
+              A second contact prompt above the fold competes with
+              the primary ContactBarWithModal anyway. */}
         </AppContainer>
       </section>
 
@@ -381,6 +378,20 @@ export default async function ListingDetailPage({
         </AppContainer>
       </section>
 
+      {/* Anonymous-friendly callback widget. Logged-in visitors already
+          have ContactBarWithModal as the primary surface and we'd
+          rather not double up; this widget exists so a random visitor
+          without a Telegram session can leave a phone for the founder
+          to follow up on WhatsApp. Lives BELOW the description so it
+          doesn't interrupt the price → specs flow above. */}
+      {!visitor ? (
+        <section className="border-t border-stone-200 py-6">
+          <AppContainer>
+            <CallbackWidget listingId={listing.id} />
+          </AppContainer>
+        </section>
+      ) : null}
+
       {/* Building summary card removed — the title block at the top
           already has the building name (clickable to /zhk), the "На
           карте" pill, AND the developer name. A repeat card here was
@@ -418,7 +429,20 @@ export default async function ListingDetailPage({
       {similar.length > 0 ? (
         <section className="border-t border-stone-200 bg-stone-50 py-6 pb-24 md:pb-7">
           <AppContainer className="flex flex-col gap-5">
-            <h2 className="text-h2 font-semibold text-stone-900">Похожие в этом ЖК</h2>
+            <div className="flex items-end justify-between gap-3">
+              <h2 className="text-h2 font-semibold text-stone-900">Похожие в этом ЖК</h2>
+              {/* Krisha pattern — when buyer is interested in this
+                  building, give them an instant escape to the full
+                  list with the building scope already applied. The
+                  building-scoped /kvartiry shows the count + filter
+                  chips so they can narrow further. */}
+              <Link
+                href={`/kvartiry?building=${building.slug}`}
+                className="shrink-0 text-meta font-medium text-terracotta-600 hover:text-terracotta-700"
+              >
+                Все квартиры в ЖК →
+              </Link>
+            </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
               {similar.map((l) => (
                 <ListingCard

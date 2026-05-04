@@ -2,6 +2,7 @@ import { setRequestLocale } from 'next-intl/server';
 import { ChevronDown, MessageCircle, Phone } from 'lucide-react';
 import { AppContainer, AppCard, AppCardContent, AppButton } from '@/components/primitives';
 import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
+import { FaqAutoOpen } from './FaqAutoOpen';
 
 /**
  * Help center — V1 simplified version.
@@ -27,8 +28,9 @@ import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
  *   - "verification-tiers" → narrowed to just "Проверенный застройщик"
  *     since that's the only verification badge V1 actually shows
  */
-const FAQ = [
+const FAQ: ReadonlyArray<{ id: string; q: string; a: readonly string[] }> = [
   {
+    id: 'verified-developer',
     q: 'Что означает «Проверенный застройщик»?',
     a: [
       'Значок появляется на карточках ЖК, когда наша команда подтвердила застройщика по телефону его офиса.',
@@ -40,6 +42,7 @@ const FAQ = [
     ],
   },
   {
+    id: 'finishing-types',
     q: 'Без ремонта, предчистовая, с ремонтом — в чём разница?',
     a: [
       'Четыре типа отделки в новостройках Таджикистана:',
@@ -50,6 +53,7 @@ const FAQ = [
     ],
   },
   {
+    id: 'installments',
     q: 'Что такое рассрочка и как она работает?',
     a: [
       'Рассрочка от застройщика — это покупка квартиры в платежах напрямую застройщику, без банка и без процентов.',
@@ -61,6 +65,7 @@ const FAQ = [
     ],
   },
   {
+    id: 'safe-buying',
     q: 'Как безопасно покупать новостройку?',
     a: [
       'Что проверить перед сделкой:',
@@ -76,6 +81,7 @@ const FAQ = [
     ],
   },
   {
+    id: 'diaspora-buying',
     q: 'Покупаю из России — как это работает?',
     a: [
       'Если вы за границей — Россия, Казахстан, Турция и другие страны — покупка возможна без поездки в Таджикистан.',
@@ -98,6 +104,7 @@ export default async function HelpCenterPage({
 
   return (
     <>
+      <FaqAutoOpen />
       <section className="border-b border-stone-200 bg-white py-5">
         <AppContainer className="flex flex-col gap-2">
           <h1 className="text-h1 font-semibold text-stone-900">Центр помощи</h1>
@@ -111,13 +118,16 @@ export default async function HelpCenterPage({
         <AppContainer className="flex flex-col gap-5">
           <div className="flex flex-col gap-3">
           {FAQ.map((item) => (
-            // Native <details> for server-rendered, JS-free accordion.
-            // Tailwind's `group/details` modifier + open: variant
-            // would let us animate the chevron, but a simple rotation
-            // via the open attribute is enough here.
+            // Native <details> with id so deep-links from badges/chips
+            // (e.g. /tsentr-pomoshchi#verified-developer) scroll here.
+            // The `target:open` selector below wouldn't work — the open
+            // attribute is HTML, not CSS — so deep-linked auto-open is
+            // handled by the small inline script in the <FaqAutoOpen>
+            // component at the bottom.
             <details
-              key={item.q}
-              className="group rounded-md border border-stone-200 bg-white open:bg-stone-50"
+              key={item.id}
+              id={item.id}
+              className="group rounded-md border border-stone-200 bg-white open:bg-stone-50 target:bg-amber-50"
             >
               <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-h3 font-semibold text-stone-900 marker:hidden [&::-webkit-details-marker]:hidden">
                 <span>{item.q}</span>

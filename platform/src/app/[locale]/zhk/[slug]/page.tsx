@@ -344,10 +344,14 @@ export default async function BuildingDetailPage({
                     <h3 className="inline-flex flex-wrap items-center gap-2 text-h3 font-semibold text-stone-900">
                       {developer.display_name.ru}
                       {developer.is_verified ? (
-                        <span className="inline-flex items-center gap-1 rounded-sm bg-amber-50 px-2 py-0.5 text-caption font-medium text-[color:var(--color-badge-tier-developer)]">
+                        <Link
+                          href="/tsentr-pomoshchi#verified-developer"
+                          className="inline-flex items-center gap-1 rounded-sm bg-amber-50 px-2 py-0.5 text-caption font-medium text-[color:var(--color-badge-tier-developer)] hover:bg-amber-100"
+                          title="Что значит «Проверенный»?"
+                        >
                           <BadgeCheck className="size-3.5" aria-hidden />
                           Проверенный
-                        </span>
+                        </Link>
                       ) : null}
                     </h3>
                     {developer.years_active ? (
@@ -370,9 +374,23 @@ export default async function BuildingDetailPage({
 
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
                   <DevStat label="Всего проектов" value={devStats.total} />
-                  <DevStat label="Сдано" value={devStats.delivered} accent="green" />
-                  <DevStat label="Строится" value={devStats.underConstruction} accent="amber" />
-                  <DevStat label="Котлован" value={devStats.announced} />
+                  <DevStat
+                    label="Сдано"
+                    value={devStats.delivered}
+                    accent="green"
+                    href="/novostroyki?status=delivered"
+                  />
+                  <DevStat
+                    label="Строится"
+                    value={devStats.underConstruction}
+                    accent="amber"
+                    href="/novostroyki?status=under_construction"
+                  />
+                  <DevStat
+                    label="Котлован"
+                    value={devStats.announced}
+                    href="/novostroyki?status=announced"
+                  />
                 </div>
 
                 {devStats.total === 0 ? (
@@ -434,10 +452,16 @@ function DevStat({
   label,
   value,
   accent,
+  href,
 }: {
   label: string;
   value: number;
   accent?: 'green' | 'amber';
+  /** Optional drill-down — the stat becomes a Link to a filtered
+   *  /novostroyki view (e.g. status=delivered for "Сдано"). When the
+   *  stat is zero we render a non-clickable card since there's nothing
+   *  to drill into. */
+  href?: string;
 }) {
   const valueClass =
     accent === 'green'
@@ -445,10 +469,25 @@ function DevStat({
       : accent === 'amber'
       ? 'text-[color:var(--color-badge-tier-developer)]'
       : 'text-stone-900';
-  return (
-    <div className="flex flex-col gap-1 rounded-md border border-stone-200 bg-stone-50 p-3">
+  const inner = (
+    <>
       <span className="text-caption text-stone-500">{label}</span>
       <span className={`text-h3 font-semibold tabular-nums ${valueClass}`}>{value}</span>
+    </>
+  );
+  if (href && value > 0) {
+    return (
+      <Link
+        href={href}
+        className="flex flex-col gap-1 rounded-md border border-stone-200 bg-stone-50 p-3 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50"
+      >
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-1 rounded-md border border-stone-200 bg-stone-50 p-3">
+      {inner}
     </div>
   );
 }

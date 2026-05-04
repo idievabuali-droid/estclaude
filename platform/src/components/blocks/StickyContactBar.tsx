@@ -16,16 +16,32 @@ export interface StickyContactBarProps {
 
 /**
  * Sticky bottom bar (mobile only). Layout:
- *   [ 💬 WhatsApp (label, primary, flex-1) ] [ ✈ ] [ 🖼 ] [ 📞 ] [ 📅 ]
+ *   [ 💬 WhatsApp (labeled primary, flex-1) ] [ icon+small label × 4 ]
  *
  * WhatsApp gets the labeled primary slot because it's the dominant
- * channel in our market (Tajik buyers default to WA). Telegram, IMO,
- * Phone, and the intent (Visit / Online-showing) are icon-only secondary
- * buttons. Five actions fit on a 375px width with this hierarchy.
+ * channel in our market (Tajik buyers default to WA). The other four
+ * (Telegram, IMO, Phone, Intent) used to be unlabeled icons — buyers
+ * had to guess which was which. Now each carries a 9px label under
+ * the icon, still fits on 375px.
  *
  * The intent button (rightmost) opens the visit/online-showing form
  * via onIntent — same modal that the desktop "Запланировать" CTA opens.
  */
+function IconWithLabel({
+  icon,
+  label,
+}: {
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <span className="flex flex-col items-center justify-center gap-0.5 leading-none">
+      {icon}
+      <span className="text-[10px] font-medium">{label}</span>
+    </span>
+  );
+}
+
 export function StickyContactBar({
   links,
   intentShortLabel,
@@ -45,18 +61,18 @@ export function StickyContactBar({
           </AppButton>
         </a>
         <a href={links.telegram} target="_blank" rel="noopener noreferrer" aria-label="Telegram">
-          <AppButton variant="secondary" size="md" className="aspect-square px-0">
-            <Send className="size-4" aria-hidden />
+          <AppButton variant="secondary" size="md" className="h-12 px-2 py-1">
+            <IconWithLabel icon={<Send className="size-4" aria-hidden />} label="TG" />
           </AppButton>
         </a>
         <a href={links.imo} target="_blank" rel="noopener noreferrer" aria-label="IMO">
-          <AppButton variant="secondary" size="md" className="aspect-square px-0">
-            <ImageIcon className="size-4" aria-hidden />
+          <AppButton variant="secondary" size="md" className="h-12 px-2 py-1">
+            <IconWithLabel icon={<ImageIcon className="size-4" aria-hidden />} label="IMO" />
           </AppButton>
         </a>
         <a href={links.call} aria-label="Позвонить">
-          <AppButton variant="secondary" size="md" className="aspect-square px-0">
-            <Phone className="size-4" aria-hidden />
+          <AppButton variant="secondary" size="md" className="h-12 px-2 py-1">
+            <IconWithLabel icon={<Phone className="size-4" aria-hidden />} label="Звонок" />
           </AppButton>
         </a>
         <AppButton
@@ -64,9 +80,9 @@ export function StickyContactBar({
           size="md"
           onClick={onIntent}
           aria-label={intentShortLabel}
-          className="aspect-square px-0"
+          className="h-12 px-2 py-1"
         >
-          <IntentIcon className="size-4" />
+          <IconWithLabel icon={<IntentIcon className="size-4" />} label={intentShortLabel} />
         </AppButton>
       </div>
     </div>

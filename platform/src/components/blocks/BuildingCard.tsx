@@ -147,9 +147,18 @@ export function BuildingCard({
             <ArrowUpRight className="size-3 shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
           </button>
           {developer.is_verified ? (
-            <span className="inline-flex w-fit">
+            // Click-through to the FAQ entry that explains what
+            // "Проверенный застройщик" actually means — closes the
+            // most-asked first-time-buyer question without forcing them
+            // to dig through /tsentr-pomoshchi.
+            <Link
+              href="/tsentr-pomoshchi#verified-developer"
+              className="inline-flex w-fit"
+              onClick={(e) => e.stopPropagation()}
+              title="Что значит «Проверенный»?"
+            >
               <VerificationBadge tier="phone_verified" developerVerified />
-            </span>
+            </Link>
           ) : null}
         </div>
 
