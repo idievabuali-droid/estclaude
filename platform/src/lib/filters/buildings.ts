@@ -23,6 +23,9 @@ export interface BuildingForFilter {
 
 export interface ListingForBuildingFilter {
   price_per_m2_dirams: bigint | string | number;
+  /** Total price in dirams — needed by the new total-price filter so a
+   *  saved search like price_to=200000 matches against the unit total. */
+  price_total_dirams: bigint | string | number;
   building: BuildingForFilter | null;
 }
 
@@ -72,6 +75,15 @@ export function matchesBuildingFilters(
     const haveAll = amenities.every((a) => (b.amenities ?? []).includes(a));
     if (!haveAll) return false;
   }
+
+  // Total-price range — the chip on /novostroyki now uses this. The
+  // unit's total price has to fit inside the saved range for the
+  // listing to be a valid match for a "Цена" subscription.
+  const priceFrom = filters.price_from ? parseInt(filters.price_from as string, 10) : null;
+  const priceTo = filters.price_to ? parseInt(filters.price_to as string, 10) : null;
+  const totalDirams = BigInt(listing.price_total_dirams as string | number);
+  if (priceFrom != null && totalDirams < BigInt(priceFrom * 100)) return false;
+  if (priceTo != null && totalDirams > BigInt(priceTo * 100)) return false;
 
   const perM2From = filters.price_per_m2_from ? parseInt(filters.price_per_m2_from as string, 10) : null;
   const perM2To = filters.price_per_m2_to ? parseInt(filters.price_per_m2_to as string, 10) : null;

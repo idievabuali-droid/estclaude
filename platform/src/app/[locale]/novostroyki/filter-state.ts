@@ -13,6 +13,11 @@
 export type FilterParams = {
   district?: string;
   status?: string;
+  /** Total-price range in TJS (Faridun's mental model: "до 220k"). */
+  price_from?: string;
+  price_to?: string;
+  /** Per-m² range in TJS — kept for legacy URLs and future advanced UI;
+   *  the chip now uses total-price by default. */
   price_per_m2_from?: string;
   price_per_m2_to?: string;
   handover?: string;

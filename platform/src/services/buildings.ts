@@ -39,9 +39,13 @@ const ACTIVE_CITY = 'vahdat';
 export type BuildingFilters = {
   district?: string[];
   status?: BuildingStatus[];
-  /** Total-price ceiling in dirams. Legacy filter, still respected. */
+  /** Total-price floor in dirams. Filters buildings whose cheapest
+   *  unit (price_from_dirams) is at least this. */
+  priceFrom?: bigint | null;
+  /** Total-price ceiling in dirams. Filters buildings whose cheapest
+   *  unit is at most this — Faridun's "до 220k" mental model. */
   priceTo?: bigint | null;
-  /** Per-m² price floor in dirams. New in V1 filter pass. */
+  /** Per-m² price floor in dirams. Power-user / advanced filter. */
   pricePerM2From?: bigint | null;
   /** Per-m² price ceiling in dirams. */
   pricePerM2To?: bigint | null;
@@ -184,10 +188,19 @@ export async function listBuildings(filters: BuildingFilters = {}): Promise<Mock
   // The denormalised column is nullable until a Postgres trigger is added.
   await fillPriceFrom(supabase, buildings);
 
-  // Total-price ceiling (legacy)
+  // Total-price range — filters buildings whose cheapest unit is
+  // within bounds. Both ends optional.
+  if (filters.priceFrom) {
+    const floor = filters.priceFrom;
+    buildings = buildings.filter(
+      (b) => b.price_from_dirams != null && b.price_from_dirams >= floor,
+    );
+  }
   if (filters.priceTo) {
     const cap = filters.priceTo;
-    buildings = buildings.filter((b) => b.price_from_dirams != null && b.price_from_dirams <= cap);
+    buildings = buildings.filter(
+      (b) => b.price_from_dirams != null && b.price_from_dirams <= cap,
+    );
   }
 
   // Per-m² price range — applied in JS because the denorm column may be

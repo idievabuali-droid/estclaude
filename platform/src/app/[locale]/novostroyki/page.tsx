@@ -141,7 +141,11 @@ export default async function NovostroykiPage({
   const filtered = await listBuildings({
     district: sp.district?.split(','),
     status: sp.status?.split(',') as BuildingStatus[] | undefined,
-    // Per-m² filters arrive as TJS strings ("4000"); convert to dirams.
+    // Total-price filters (TJS strings → dirams).
+    priceFrom: sp.price_from ? BigInt(parseInt(sp.price_from, 10) * 100) : null,
+    priceTo: sp.price_to ? BigInt(parseInt(sp.price_to, 10) * 100) : null,
+    // Per-m² range — kept for backwards compat with old saved searches;
+    // no UI exposes it after the chip was retargeted to total price.
     pricePerM2From: sp.price_per_m2_from
       ? BigInt(parseInt(sp.price_per_m2_from, 10) * 100)
       : null,
@@ -194,6 +198,9 @@ export default async function NovostroykiPage({
                 {sp.near_label && nearRadius
                   ? ` · в радиусе ${(nearRadius / 1000).toFixed(1)} км`
                   : ''}
+                {/* Price range hint sets expectation BEFORE he scrolls.
+                    Krisha pattern: "от X до Y" in the result-count line. */}
+                {priceRangeText(filtered) ? ` · ${priceRangeText(filtered)}` : ''}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -266,9 +273,19 @@ export default async function NovostroykiPage({
               sheet with the full set of options + an Apply button. The
               bar scrolls horizontally on narrow viewports — chips are
               shrink-0 so they keep their natural width. */}
+          {/* Chip order: high-decision filters first so the truncation
+              edge of the horizontal scroll doesn't hide the chip a
+              first-time buyer reaches for. Цена + Что рядом are
+              decisive; Стадия/Сдача/Удобства are refinements. */}
           <div className="-mx-4 md:-mx-5 lg:-mx-6">
             <div className="flex items-center gap-2 overflow-x-auto px-4 py-1 md:px-5 lg:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <PriceChip current={sp} />
+              <MultiSelectChip
+                label="Что рядом"
+                paramKey="nearby"
+                options={NEARBY_FILTERS}
+                current={sp}
+              />
               <MultiSelectChip
                 label="Стадия"
                 paramKey="status"
@@ -285,12 +302,6 @@ export default async function NovostroykiPage({
                 label="Удобства"
                 paramKey="amenities"
                 options={AMENITIES_FILTERS}
-                current={sp}
-              />
-              <MultiSelectChip
-                label="Что рядом"
-                paramKey="nearby"
-                options={NEARBY_FILTERS}
                 current={sp}
               />
             </div>
@@ -370,6 +381,32 @@ export default async function NovostroykiPage({
   );
 }
 
+/** Returns "от 168К до 1.2М TJS" given the filtered building list,
+ *  or empty string when no buildings have a price set. Uses the
+ *  building's cheapest-unit price (price_from_dirams) since that's
+ *  the figure each card already displays. */
+function priceRangeText(buildings: Array<{ price_from_dirams?: bigint | null }>): string {
+  const prices = buildings
+    .map((b) => b.price_from_dirams)
+    .filter((p): p is bigint => p != null);
+  if (prices.length === 0) return '';
+  // BigInt min/max (no Math.min on bigints).
+  let min = prices[0]!;
+  let max = prices[0]!;
+  for (const p of prices) {
+    if (p < min) min = p;
+    if (p > max) max = p;
+  }
+  const fmt = (dirams: bigint) => {
+    const tjs = Number(dirams) / 100;
+    if (tjs >= 1_000_000) return `${(tjs / 1_000_000).toFixed(1).replace(/\.0$/, '')}М`;
+    if (tjs >= 1_000) return `${Math.round(tjs / 1_000)}К`;
+    return String(Math.round(tjs));
+  };
+  if (min === max) return `от ${fmt(min)} TJS`;
+  return `от ${fmt(min)} до ${fmt(max)} TJS`;
+}
+
 /** True when the visitor has narrowed the result set in any way that
  *  could be re-played as a notification trigger. View-mode toggles
  *  (?view=karta) and focus pins (?focus=...) are navigation, not
@@ -381,6 +418,8 @@ function hasActiveFilters(sp: FilterParams): boolean {
       sp.handover ||
       sp.amenities ||
       sp.nearby ||
+      sp.price_from ||
+      sp.price_to ||
       sp.price_per_m2_from ||
       sp.price_per_m2_to,
   );
@@ -397,6 +436,7 @@ function countActiveFilters(sp: FilterParams): number {
   if (sp.handover) n++;
   if (sp.amenities) n++;
   if (sp.nearby) n++;
+  if (sp.price_from || sp.price_to) n++;
   if (sp.price_per_m2_from || sp.price_per_m2_to) n++;
   return n;
 }
@@ -406,15 +446,19 @@ function countActiveFilters(sp: FilterParams): number {
 function buildRelaxOptionsNovostroyki(
   sp: FilterParams,
 ): Array<{ paramKey: string; label: string }> {
+  // Order = "least likely to be the user's hard constraint first" so
+  // we don't prompt Faridun to drop his price ceiling. Amenities/nearby
+  // tend to be soft preferences; price/district are hard.
   const opts: Array<{ paramKey: string; label: string }> = [];
-  if (sp.price_per_m2_from || sp.price_per_m2_to) {
-    opts.push({ paramKey: 'price_per_m2_to', label: 'Цена за м²' });
-  }
   if (sp.amenities) opts.push({ paramKey: 'amenities', label: 'Удобства' });
   if (sp.nearby) opts.push({ paramKey: 'nearby', label: 'Что рядом' });
   if (sp.handover) opts.push({ paramKey: 'handover', label: 'Сдача' });
   if (sp.status) opts.push({ paramKey: 'status', label: 'Стадия' });
   if (sp.district) opts.push({ paramKey: 'district', label: 'Район' });
+  if (sp.price_from || sp.price_to) opts.push({ paramKey: 'price_to', label: 'Цена' });
+  if (sp.price_per_m2_from || sp.price_per_m2_to) {
+    opts.push({ paramKey: 'price_per_m2_to', label: 'Цена за м²' });
+  }
   return opts.slice(0, 3);
 }
 
