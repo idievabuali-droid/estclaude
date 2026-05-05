@@ -116,27 +116,28 @@ export default async function ListingDetailPage({
   setRequestLocale(locale);
   const tFinishing = await getTranslations('Finishing');
 
+  // getListing is the only blocker for the rest — we need its
+  // building lat/lng + listing id before the parallel batch.
   const data = await getListing(slug);
   if (!data) notFound();
   const { listing, building, developer, district, similar, sellerPhone } = data;
-  // Auth check used to decide whether to show the anonymous-only
-  // CallbackWidget (logged-in users have ContactBarWithModal, no
-  // need for a duplicate phone-capture surface).
-  const visitor = await getCurrentUser();
-  // Diaspora context: when the buyer has set a foreign currency on
-  // /diaspora, the contact-bar intent CTA switches from physical visit
-  // to online showing.
   const currency = await readCurrencyCookie();
   const isDiaspora = currency != null && currency !== 'TJS';
-  // Exchange rates only fetched when the visitor has set a foreign
-  // currency — local buyers don't need them and the call (cached
-  // 24h, fail-soft) is wasted work otherwise.
-  const rates = isDiaspora ? await getExchangeRates() : null;
-  const pois = await getNearbyPOIs(building.latitude, building.longitude);
-  // Trust signals — view count + recent price-change line, sourced
-  // from the events table. Both are optional: zero views or no price
-  // history → the strip simply doesn't render.
-  const stats = await getListingStats(listing.id, listing.slug);
+
+  // Parallelise the rest. Was sequential before — the slowest single
+  // call (getNearbyPOIs hits Overpass live, ~1-3s) blocked everything
+  // after it, multiplying perceived latency on Tajik mobile networks.
+  // Promise.all collapses them to max(individual) instead of sum.
+  // - getCurrentUser: cookie + 1-2 DB lookups
+  // - getExchangeRates: cached 24h, only fired for diaspora
+  // - getNearbyPOIs: now properly cached (24h via unstable_cache)
+  // - getListingStats: events table aggregations
+  const [visitor, rates, pois, stats] = await Promise.all([
+    getCurrentUser(),
+    isDiaspora ? getExchangeRates() : Promise.resolve(null),
+    getNearbyPOIs(building.latitude, building.longitude),
+    getListingStats(listing.id, listing.slug),
+  ]);
 
   // Pre-compute the compact nearby rows so the JSX stays readable.
   const compactNearby = COMPACT_POI_CATEGORIES.map((cat) => ({

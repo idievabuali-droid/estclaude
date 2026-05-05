@@ -6,9 +6,14 @@
  * Mosque is a first-class category — no Russian platform offers it, but
  * culturally load-bearing in Tajikistan.
  *
- * Cached at the fetch layer (24h revalidate) so we don't hammer Overpass.
- * Per request takes ~1-2s on first hit, instant on cache hit.
+ * Caching: the underlying Overpass call is a POST, which Next.js fetch
+ * cache won't honor. We wrap getNearbyPOIs in unstable_cache instead
+ * (24h TTL, keyed by rounded lat/lng so two buildings on the same
+ * block share the cache entry). Without this every /kvartira and /zhk
+ * page render hits Overpass live (~1-3s) — the biggest single
+ * slowdown on Tajik mobile networks.
  */
+import { unstable_cache } from 'next/cache';
 
 export type PoiCategory =
   | 'mosque'
@@ -95,10 +100,37 @@ function elementName(el: OverpassElement, fallback: string): string {
 }
 
 /**
- * Fetches POIs from Overpass for a given coordinate. Returns nearest
- * `PER_CATEGORY_LIMIT` per category, sorted by distance.
+ * Public entry point. Rounds the coords to ~3 decimals (≈100m
+ * granularity) so two buildings on the same block share the cache
+ * entry, then delegates to the cached implementation. Cache is
+ * server-side via unstable_cache — re-validates every 24h or on
+ * tag invalidation.
  */
 export async function getNearbyPOIs(
+  lat: number,
+  lng: number,
+): Promise<PoiResult> {
+  const roundedLat = Math.round(lat * 1000) / 1000;
+  const roundedLng = Math.round(lng * 1000) / 1000;
+  return getNearbyPOIsCached(roundedLat, roundedLng);
+}
+
+const getNearbyPOIsCached = unstable_cache(
+  async (lat: number, lng: number): Promise<PoiResult> => {
+    return fetchNearbyPOIsFresh(lat, lng);
+  },
+  ['nearby-pois-v1'],
+  {
+    revalidate: 86_400, // 24h
+    tags: ['overpass-poi'],
+  },
+);
+
+/**
+ * Underlying Overpass fetch. Was the public function before; now
+ * private behind getNearbyPOIs + unstable_cache.
+ */
+async function fetchNearbyPOIsFresh(
   lat: number,
   lng: number,
 ): Promise<PoiResult> {
@@ -125,8 +157,9 @@ export async function getNearbyPOIs(
         accept: 'application/json',
       },
       body: 'data=' + encodeURIComponent(query),
-      // Cache for 24h — POI data doesn't change frequently
-      next: { revalidate: 86_400 },
+      // No `next: revalidate` here — Next.js fetch cache doesn't
+      // honor it for POST requests. Caching happens one level up
+      // via unstable_cache around getNearbyPOIs.
     });
     if (!res.ok) throw new Error(`Overpass HTTP ${res.status}`);
     data = (await res.json()) as OverpassResponse;
