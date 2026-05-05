@@ -10,8 +10,14 @@ import { cn } from '@/lib/utils';
 type Answers = {
   districts: string[];
   budget: string | null;
-  rooms: string | null;
-  finishing: string | null;
+  /** Multi-select: buyer can pick "1 OR 2 rooms" (Faridun's case).
+   *  Treats the special "any" value as mutually exclusive with
+   *  specific room counts. */
+  rooms: string[];
+  /** Multi-select: buyer can pick "С ремонтом OR Отремонтировано
+   *  владельцем" (anything ready-to-move-in). Same "any"
+   *  exclusivity rule as rooms. */
+  finishing: string[];
   timing: string | null;
 };
 
@@ -63,17 +69,19 @@ export function GuidedFinder() {
   const [answers, setAnswers] = useState<Answers>({
     districts: [],
     budget: null,
-    rooms: null,
-    finishing: null,
+    rooms: [],
+    finishing: [],
     timing: null,
   });
 
   const step = STEPS[stepIdx]!;
   const isLast = stepIdx === STEPS.length - 1;
-  const canAdvance =
-    step.key === 'districts'
-      ? true // skip allowed
-      : answers[step.key] != null;
+  const canAdvance = (() => {
+    if (step.key === 'districts') return true; // skip allowed
+    if (step.key === 'rooms') return answers.rooms.length > 0;
+    if (step.key === 'finishing') return answers.finishing.length > 0;
+    return answers[step.key] != null;
+  })();
 
   function next() {
     if (!isLast) return setStepIdx((i) => i + 1);
@@ -86,8 +94,13 @@ export function GuidedFinder() {
       // dimension; the user will land there if they picked districts but no rooms/finishing.
     }
     if (answers.budget && answers.budget !== 'any') params.set('price_to', answers.budget);
-    if (answers.rooms && answers.rooms !== 'any') params.set('rooms', answers.rooms);
-    if (answers.finishing && answers.finishing !== 'any') params.set('finishing', answers.finishing);
+    // Multi-select: drop the "any" sentinel before joining; if "any"
+    // was the only pick the param is omitted, matching the "no filter"
+    // semantic the destination pages expect.
+    const roomsClean = answers.rooms.filter((r) => r !== 'any');
+    if (roomsClean.length) params.set('rooms', roomsClean.join(','));
+    const finishingClean = answers.finishing.filter((f) => f !== 'any');
+    if (finishingClean.length) params.set('finishing', finishingClean.join(','));
     // Wizard flag — destination page reads this and renders the
     // WizardResultBanner so the buyer's 5 questions of effort get
     // an explicit acknowledgement instead of an identical-to-normal
@@ -96,8 +109,9 @@ export function GuidedFinder() {
 
     // Choose target: /kvartiry is the right destination when buyer picked
     // unit-level criteria; /novostroyki is right when they only picked districts.
-    const hasUnitCriteria = (answers.rooms && answers.rooms !== 'any') ||
-      (answers.finishing && answers.finishing !== 'any');
+    const hasUnitCriteria =
+      answers.rooms.some((r) => r !== 'any') ||
+      answers.finishing.some((f) => f !== 'any');
     if (hasUnitCriteria) {
       router.push(`/kvartiry?${params.toString()}`);
     } else {
@@ -170,17 +184,18 @@ export function GuidedFinder() {
             ) : null}
             {step.key === 'rooms' ? (
               <ChipChoice
-                multi={false}
+                multi
                 options={ROOMS}
-                values={answers.rooms ? [answers.rooms] : []}
-                onChange={(v) => setAnswers((a) => ({ ...a, rooms: v[0] ?? null }))}
+                values={answers.rooms}
+                onChange={(v) => setAnswers((a) => ({ ...a, rooms: applyAnyMutex(v) }))}
               />
             ) : null}
             {step.key === 'finishing' ? (
               <CardChoice
+                multi
                 options={FINISHING}
-                value={answers.finishing}
-                onChange={(v) => setAnswers((a) => ({ ...a, finishing: v }))}
+                values={answers.finishing}
+                onChange={(v) => setAnswers((a) => ({ ...a, finishing: applyAnyMutex(v) }))}
               />
             ) : null}
             {step.key === 'timing' ? (
@@ -210,6 +225,15 @@ export function GuidedFinder() {
       </div>
     </div>
   );
+}
+
+/** Picking "Не важно" deselects every specific value (and vice
+ *  versa). Lets the buyer multi-select specific values like 1 + 2
+ *  rooms without the "any" sentinel polluting the URL params. */
+function applyAnyMutex(next: string[]): string[] {
+  const last = next[next.length - 1];
+  if (last === 'any') return ['any'];
+  return next.filter((v) => v !== 'any');
 }
 
 function ChipChoice({
@@ -254,29 +278,53 @@ function ChipChoice({
   );
 }
 
-function CardChoice({
-  options,
-  value,
-  onChange,
-}: {
-  options: Array<{ value: string; label: string; hint?: string }>;
-  value: string | null;
-  onChange: (v: string) => void;
-}) {
+/**
+ * Single OR multi-select large card chooser. Discriminated by which
+ * props are passed: `value` + scalar onChange for single (Q2 budget,
+ * Q5 timing); `values` + array onChange + `multi` for finishing
+ * (Q4) where "С ремонтом OR Отремонтировано владельцем" is a real
+ * combination buyers want.
+ */
+type CardChoiceProps =
+  | {
+      multi?: false;
+      options: Array<{ value: string; label: string; hint?: string }>;
+      value: string | null;
+      onChange: (v: string) => void;
+    }
+  | {
+      multi: true;
+      options: Array<{ value: string; label: string; hint?: string }>;
+      values: string[];
+      onChange: (v: string[]) => void;
+    };
+
+function CardChoice(props: CardChoiceProps) {
+  function isActive(v: string): boolean {
+    if (props.multi) return props.values.includes(v);
+    return props.value === v;
+  }
+  function handleClick(v: string) {
+    if (props.multi) {
+      const next = props.values.includes(v)
+        ? props.values.filter((x) => x !== v)
+        : [...props.values, v];
+      props.onChange(next);
+    } else {
+      props.onChange(v);
+    }
+  }
   return (
     <div className="flex flex-col gap-2">
-      {options.map((opt) => {
-        const active = value === opt.value;
-        return (
-          <CardOption
-            key={opt.value}
-            active={active}
-            onClick={() => onChange(opt.value)}
-            label={opt.label}
-            hint={opt.hint}
-          />
-        );
-      })}
+      {props.options.map((opt) => (
+        <CardOption
+          key={opt.value}
+          active={isActive(opt.value)}
+          onClick={() => handleClick(opt.value)}
+          label={opt.label}
+          hint={opt.hint}
+        />
+      ))}
     </div>
   );
 }
