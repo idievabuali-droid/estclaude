@@ -69,6 +69,8 @@ export { CardPhotoCarousel } from './CardPhotoCarousel';
 export type { CardPhotoCarouselProps } from './CardPhotoCarousel';
 export { BuildingContactButton } from './BuildingContactButton';
 export type { BuildingContactButtonProps } from './BuildingContactButton';
+export { BuildingStickyContact } from './BuildingStickyContact';
+export type { BuildingStickyContactProps } from './BuildingStickyContact';
 export { MessagingPopoverButton } from './MessagingPopoverButton';
 export type { MessagingPopoverButtonProps } from './MessagingPopoverButton';
 export { WizardResultBanner } from './WizardResultBanner';

@@ -19,6 +19,7 @@ import {
   MiniMap,
   ShareButton,
   SaveToggle,
+  BuildingStickyContact,
 } from '@/components/blocks';
 import { getBuilding, getDeveloperStats } from '@/services/buildings';
 import { getDistrictBenchmark } from '@/services/benchmarks';
@@ -495,7 +496,11 @@ export default async function BuildingDetailPage({
       </section>
 
       {/* ─── 8. FINISHING LEGEND (footer) ────────────────────────── */}
-      <section className="bg-stone-50 py-6 pb-9 md:pb-7">
+      {/* Extra bottom padding on mobile so the BuildingStickyContact
+          bar doesn't cover the legend's last row. The 80px clears the
+          ~64px sticky bar plus the safe-area inset on iOS notch
+          devices. Desktop drops back to its smaller padding. */}
+      <section className="bg-stone-50 py-6 pb-24 md:pb-7">
         <AppContainer className="flex flex-col gap-3">
           <h2 className="text-h3 font-semibold text-stone-900">Что значит отделка</h2>
           <div className="flex flex-wrap gap-2">
@@ -514,6 +519,18 @@ export default async function BuildingDetailPage({
           </div>
         </AppContainer>
       </section>
+
+      {/* Mobile sticky contact bar — see BuildingStickyContact for
+          the layout rationale. Anchored at the bottom across every
+          section so the buyer always has a one-tap path to ask the
+          founder about THIS specific building. */}
+      <BuildingStickyContact
+        buildingName={building.name.ru}
+        buildingAddress={`${district.name.ru} · ${building.address.ru}`}
+        whatsappLink={FOUNDER_CONTACTS.whatsappLink}
+        telegramLink={FOUNDER_CONTACTS.telegramLink}
+        phone={FOUNDER_CONTACTS.phone}
+      />
     </>
   );
 }

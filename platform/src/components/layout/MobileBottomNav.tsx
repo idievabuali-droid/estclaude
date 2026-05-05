@@ -73,6 +73,16 @@ function MobileBottomNavInner({ isAuthenticated }: { isAuthenticated: boolean })
   const isFlow = pathname.startsWith('/post') || pathname.startsWith('/verifikatsiya');
   if (isFlow) return null;
 
+  // Hide on detail pages where the contact StickyContactBar /
+  // BuildingStickyContact already pin the bottom of the screen — two
+  // stacked bars compete for tap targets and cover each other. On
+  // these pages the buyer's job is "decide on this property", so the
+  // global nav demoting itself for the duration is the right move
+  // (Cian, Avito, Rightmove all do this on listing detail).
+  const isDetail =
+    pathname.startsWith('/kvartira/') || pathname.startsWith('/zhk/');
+  if (isDetail) return null;
+
   // Hide on the focus-mode map view.
   const isFocusMap =
     pathname.startsWith('/novostroyki') &&
