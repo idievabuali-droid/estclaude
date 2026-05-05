@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { ChevronLeft, MapPin, Coins, Bed, Brush, Calendar } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { AppButton, AppCard, AppCardContent } from '@/components/primitives';
+import { LocationSearch } from '@/components/blocks';
 import { mockDistricts } from '@/lib/mock';
 import { cn } from '@/lib/utils';
 
@@ -180,12 +181,49 @@ export function GuidedFinder() {
             </div>
 
             {step.key === 'districts' ? (
-              <ChipChoice
-                multi
-                options={mockDistricts.map((d) => ({ value: d.slug, label: d.name.ru }))}
-                values={answers.districts}
-                onChange={(v) => setAnswers((a) => ({ ...a, districts: v }))}
-              />
+              <div className="flex flex-col gap-4">
+                {/* LocationSearch as the richer location input —
+                    leverages the multi-source search (district / ЖК /
+                    застройщик / POI). Picking a result navigates the
+                    visitor away from the wizard with the right
+                    destination URL (POI → /novostroyki?near_...,
+                    district → ?district=, ЖК → /zhk/<slug>, dev →
+                    /novostroyki?developer=). Buyers who already know
+                    their anchor skip Q2-Q5 entirely — the wizard
+                    is for buyers WITHOUT a specific place in mind,
+                    so this is correct. */}
+                <div className="flex flex-col gap-1">
+                  <LocationSearch
+                    destinationPath="/novostroyki"
+                    variant="compact"
+                  />
+                  <p className="text-caption text-stone-500">
+                    Знаете конкретное место — школу, ЖК, район? Введите
+                    название и сразу увидите подходящие квартиры.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 text-caption uppercase tracking-wide text-stone-400">
+                  <span className="h-px flex-1 bg-stone-200" />
+                  или
+                  <span className="h-px flex-1 bg-stone-200" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <span className="text-caption text-stone-500">
+                    Выберите один или несколько районов
+                  </span>
+                  <ChipChoice
+                    multi
+                    options={mockDistricts.map((d) => ({
+                      value: d.slug,
+                      label: d.name.ru,
+                    }))}
+                    values={answers.districts}
+                    onChange={(v) =>
+                      setAnswers((a) => ({ ...a, districts: v }))
+                    }
+                  />
+                </div>
+              </div>
             ) : null}
             {step.key === 'budget' ? (
               <BudgetChoice
