@@ -106,8 +106,8 @@ export default async function DiasporaPage({
             Покупка квартиры из-за границы
           </h1>
           <p className="text-body text-stone-700">
-            Видеообзор, проверка документов — без поездки в Таджикистан.
-            Цены сразу в вашей валюте.
+            Видеообзор по WhatsApp, проверка документов — без поездки в
+            Таджикистан. Цены сразу в вашей валюте.
           </p>
           <div className="flex flex-wrap gap-2">
             <Link
@@ -125,6 +125,21 @@ export default async function DiasporaPage({
               <ArrowRight className="size-3.5" />
             </Link>
           </div>
+          {/* Direct WhatsApp tap so the buyer can actually request the
+              videoобзор / документы the headline promises. Without it,
+              the headline reads like marketing copy that points
+              nowhere — buyers from Russia / UAE / Germany lose the
+              thread and bounce. The link routes to the founder; the
+              prefilled message names the page so the founder lands in
+              chat with the right context. */}
+          <a
+            href="https://wa.me/992935563306?text=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%9F%D0%B8%D1%88%D1%83%20%D0%B8%D0%B7-%D0%B7%D0%B0%20%D0%B3%D1%80%D0%B0%D0%BD%D0%B8%D1%86%D1%8B.%20%D0%9C%D0%BE%D0%B6%D0%B5%D1%82%D0%B5%20%D1%81%D0%B4%D0%B5%D0%BB%D0%B0%D1%82%D1%8C%20%D0%B2%D0%B8%D0%B4%D0%B5%D0%BE%D0%BE%D0%B1%D0%B7%D0%BE%D1%80%20%D0%BA%D0%B2%D0%B0%D1%80%D1%82%D0%B8%D1%80%D1%8B%3F"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex w-fit items-center gap-2 text-meta font-medium text-terracotta-700 underline-offset-4 hover:underline"
+          >
+            Запросить видеообзор в WhatsApp →
+          </a>
         </AppContainer>
       </section>
 
