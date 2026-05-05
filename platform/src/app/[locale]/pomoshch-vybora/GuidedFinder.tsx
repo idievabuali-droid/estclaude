@@ -17,7 +17,17 @@ type Answers = {
    *  ?developer=… for devs). Mutually informative with `districts`
    *  — both can be set; the destination page handles either. */
   anchor: PickedAnchor | null;
+  /** Budget mode — drives whether the buyer is thinking in total
+   *  cash ("сразу") or monthly installments ("в рассрочку"). Vahdat
+   *  reality: ~half the active buyers are budget-constrained and
+   *  reason in TJS/мес — asking only for total price loses them. */
+  budgetMode: 'lump_sum' | 'installment';
+  /** Total-price ceiling, TJS, when budgetMode = lump_sum. */
   budget: string | null;
+  /** Monthly-payment ceiling, TJS, when budgetMode = installment.
+   *  Resolves to ?monthly_to= on /kvartiry, which forces
+   *  installment_available + the matching monthly cap. */
+  maxMonthly: string | null;
   /** Multi-select: buyer can pick "1 OR 2 rooms" (Faridun's case).
    *  Treats the special "any" value as mutually exclusive with
    *  specific room counts. */
@@ -59,6 +69,19 @@ const BUDGET_PRESETS = [
   { value: '1200000', label: 'до 1 200 000' },
 ];
 
+// Monthly-payment ceilings, TJS/мес. Calibrated to typical Vahdat
+// installment ranges: a 200k unit at 84 months ~2400 TJS/мес;
+// a 350k unit at 60 months ~6000. The chips cover that band so a
+// buyer's first instinct ("я могу 4000 в месяц") matches a real
+// preset. Custom input handles the edges.
+const MONTHLY_PRESETS = [
+  { value: '2000', label: 'до 2 000' },
+  { value: '3000', label: 'до 3 000' },
+  { value: '4000', label: 'до 4 000' },
+  { value: '5000', label: 'до 5 000' },
+  { value: '8000', label: 'до 8 000' },
+];
+
 const ROOMS = [
   { value: '1', label: '1' },
   { value: '2', label: '2' },
@@ -97,7 +120,9 @@ export function GuidedFinder() {
   const [answers, setAnswers] = useState<Answers>({
     districts: [],
     anchor: null,
+    budgetMode: 'lump_sum',
     budget: null,
+    maxMonthly: null,
     rooms: [],
     finishing: [],
     timing: null,
@@ -110,10 +135,12 @@ export function GuidedFinder() {
     if (step.key === 'rooms') return answers.rooms.length > 0;
     if (step.key === 'finishing') return answers.finishing.length > 0;
     if (step.key === 'budget') {
-      // Treat empty string (free-input cleared) the same as null —
-      // buyer hasn't chosen yet. Numeric strings + presets + "any"
-      // all advance.
-      return answers.budget != null && answers.budget !== '';
+      // Either tab can satisfy the step. lump_sum needs `budget`
+      // (preset, custom, or "any"); installment needs `maxMonthly`
+      // (preset, custom, or "any"). Empty string = buyer cleared
+      // a custom input before choosing — keep them on this step.
+      const v = answers.budgetMode === 'installment' ? answers.maxMonthly : answers.budget;
+      return v != null && v !== '';
     }
     return answers[step.key] != null;
   })();
@@ -143,7 +170,17 @@ export function GuidedFinder() {
     // District anchor → ?district=, but allow alongside existing
     // district chip selection (deduped).
     const params = new URLSearchParams();
-    if (answers.budget && answers.budget !== 'any') params.set('price_to', answers.budget);
+    if (answers.budgetMode === 'installment') {
+      // Installment forces the apartment-level destination — the
+      // monthly_to filter is per-listing, not per-building, and the
+      // listings service auto-narrows to installment_available=true
+      // when the cap is set.
+      if (answers.maxMonthly && answers.maxMonthly !== 'any') {
+        params.set('monthly_to', answers.maxMonthly);
+      }
+    } else if (answers.budget && answers.budget !== 'any') {
+      params.set('price_to', answers.budget);
+    }
     const roomsClean = answers.rooms.filter((r) => r !== 'any');
     if (roomsClean.length) params.set('rooms', roomsClean.join(','));
     const finishingClean = answers.finishing.filter((f) => f !== 'any');
@@ -156,7 +193,11 @@ export function GuidedFinder() {
     }
     params.set('wizard', '1');
 
+    // Installment path always lands on /kvartiry — the monthly cap
+    // doesn't aggregate at building level.
+    const isInstallment = answers.budgetMode === 'installment';
     const hasUnitCriteria =
+      isInstallment ||
       answers.rooms.some((r) => r !== 'any') ||
       answers.finishing.some((f) => f !== 'any');
     if (hasUnitCriteria) {
@@ -306,8 +347,24 @@ export function GuidedFinder() {
             ) : null}
             {step.key === 'budget' ? (
               <BudgetChoice
-                value={answers.budget}
-                onChange={(v) => setAnswers((a) => ({ ...a, budget: v }))}
+                mode={answers.budgetMode}
+                budget={answers.budget}
+                maxMonthly={answers.maxMonthly}
+                onModeChange={(mode) =>
+                  setAnswers((a) => ({
+                    ...a,
+                    budgetMode: mode,
+                    // Switching tabs clears the OTHER mode's value so
+                    // the URL params stay clean and canAdvance reads
+                    // only the active tab's input.
+                    budget: mode === 'lump_sum' ? a.budget : null,
+                    maxMonthly: mode === 'installment' ? a.maxMonthly : null,
+                  }))
+                }
+                onBudgetChange={(v) => setAnswers((a) => ({ ...a, budget: v }))}
+                onMaxMonthlyChange={(v) =>
+                  setAnswers((a) => ({ ...a, maxMonthly: v }))
+                }
               />
             ) : null}
             {step.key === 'rooms' ? (
@@ -458,37 +515,143 @@ function CardChoice(props: CardChoiceProps) {
 }
 
 /**
- * Budget Q2 choice — replaces the rigid 4-option card list. Three
- * surfaces in priority order:
+ * Budget Q2 choice — tabbed picker that splits the question by HOW
+ * the buyer will pay rather than ramming both decisions into one
+ * screen. Vahdat reality: about half the buyers reason in monthly
+ * installments (Faridun: "я могу 4000 в месяц"), the other half in
+ * total cash. The earlier single-track version forced both into the
+ * total-price track and lost installment buyers entirely.
  *
- *   1. Quick-pick chips (5 ceiling presets, starting at 250k so
- *      Faridun's actual 200k budget gets meaningful results).
- *   2. Free-text "Или введите свой максимум" input — the buyer
- *      types their actual ceiling. Selecting a preset clears the
- *      typed value and vice versa.
- *   3. "Не важно — покажите все" CardOption to skip the filter
- *      entirely. Mutually exclusive with the chips + input.
+ * Two tabs:
+ *   1. "Сразу"      → BudgetTrack with TJS-total presets + custom +
+ *                     "не важно". Resolves to ?price_to=… on submit.
+ *   2. "В рассрочку" → BudgetTrack with TJS-per-month presets + custom +
+ *                     "не важно". Resolves to ?monthly_to=… which
+ *                     forces installment_available=true at the
+ *                     listings service layer.
  *
- * Discriminating which mode is active: if value is "any" → "Не
- * важно" wins; if value matches a preset → that chip is highlighted;
- * otherwise the input shows the value.
+ * Switching tabs clears the OTHER tab's value (handled by parent)
+ * so the URL params on submit reflect exactly one track.
  */
 function BudgetChoice({
+  mode,
+  budget,
+  maxMonthly,
+  onModeChange,
+  onBudgetChange,
+  onMaxMonthlyChange,
+}: {
+  mode: 'lump_sum' | 'installment';
+  budget: string | null;
+  maxMonthly: string | null;
+  onModeChange: (mode: 'lump_sum' | 'installment') => void;
+  onBudgetChange: (v: string) => void;
+  onMaxMonthlyChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Mode tabs — pill segmented control. Each pill is a button
+          (not a Link) so the wizard state stays intact when switching. */}
+      <div
+        role="tablist"
+        aria-label="Способ оплаты"
+        className="inline-flex w-fit rounded-full border border-stone-200 bg-stone-50 p-1"
+      >
+        {(
+          [
+            { id: 'lump_sum' as const, label: 'Сразу' },
+            { id: 'installment' as const, label: 'В рассрочку' },
+          ]
+        ).map((tab) => {
+          const active = mode === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onModeChange(tab.id)}
+              className={cn(
+                'rounded-full px-4 py-1.5 text-meta font-medium transition-colors',
+                active
+                  ? 'bg-white text-terracotta-700 shadow-sm'
+                  : 'text-stone-600 hover:text-stone-900',
+              )}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {mode === 'lump_sum' ? (
+        <BudgetTrack
+          presets={BUDGET_PRESETS}
+          value={budget}
+          onChange={onBudgetChange}
+          inputLabel="Или введите свой максимум, TJS"
+          inputPlaceholder="220 000"
+          inputId="wizard-budget-input"
+          unit="TJS"
+          skipHint="Без ограничения по цене"
+        />
+      ) : (
+        <BudgetTrack
+          presets={MONTHLY_PRESETS}
+          value={maxMonthly}
+          onChange={onMaxMonthlyChange}
+          inputLabel="Или введите свой максимум, TJS / мес"
+          inputPlaceholder="3 500"
+          inputId="wizard-monthly-input"
+          unit="TJS / мес"
+          skipHint="Без ограничения по платежу"
+        />
+      )}
+
+      {mode === 'installment' ? (
+        // Trust note — the installment track narrows results to
+        // listings the seller actually offers in rassrochka. Buyers
+        // who don't see this assume "rassrochka exists everywhere"
+        // and get confused when the result count drops.
+        <p className="text-caption text-stone-500">
+          Покажем только квартиры с рассрочкой от застройщика. Платёж рассчитан по
+          объявленным условиям продавца.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Inner picker shared between the two budget tabs. Same UI shape
+ *  (chips + custom input + "не важно" card), just different presets,
+ *  units and copy. */
+function BudgetTrack({
+  presets,
   value,
   onChange,
+  inputLabel,
+  inputPlaceholder,
+  inputId,
+  unit,
+  skipHint,
 }: {
+  presets: Array<{ value: string; label: string }>;
   value: string | null;
   onChange: (v: string) => void;
+  inputLabel: string;
+  inputPlaceholder: string;
+  inputId: string;
+  unit: string;
+  skipHint: string;
 }) {
-  const presetValues = new Set(BUDGET_PRESETS.map((p) => p.value));
+  const presetValues = new Set(presets.map((p) => p.value));
   const inputValue =
     value && value !== 'any' && !presetValues.has(value) ? value : '';
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Quick-pick presets */}
       <div className="flex flex-wrap gap-2">
-        {BUDGET_PRESETS.map((p) => {
+        {presets.map((p) => {
           const active = value === p.value;
           return (
             <button
@@ -502,33 +665,26 @@ function BudgetChoice({
                   : 'border-stone-200 bg-stone-50 text-stone-700 hover:border-terracotta-300 hover:bg-terracotta-50',
               )}
             >
-              {p.label} TJS
+              {p.label} {unit}
             </button>
           );
         })}
       </div>
 
-      {/* Free-text input — for buyers whose ceiling doesn't match a
-          preset (e.g. Faridun at 220k, or 600k cash buyers). */}
       <div className="flex flex-col gap-1">
-        <label
-          htmlFor="wizard-budget-input"
-          className="text-caption text-stone-500"
-        >
-          Или введите свой максимум, TJS
+        <label htmlFor={inputId} className="text-caption text-stone-500">
+          {inputLabel}
         </label>
         <input
-          id="wizard-budget-input"
+          id={inputId}
           type="number"
           inputMode="numeric"
           min={0}
-          placeholder="220 000"
+          placeholder={inputPlaceholder}
           value={inputValue}
           onChange={(e) => {
             const raw = e.target.value.trim();
             if (!raw) {
-              // Empty input clears the budget answer entirely (so the
-              // "Далее" button disables until the buyer picks again).
               onChange('');
               return;
             }
@@ -538,13 +694,11 @@ function BudgetChoice({
         />
       </div>
 
-      {/* "Не важно" — the catch-all skip. Card-style for prominence
-          since it's the most-clicked option for low-effort buyers. */}
       <CardOption
         active={value === 'any'}
         onClick={() => onChange('any')}
         label="Не важно — покажите все"
-        hint="Без ограничения по цене"
+        hint={skipHint}
       />
     </div>
   );

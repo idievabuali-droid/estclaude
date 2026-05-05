@@ -43,8 +43,18 @@ export function displayNameFromFilters(
     if (rooms.length) parts.push(`${rooms.join('/')}-комн`);
     const finishing = (filters.finishing as string)?.split(',').filter(Boolean) ?? [];
     if (finishing.length === 1) parts.push(FINISHING_LABEL[finishing[0]!] ?? finishing[0]!);
-    if (filters.price_to) parts.push(`до ${fmtPriceTjs(filters.price_to as string)} TJS`);
-    else if (filters.price_from) parts.push(`от ${fmtPriceTjs(filters.price_from as string)} TJS`);
+    if (filters.monthly_to) {
+      // Installment buyers think in monthly payment first; show that
+      // ahead of total price so the summary matches how they framed
+      // the wizard answer ("я могу 4 000 в месяц"). The platform
+      // also auto-narrows to installment_available=true when this
+      // param is set, so the chip implies "with installment".
+      parts.push(`до ${fmtPriceTjs(filters.monthly_to as string)} TJS / мес`);
+    } else if (filters.price_to) {
+      parts.push(`до ${fmtPriceTjs(filters.price_to as string)} TJS`);
+    } else if (filters.price_from) {
+      parts.push(`от ${fmtPriceTjs(filters.price_from as string)} TJS`);
+    }
     if (filters.size_from || filters.size_to) {
       const a = filters.size_from ?? '';
       const b = filters.size_to ?? '';
