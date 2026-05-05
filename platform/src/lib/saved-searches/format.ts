@@ -109,16 +109,52 @@ export function formatMatchMessage(input: MatchMessageInput): string {
   ].join('\n');
 }
 
-/** Telegram body to ping the founder for a phone-fallback match. */
-export function formatFounderRelayMessage(input: MatchMessageInput & { phone: string }): string {
+/**
+ * Buyer-facing WhatsApp message body — what the founder sends to the
+ * buyer when a match fires. Written so it reads as a normal personal
+ * "thought of you" note, not a forwarded notification. Founder taps
+ * the wa.me link (see `formatFounderRelayMessage`), WhatsApp opens
+ * pre-loaded with this text, founder hits send. From the buyer's
+ * perspective the message arrives instantly from the founder's real
+ * WhatsApp — feels automated even though it's a one-tap manual send.
+ */
+export function formatBuyerWhatsAppBody(input: MatchMessageInput): string {
   const url = `${input.origin}/ru/kvartira/${input.listing_slug}`;
   const priceFmt = new Intl.NumberFormat('ru-RU').format(input.price_total_tjs);
   return [
-    `📲 Новый матч — нужно написать в WhatsApp`,
+    `Здравствуйте! У нас появилась квартира по вашему поиску «${input.search_display_name}»:`,
+    '',
+    `${input.building_name} · ${input.rooms_count}-комн · ${input.size_m2} м² · ${priceFmt} TJS`,
+    url,
+    '',
+    `Если интересно — расскажу подробнее.`,
+  ].join('\n');
+}
+
+/**
+ * Telegram body for the founder relay nudge. Includes a `wa.me` deep
+ * link pre-loaded with the buyer-facing message body, so the founder
+ * can complete the send in ONE tap (open the link → WhatsApp opens
+ * pre-loaded → founder hits send). Without this the founder had to
+ * manually copy the listing details into WhatsApp every time, which
+ * meant relays often took hours and felt like missed messages.
+ */
+export function formatFounderRelayMessage(
+  input: MatchMessageInput & { phone: string },
+): string {
+  const priceFmt = new Intl.NumberFormat('ru-RU').format(input.price_total_tjs);
+  const buyerBody = formatBuyerWhatsAppBody(input);
+  // wa.me requires a digits-only phone number — strip everything else.
+  const phoneDigits = input.phone.replace(/\D/g, '');
+  const sendNowLink = `https://wa.me/${phoneDigits}?text=${encodeURIComponent(buyerBody)}`;
+  return [
+    `📲 Новый матч — отправьте в WhatsApp`,
     `${input.phone}`,
     `По поиску: «${input.search_display_name}»`,
     '',
     `${input.building_name} · ${input.rooms_count}-комн · ${input.size_m2} м² · ${priceFmt} TJS`,
-    url,
+    '',
+    `Отправить за один тап:`,
+    sendNowLink,
   ].join('\n');
 }

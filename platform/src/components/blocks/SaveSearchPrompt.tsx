@@ -138,6 +138,7 @@ export function SaveSearchPrompt({
     const summary = filterSummary ?? displayNameFromFilters(page, filters);
     const introMessage = `Здравствуйте! Я подписался на поиск: ${summary}. Можете подсказать, если что-то подходящее уже есть?`;
     const waHref = `${FOUNDER_CONTACTS.whatsappLink}?text=${encodeURIComponent(introMessage)}`;
+    const tgHref = `${FOUNDER_CONTACTS.telegramLink}?text=${encodeURIComponent(introMessage)}`;
     return (
       <AppCard>
         <AppCardContent>
@@ -152,7 +153,7 @@ export function SaveSearchPrompt({
                   Сохранили ваш номер.
                 </p>
                 <p className="text-meta text-stone-700">
-                  Я лично напишу вам в WhatsApp, как только появится подходящая
+                  Напишу вам в WhatsApp, как только появится подходящая
                   квартира. Если хотите ответ быстрее — напишите нам сами.
                 </p>
               </div>
@@ -165,6 +166,22 @@ export function SaveSearchPrompt({
             >
               <MessageCircle className="size-4" aria-hidden />
               Написать в WhatsApp сейчас
+            </a>
+            {/* Telegram fallback link — buyers who have both apps
+                might prefer Telegram for faster response (the founder
+                checks Telegram more often than WhatsApp during the
+                day). Smaller / less prominent than the WhatsApp CTA
+                so it doesn't compete with the channel they just
+                chose, but visible so it's not "WhatsApp-only or
+                nothing". */}
+            <a
+              href={tgHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex w-fit items-center gap-1.5 self-center text-meta font-medium text-stone-600 underline-offset-4 hover:text-terracotta-700 hover:underline"
+            >
+              <Send className="size-3.5" aria-hidden />
+              Или в Telegram
             </a>
           </div>
         </AppCardContent>

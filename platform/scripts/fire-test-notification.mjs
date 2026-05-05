@@ -85,16 +85,33 @@ function formatMatchMessage({ search_display_name, building_name, rooms_count, s
   ].join('\n');
 }
 
-function formatFounderRelayMessage({ search_display_name, building_name, rooms_count, size_m2, price_total_tjs, listing_slug, phone }) {
+function formatBuyerWhatsAppBody({ search_display_name, building_name, rooms_count, size_m2, price_total_tjs, listing_slug }) {
   const url = `${APP_ORIGIN}/ru/kvartira/${listing_slug}`;
   const priceFmt = new Intl.NumberFormat('ru-RU').format(price_total_tjs);
   return [
-    `📲 Новый матч — нужно написать в WhatsApp`,
-    `${phone}`,
-    `По поиску: «${search_display_name}»`,
+    `Здравствуйте! У нас появилась квартира по вашему поиску «${search_display_name}»:`,
     '',
     `${building_name} · ${rooms_count}-комн · ${size_m2} м² · ${priceFmt} TJS`,
     url,
+    '',
+    `Если интересно — расскажу подробнее.`,
+  ].join('\n');
+}
+
+function formatFounderRelayMessage(input) {
+  const priceFmt = new Intl.NumberFormat('ru-RU').format(input.price_total_tjs);
+  const buyerBody = formatBuyerWhatsAppBody(input);
+  const phoneDigits = input.phone.replace(/\D/g, '');
+  const sendNowLink = `https://wa.me/${phoneDigits}?text=${encodeURIComponent(buyerBody)}`;
+  return [
+    `📲 Новый матч — отправьте в WhatsApp`,
+    `${input.phone}`,
+    `По поиску: «${input.search_display_name}»`,
+    '',
+    `${input.building_name} · ${input.rooms_count}-комн · ${input.size_m2} м² · ${priceFmt} TJS`,
+    '',
+    `Отправить за один тап:`,
+    sendNowLink,
   ].join('\n');
 }
 
