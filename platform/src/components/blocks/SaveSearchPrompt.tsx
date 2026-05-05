@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Bell, Send, Phone, Sparkles } from 'lucide-react';
+import { Bell, Send, Phone, Sparkles, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { AppCard, AppCardContent, AppButton, AppInput } from '@/components/primitives';
 import { toast } from '@/components/primitives/AppToast';
 import { track } from '@/lib/analytics/track';
+import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
+import { displayNameFromFilters } from '@/lib/saved-searches/format';
 
 export interface SaveSearchPromptProps {
   page: 'novostroyki' | 'kvartiry';
@@ -112,16 +114,58 @@ export function SaveSearchPrompt({
   }
 
   if (done) {
+    if (done === 'telegram') {
+      return (
+        <AppCard>
+          <AppCardContent>
+            <div className="flex items-center gap-3">
+              <Bell className="size-5 shrink-0 text-terracotta-700" aria-hidden />
+              <p className="text-meta text-stone-700">
+                Подписаны через Telegram. Напишем сразу, как появится подходящая квартира.
+              </p>
+            </div>
+          </AppCardContent>
+        </AppCard>
+      );
+    }
+    // WhatsApp success — honest about the relay flow + give the buyer a
+    // direct tap to open the founder's WhatsApp pre-loaded with context.
+    // Without that tap they sit waiting for an automated message that
+    // never comes (we don't have WhatsApp Business API in V1; the
+    // founder personally writes the buyer when a match arrives). The
+    // "Написать сейчас" affordance lets the buyer kick off the
+    // conversation themselves so they get an immediate human reply.
+    const summary = filterSummary ?? displayNameFromFilters(page, filters);
+    const introMessage = `Здравствуйте! Я подписался на поиск: ${summary}. Можете подсказать, если что-то подходящее уже есть?`;
+    const waHref = `${FOUNDER_CONTACTS.whatsappLink}?text=${encodeURIComponent(introMessage)}`;
     return (
       <AppCard>
         <AppCardContent>
-          <div className="flex items-center gap-3">
-            <Bell className="size-5 text-terracotta-700" aria-hidden />
-            <p className="text-meta text-stone-700">
-              {done === 'telegram'
-                ? 'Подписаны через Telegram. Напишем сразу, как появится подходящая квартира.'
-                : 'Сохранили ваш номер. Напишем в WhatsApp при появлении подходящих вариантов.'}
-            </p>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <MessageCircle
+                className="size-5 shrink-0 text-emerald-700"
+                aria-hidden
+              />
+              <div className="flex flex-col gap-1">
+                <p className="text-meta font-medium text-stone-900">
+                  Сохранили ваш номер.
+                </p>
+                <p className="text-meta text-stone-700">
+                  Я лично напишу вам в WhatsApp, как только появится подходящая
+                  квартира. Если хотите ответ быстрее — напишите нам сами.
+                </p>
+              </div>
+            </div>
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 text-meta font-medium text-white transition-colors hover:bg-emerald-700"
+            >
+              <MessageCircle className="size-4" aria-hidden />
+              Написать в WhatsApp сейчас
+            </a>
           </div>
         </AppCardContent>
       </AppCard>
@@ -192,7 +236,15 @@ export function SaveSearchPrompt({
               hiding it behind a "У меня нет Telegram" link (the old
               UX) treated the dominant local channel as a fallback.
               Now both methods are visible at first sight; tapping
-              WhatsApp expands the phone-input row inline. */}
+              WhatsApp expands the phone-input row inline.
+
+              Telegram = primary (terracotta) since it's the only
+              channel with TRULY automated delivery (bot sends direct
+              message). WhatsApp stays as a secondary outline button
+              even when expanded — promoting it to primary on tap made
+              both buttons identical-terracotta and the buyer couldn't
+              tell which one they'd just tapped. The chevron flip is
+              the state cue instead. */}
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             <AppButton
               variant="primary"
@@ -203,30 +255,48 @@ export function SaveSearchPrompt({
               Через Telegram
             </AppButton>
             <AppButton
-              variant={showWhatsApp ? 'primary' : 'secondary'}
+              variant="secondary"
               onClick={() => setShowWhatsApp((v) => !v)}
+              aria-expanded={showWhatsApp}
             >
               <Phone className="size-4" />
               Через WhatsApp
+              {showWhatsApp ? (
+                <ChevronUp className="size-4" aria-hidden />
+              ) : (
+                <ChevronDown className="size-4" aria-hidden />
+              )}
             </AppButton>
           </div>
           {showWhatsApp ? (
-            <div className="flex flex-col gap-2 md:flex-row md:items-start">
-              <AppInput
-                type="tel"
-                inputMode="tel"
-                placeholder="+992 93 ..."
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="md:flex-1"
-              />
-              <AppButton
-                variant="primary"
-                onClick={subscribeViaWhatsApp}
-                loading={submitting && showWhatsApp}
-              >
-                Сохранить номер
-              </AppButton>
+            <div className="flex flex-col gap-2">
+              {/* Honest about the relay flow — buyer needs to know the
+                  WhatsApp message comes manually from the founder, not
+                  an automated bot. Without this preface they expect
+                  instant delivery and feel ghosted when nothing
+                  arrives in 30 seconds. */}
+              <p className="text-caption text-stone-600">
+                Я (Абуали, основатель) лично напишу вам в WhatsApp, как только
+                появится подходящая квартира. Это V1 — без автоматических
+                рассылок.
+              </p>
+              <div className="flex flex-col gap-2 md:flex-row md:items-start">
+                <AppInput
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="+992 93 ..."
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="md:flex-1"
+                />
+                <AppButton
+                  variant="primary"
+                  onClick={subscribeViaWhatsApp}
+                  loading={submitting && showWhatsApp}
+                >
+                  Сохранить номер
+                </AppButton>
+              </div>
             </div>
           ) : null}
         </div>
