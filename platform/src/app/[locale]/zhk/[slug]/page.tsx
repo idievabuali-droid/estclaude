@@ -13,14 +13,14 @@ import {
 } from '@/components/primitives';
 import {
   ListingCard,
-  NearbyPois,
+  NearbyChips,
   BuildingStageProgress,
   PriceConversion,
-  MiniMap,
   ShareButton,
   SaveToggle,
   BuildingStickyContact,
 } from '@/components/blocks';
+import type { PoiCategory } from '@/services/poi';
 import { getBuilding, getDeveloperStats } from '@/services/buildings';
 import { getDistrictBenchmark } from '@/services/benchmarks';
 import { getNearbyPOIs } from '@/services/poi';
@@ -389,18 +389,45 @@ export default async function BuildingDetailPage({
       </section>
 
       {/* ─── 6. LOCATION + NEARBY POIs ───────────────────────────── */}
+      {/* Same interactive map+chip pattern as /kvartira: tapping a
+          POI category drops a star on the mini-map and re-fits the
+          camera so the buyer sees WHERE the school / mosque / etc
+          actually is. The earlier static MiniMap + plain list let
+          buyers see the categories but not the spatial relationship
+          ("which side of the building is the school on?"), so they'd
+          still tap "На карте" to enter focus mode. Now the answer
+          is one tap inline. The "Все рядом" link still drops them
+          into the immersive focus map for the building. */}
       <section id="nearby" className="scroll-mt-28 border-t border-stone-200 py-6">
-        <AppContainer className="flex flex-col gap-4">
-          {/* Inline mini-map preview — was missing entirely; the
-              spatial answer ("where is this building?") used to
-              require tapping "На карте" to enter focus mode. */}
-          <MiniMap
-            latitude={building.latitude}
-            longitude={building.longitude}
-            label={building.name.ru}
-            height={260}
+        <AppContainer>
+          <NearbyChips
+            anchorLat={building.latitude}
+            anchorLng={building.longitude}
+            anchorLabel={building.name.ru}
+            mapHeight={260}
+            items={(
+              [
+                'mosque',
+                'school',
+                'kindergarten',
+                'hospital',
+                'supermarket',
+                'transit',
+                'park',
+                'pharmacy',
+              ] as PoiCategory[]
+            )
+              .map((cat) => ({ cat, item: pois[cat][0] ?? null }))
+              .filter((x) => x.item != null)
+              .map((x) => ({
+                cat: x.cat,
+                name: x.item!.name,
+                latitude: x.item!.lat,
+                longitude: x.item!.lng,
+                distanceM: x.item!.distanceM,
+              }))}
+            allNearbyHref={`/novostroyki?view=karta&focus=${building.slug}`}
           />
-          <NearbyPois pois={pois} />
         </AppContainer>
       </section>
 

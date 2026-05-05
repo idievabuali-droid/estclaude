@@ -2,9 +2,34 @@
 
 import { useState } from 'react';
 import { Link } from '@/i18n/navigation';
-import { ArrowUpRight } from 'lucide-react';
+import {
+  ArrowUpRight,
+  Landmark,
+  School,
+  Baby,
+  Hospital,
+  ShoppingBag,
+  Bus,
+  Trees,
+  Pill,
+  type LucideIcon,
+} from 'lucide-react';
 import { MiniMap, type MiniMapHighlight } from './MiniMap';
 import { POI_LABELS, type PoiCategory } from '@/services/poi';
+
+/** Same Lucide mapping as NearbyPois — keep in sync if categories
+ *  evolve. Lucide doesn't ship a Mosque glyph; Landmark is the
+ *  closest neutral building-with-spire icon. */
+const POI_ICONS: Record<PoiCategory, LucideIcon> = {
+  mosque: Landmark,
+  school: School,
+  kindergarten: Baby,
+  hospital: Hospital,
+  supermarket: ShoppingBag,
+  transit: Bus,
+  park: Trees,
+  pharmacy: Pill,
+};
 
 export interface NearbyChipsItem {
   cat: PoiCategory;
@@ -93,6 +118,7 @@ export function NearbyChips({
       <div className="flex flex-wrap gap-2">
         {items.map((item, i) => {
           const isActive = i === activeIdx;
+          const Icon = POI_ICONS[item.cat];
           return (
             <button
               key={`${item.cat}-${i}`}
@@ -106,7 +132,7 @@ export function NearbyChips({
                   : 'border-stone-200 bg-stone-50 text-stone-700 hover:border-orange-200 hover:bg-orange-50/60')
               }
             >
-              <span aria-hidden>{POI_LABELS[item.cat].emoji}</span>
+              <Icon className="size-4 shrink-0" aria-hidden />
               <span className="font-medium">{POI_LABELS[item.cat].ru}</span>
               <span className="tabular-nums text-stone-500">· {item.distanceM} м</span>
             </button>

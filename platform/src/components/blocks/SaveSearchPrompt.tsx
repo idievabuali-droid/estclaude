@@ -286,34 +286,22 @@ export function SaveSearchPrompt({
             </AppButton>
           </div>
           {showWhatsApp ? (
-            <div className="flex flex-col gap-2">
-              {/* Honest about the relay flow — buyer needs to know the
-                  WhatsApp message comes manually from the founder, not
-                  an automated bot. Without this preface they expect
-                  instant delivery and feel ghosted when nothing
-                  arrives in 30 seconds. */}
-              <p className="text-caption text-stone-600">
-                Я (Абуали, основатель) лично напишу вам в WhatsApp, как только
-                появится подходящая квартира. Это V1 — без автоматических
-                рассылок.
-              </p>
-              <div className="flex flex-col gap-2 md:flex-row md:items-start">
-                <AppInput
-                  type="tel"
-                  inputMode="tel"
-                  placeholder="+992 93 ..."
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="md:flex-1"
-                />
-                <AppButton
-                  variant="primary"
-                  onClick={subscribeViaWhatsApp}
-                  loading={submitting && showWhatsApp}
-                >
-                  Сохранить номер
-                </AppButton>
-              </div>
+            <div className="flex flex-col gap-2 md:flex-row md:items-start">
+              <AppInput
+                type="tel"
+                inputMode="tel"
+                placeholder="+992 93 ..."
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="md:flex-1"
+              />
+              <AppButton
+                variant="primary"
+                onClick={subscribeViaWhatsApp}
+                loading={submitting && showWhatsApp}
+              >
+                Сохранить номер
+              </AppButton>
             </div>
           ) : null}
         </div>

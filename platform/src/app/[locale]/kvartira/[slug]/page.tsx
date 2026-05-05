@@ -5,6 +5,8 @@ import {
   Ruler,
   Bath,
   ArrowUpRight,
+  Move3D,
+  Square,
 } from 'lucide-react';
 import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
@@ -189,17 +191,12 @@ export default async function ListingDetailPage({
               <SaveToggle type="listing" id={listing.id} />
             </div>
           </div>
-          {/* Bottom title overlay — gradient sits inside the gallery so
-              the carousel transition still works underneath. The title
-              is pointer-events-none so taps fall through to the photo
-              and open the lightbox. */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-stone-900/65 via-stone-900/10 to-transparent">
-            <AppContainer className="pb-3 md:pb-4">
-              <h1 className="text-h2 font-semibold leading-[var(--leading-h2)] text-white drop-shadow-sm md:text-h1">
-                {listing.rooms_count}-комн · {formatM2(listing.size_m2)}
-              </h1>
-            </AppContainer>
-          </div>
+          {/* Title overlay removed — it duplicated the same rooms+m²
+              that now sits in the body H1 below the breadcrumb, AND
+              competed visually with the photo. Photos read cleanest
+              without any text overlay (Cian / Avito do this too); the
+              first body section under the breadcrumb is the right
+              place for the title. */}
         </div>
       ) : (
         // No-photo fallback: source-coded coloured hero. Single photo
@@ -218,13 +215,11 @@ export default async function ListingDetailPage({
             />
             <SaveToggle type="listing" id={listing.id} />
           </div>
-          <div className="absolute bottom-0 left-0 right-0">
-            <AppContainer className="pb-3 md:pb-4">
-              <h1 className="text-h2 font-semibold leading-[var(--leading-h2)] text-white drop-shadow-sm md:text-h1">
-                {listing.rooms_count}-комн · {formatM2(listing.size_m2)}
-              </h1>
-            </AppContainer>
-          </div>
+          {/* No-photo hero — title now lives in the body section
+              below the breadcrumb, same as the with-photo path. The
+              coloured block + gradient still reads as "this is the
+              hero space" so the layout doesn't collapse to zero
+              height when no photos are uploaded. */}
         </div>
       )}
 
@@ -254,6 +249,16 @@ export default async function ListingDetailPage({
       {/* ─── 3. TITLE + PRICE + CONTACT (the "above the fold" zone) ─ */}
       <section className="border-b border-stone-200 bg-white py-4">
         <AppContainer className="flex flex-col gap-3">
+          {/* Page H1 — moved here from the photo overlay. Carries the
+              three buyer-distinctive specs (rooms / m² / floor) so the
+              listing has a proper name before the price block. Without
+              this, removing the hero overlay left the page jumping
+              straight from breadcrumb to a building name + price with
+              no explicit title. */}
+          <h1 className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display">
+            {listing.rooms_count}-комн · {formatM2(listing.size_m2)} · {formatFloor(listing.floor_number, listing.total_floors)} эт
+          </h1>
+
           {/* Building name link → /zhk; small "На карте" pill → map.
               Developer name added on a second line so the building
               summary card lower on the page can be dropped (was
@@ -348,6 +353,13 @@ export default async function ListingDetailPage({
       </section>
 
       {/* ─── 4. SPECS + FINISHING (the "stats" zone) ────────────── */}
+      {/* The Fact grid now renders every spec field that exists on the
+          listing — earlier this only showed Площадь / Этаж / Санузел,
+          silently dropping bathroom_count / ceiling_height_cm / balcony
+          even when the seller had filled them in. Buyers (especially
+          Saidakbar shopping for a family) actively look for ceiling
+          height + balcony before contacting; without those rows on the
+          page they assumed the data wasn't captured at all. */}
       <section className="bg-stone-50 py-5">
         <AppContainer className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
@@ -361,11 +373,35 @@ export default async function ListingDetailPage({
               label="Этаж"
               value={formatFloor(listing.floor_number, listing.total_floors)}
             />
-            {listing.bathroom_separate != null ? (
+            {listing.bathroom_count != null ? (
+              <Fact
+                icon={<Bath className="size-4 text-stone-500" />}
+                label="Санузлов"
+                value={
+                  listing.bathroom_separate != null
+                    ? `${listing.bathroom_count} · ${listing.bathroom_separate ? 'раздельный' : 'совмещённый'}`
+                    : String(listing.bathroom_count)
+                }
+              />
+            ) : listing.bathroom_separate != null ? (
               <Fact
                 icon={<Bath className="size-4 text-stone-500" />}
                 label="Санузел"
                 value={listing.bathroom_separate ? 'раздельный' : 'совмещённый'}
+              />
+            ) : null}
+            {listing.ceiling_height_cm != null ? (
+              <Fact
+                icon={<Move3D className="size-4 text-stone-500" />}
+                label="Потолок"
+                value={`${(listing.ceiling_height_cm / 100).toFixed(2).replace(/\.?0+$/, '')} м`}
+              />
+            ) : null}
+            {listing.balcony != null ? (
+              <Fact
+                icon={<Square className="size-4 text-stone-500" />}
+                label="Балкон"
+                value={listing.balcony ? 'есть' : 'нет'}
               />
             ) : null}
           </div>
@@ -452,7 +488,14 @@ export default async function ListingDetailPage({
                 longitude: c.item!.lng,
                 distanceM: c.item!.distanceM,
               }))}
-              allNearbyHref={`/zhk/${building.slug}#nearby`}
+              // "Все рядом" → focus map of this building. Buyer sees
+              // the building as the orange pin AND can tap a POI
+              // category chip on the map to drop pins for every nearby
+              // mosque / school / etc, then tap a pin for details.
+              // Was previously /zhk#nearby — sent the buyer back to a
+              // STATIC list on a different detail page, defeating the
+              // "show me where the things are" question.
+              allNearbyHref={`/novostroyki?view=karta&focus=${building.slug}&from=kvartira&fromSlug=${listing.slug}`}
             />
           </AppContainer>
         </section>
