@@ -7,14 +7,13 @@ import { AppContainer, AppChip } from '@/components/primitives';
 import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle, ShareButton, NearbyChips, PhotoGallery } from '@/components/blocks';
 import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
-import { formatPriceNumber, formatM2, formatFloor, formatPostedAgoLong } from '@/lib/format';
+import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo } from '@/lib/format';
 import { getListing } from '@/services/listings';
 import { getNearbyPOIs, type PoiCategory } from '@/services/poi';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { getExchangeRates } from '@/services/currency';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { supabasePublicUrl } from '@/services/photos';
-import { STAGE_INFO } from '@/lib/building-stages';
 import { ContactBarWithModal } from './ContactBarWithModal';
 
 const FINISHING_TONE = {
@@ -252,13 +251,15 @@ export default async function ListingDetailPage({
             {listing.rooms_count}-комн · {formatM2(listing.size_m2)} · {formatFloor(listing.floor_number, listing.total_floors)} эт
           </h1>
 
-          {/* Building name link → /zhk; small "На карте" pill → map.
-              Below: stage + handover quarter (when can I move in?)
-              and developer name + verified badge (is this developer
-              trustworthy?). Both questions earlier required clicking
-              through to /zhk to answer — they belong on the apartment
-              page too because they shape the buyer's decision before
-              they make contact. */}
+          {/* Building name link → /zhk; small "На карте" pill → map;
+              "Проверенный" badge inline next to the building name when
+              the developer is verified. Stage chip and developer NAME
+              were dropped from this title block — buyers who want to
+              evaluate the developer or read about the build phase tap
+              the building name and land on /zhk where the full picture
+              lives. The apartment page only carries the answers a
+              buyer needs to decide whether to contact: building
+              orientation + when can I move in + price + condition. */}
           <div className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <Link
@@ -269,6 +270,16 @@ export default async function ListingDetailPage({
                 <span className="font-medium text-stone-900">{building.name.ru}</span>
                 <span className="text-stone-500">· {district.name.ru}</span>
               </Link>
+              {developer.is_verified ? (
+                <Link
+                  href="/tsentr-pomoshchi#verified-developer"
+                  className="inline-flex items-center gap-1 rounded-sm bg-amber-50 px-1.5 py-0.5 text-caption font-medium text-amber-800 hover:bg-amber-100"
+                  title="Что значит «Проверенный»?"
+                >
+                  <BadgeCheck className="size-3" aria-hidden />
+                  Проверенный
+                </Link>
+              ) : null}
               <Link
                 href={`/novostroyki?view=karta&focus=${building.slug}&from=kvartira&fromSlug=${slug}`}
                 className="group inline-flex items-center gap-1 rounded-sm border border-stone-200 bg-stone-50 px-2 py-0.5 text-caption font-medium text-stone-700 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50 hover:text-terracotta-700"
@@ -279,39 +290,23 @@ export default async function ListingDetailPage({
                 <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
               </Link>
             </div>
-            {/* Stage + handover line — answers "когда сдача?" without
-                making the buyer drill into the building page. For
-                delivered buildings we show "Сдан" alone (the quarter
-                is in the past and irrelevant); under-construction
-                buildings show stage + quarter. */}
-            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-stone-600">
-              <span className="font-medium text-stone-900">
-                {STAGE_INFO[building.status].label}
+            {/* When can I move in? — single answer line. Delivered
+                buildings get "Готов к заселению" (no quarter needed);
+                under-construction buildings get the handover quarter
+                directly. The stage chip ("Строится", "Котлован" etc)
+                was dropped — the quarter alone implies "ещё не сдан"
+                and the stage detail belongs on /zhk for buyers who
+                care about phase-by-phase progress. */}
+            {building.status === 'delivered' ? (
+              <span className="text-caption font-medium text-stone-900">
+                Готов к заселению
               </span>
-              {building.status !== 'delivered' && building.handover_estimated_quarter ? (
-                <span className="inline-flex items-center gap-1 text-stone-600">
-                  <Calendar className="size-3 text-stone-500" aria-hidden />
-                  Сдача {building.handover_estimated_quarter}
-                </span>
-              ) : null}
-            </span>
-            {/* Developer line — verified badge inline so the trust
-                signal appears together with the developer name, not
-                only on /zhk. Compact: small icon + "Проверенный"
-                wording so it reads as one element next to the name. */}
-            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-stone-500">
-              <span>Застройщик: {developer.display_name.ru}</span>
-              {developer.is_verified ? (
-                <Link
-                  href="/tsentr-pomoshchi#verified-developer"
-                  className="inline-flex items-center gap-1 rounded-sm bg-amber-50 px-1.5 py-0.5 font-medium text-amber-800 hover:bg-amber-100"
-                  title="Что значит «Проверенный»?"
-                >
-                  <BadgeCheck className="size-3" aria-hidden />
-                  Проверенный
-                </Link>
-              ) : null}
-            </span>
+            ) : building.handover_estimated_quarter ? (
+              <span className="inline-flex items-center gap-1 text-caption text-stone-700">
+                <Calendar className="size-3 text-stone-500" aria-hidden />
+                Сдача {building.handover_estimated_quarter}
+              </span>
+            ) : null}
           </div>
 
           {/* Price block. Each TJS amount is paired with its ≈
@@ -379,10 +374,12 @@ export default async function ListingDetailPage({
             ) : null}
           </div>
 
-          {/* Tertiary signal — small + muted so it doesn't compete with
-              price or building info above. */}
+          {/* Tertiary signal — small + muted so it doesn't compete
+              with price or building info above. Relative-only — the
+              absolute date repeated the same fact for 2-29-day-old
+              listings ("2 дня назад · 3 мая") and read as duplication. */}
           <span className="text-caption text-stone-400">
-            Опубликовано {formatPostedAgoLong(listing.published_at)}
+            Опубликовано {formatPostedAgo(listing.published_at)}
           </span>
 
           {/* Trust signals: view count + most-recent price change.
