@@ -53,6 +53,8 @@ export type FilterParams = {
   /** Filter to a single developer by id. Set by the "Все проекты
    *  застройщика" CTA on /zhk Застройщик card. */
   developer?: string;
+  /** Wizard payoff flag — see WizardResultBanner + GuidedFinder. */
+  wizard?: string;
 };
 
 /** Read a CSV param as a Set for membership checks + toggling. */

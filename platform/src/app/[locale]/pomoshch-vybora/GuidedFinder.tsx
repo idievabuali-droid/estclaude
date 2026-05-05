@@ -88,6 +88,11 @@ export function GuidedFinder() {
     if (answers.budget && answers.budget !== 'any') params.set('price_to', answers.budget);
     if (answers.rooms && answers.rooms !== 'any') params.set('rooms', answers.rooms);
     if (answers.finishing && answers.finishing !== 'any') params.set('finishing', answers.finishing);
+    // Wizard flag — destination page reads this and renders the
+    // WizardResultBanner so the buyer's 5 questions of effort get
+    // an explicit acknowledgement instead of an identical-to-normal
+    // filtered list page.
+    params.set('wizard', '1');
 
     // Choose target: /kvartiry is the right destination when buyer picked
     // unit-level criteria; /novostroyki is right when they only picked districts.
@@ -99,6 +104,7 @@ export function GuidedFinder() {
       const projectParams = new URLSearchParams();
       if (answers.districts.length) projectParams.set('district', answers.districts.join(','));
       if (answers.budget && answers.budget !== 'any') projectParams.set('price_to', answers.budget);
+      projectParams.set('wizard', '1');
       router.push(`/novostroyki?${projectParams.toString()}`);
     }
   }

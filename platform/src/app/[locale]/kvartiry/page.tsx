@@ -2,7 +2,8 @@ import { ChevronLeft, X } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
-import { ListingCard, LocationSearch, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion, SortChip, type SortMode } from '@/components/blocks';
+import { ListingCard, LocationSearch, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion, SortChip, WizardResultBanner, type SortMode } from '@/components/blocks';
+import { displayNameFromFilters } from '@/lib/saved-searches/format';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { getExchangeRates } from '@/services/currency';
 import { listListings } from '@/services/listings';
@@ -57,6 +58,11 @@ type SearchParams = {
   monthly_to?: string;
   /** Sort mode — see SortChip / ListingFilters.sort. */
   sort?: SortMode;
+  /** Set to "1" by /pomoshch-vybora on completion. Page reads this
+   *  and renders the WizardResultBanner so the buyer sees their
+   *  match count + a save-as-alert prompt instead of a generic
+   *  filter result page. */
+  wizard?: string;
 };
 
 export default async function KvartiryPage({
@@ -220,6 +226,17 @@ export default async function KvartiryPage({
 
       <section className="py-6">
         <AppContainer className="flex flex-col gap-5">
+          {/* Wizard payoff — buyer answered 5 questions in
+              /pomoshch-vybora and landed here with ?wizard=1.
+              Acknowledge the effort: count + filter recap + a
+              prominent subscribe-to-alerts CTA. Was the wizard's
+              biggest UX gap (no payoff for the effort). */}
+          {sp.wizard ? (
+            <WizardResultBanner
+              resultCount={filtered.length}
+              filterSummary={displayNameFromFilters('kvartiry', sp)}
+            />
+          ) : null}
           {/* "Save this search" prompt — same affordance as on
               /novostroyki. Skip when no filters are active (a bare
               /kvartiry visit isn't a search worth saving) and when
@@ -228,8 +245,11 @@ export default async function KvartiryPage({
           {/* Same deferral as /novostroyki — only show this when the
               search is "serious" (≥2 filters or 0 results), so single-
               chip browsing isn't interrupted. Building scope is treated
-              as navigation, not a filter (already excluded). */}
-          {(countActiveFiltersK(sp) >= 2 || filtered.length === 0) &&
+              as navigation, not a filter (already excluded). The
+              wizard banner above already prompts subscription so we
+              skip this redundant block when wizard=1 is set. */}
+          {!sp.wizard &&
+          (countActiveFiltersK(sp) >= 2 || filtered.length === 0) &&
           hasActiveFiltersK(sp) &&
           !scopedBuilding ? (
             <SaveSearchPrompt

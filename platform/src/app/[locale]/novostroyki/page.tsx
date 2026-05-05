@@ -2,7 +2,8 @@ import { Map as MapIcon, List, ArrowLeft, X } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
-import { BuildingCard, LocationSearch, MapView, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion, SortChip } from '@/components/blocks';
+import { BuildingCard, LocationSearch, MapView, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion, SortChip, WizardResultBanner } from '@/components/blocks';
+import { displayNameFromFilters } from '@/lib/saved-searches/format';
 import {
   listBuildings,
   getBuildingBySlug,
@@ -335,6 +336,16 @@ export default async function NovostroykiPage({
       {!isMap && (
         <section className="py-6">
           <AppContainer className="flex flex-col gap-5">
+            {/* Wizard payoff banner — see /kvartiry for the rationale.
+                When ?wizard=1 is set, replace the SaveSearchPrompt
+                with the celebratory recap so the buyer sees a count
+                and an explicit subscribe CTA. */}
+            {sp.wizard ? (
+              <WizardResultBanner
+                resultCount={filtered.length}
+                filterSummary={displayNameFromFilters('novostroyki', sp)}
+              />
+            ) : null}
             {/* "Save this search" prompt — always rendered when at
                 least one filter is active. The 0-results variant is
                 bigger and more directive (the buyer literally told us
@@ -344,7 +355,9 @@ export default async function NovostroykiPage({
                 viewport it eats pushed results below the fold for a
                 visitor who hadn't even narrowed seriously yet. ≥2 is
                 "serious enough to be worth saving as an alert." */}
-            {(countActiveFilters(sp) >= 2 || filtered.length === 0) && hasActiveFilters(sp) ? (
+            {!sp.wizard &&
+            (countActiveFilters(sp) >= 2 || filtered.length === 0) &&
+            hasActiveFilters(sp) ? (
               <SaveSearchPrompt
                 page="novostroyki"
                 filters={sp}
