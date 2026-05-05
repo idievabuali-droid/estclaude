@@ -44,6 +44,15 @@ function MobileBottomNavInner({ isAuthenticated }: { isAuthenticated: boolean })
   const searchParams = useSearchParams();
   const [hydrated, setHydrated] = useState(false);
   const { type: compareType, ids: compareIds } = useCompareStore();
+  // Tracks which tab the buyer just tapped. Drives instant visual
+  // feedback (active style + pulsing dot) while the destination
+  // server-renders. Without this the tap had zero feedback for the
+  // 1-3 seconds the new page took to render — buyer thought their
+  // tap didn't register and tapped again. The "pending" check below
+  // is `tappedHref !== pathname`, so once navigation completes
+  // (pathname matches), the dot just naturally stops rendering — no
+  // need for an effect that sets state in response to pathname.
+  const [tappedHref, setTappedHref] = useState<string | null>(null);
 
   // Compare store is sessionStorage-backed with skipHydration: true,
   // so we manually rehydrate to avoid mismatches between server-render
@@ -102,23 +111,33 @@ function MobileBottomNavInner({ isAuthenticated }: { isAuthenticated: boolean })
     >
       <ul className={gridClass}>
         {items.map(({ href, Icon, label, badge }) => {
-          const active =
+          const baseHref = href.split('?')[0];
+          const isCurrent =
             href === '/'
               ? pathname === '/'
-              : pathname === href || pathname.startsWith(href.split('?')[0] + '/');
+              : pathname === baseHref || pathname.startsWith(baseHref + '/');
+          const isPending = tappedHref === href && !isCurrent;
+          // Treat pending the same as active visually so the tapped
+          // tab shifts colour the instant the buyer touches it. The
+          // pulsing dot below the icon makes the "loading" intent
+          // explicit so they don't think the page silently swapped.
+          const active = isCurrent || isPending;
           return (
             <li key={label}>
               <Link
                 href={href}
+                onClick={() => {
+                  if (!isCurrent) setTappedHref(href);
+                }}
                 className={cn(
-                  'flex flex-col items-center gap-1 py-2 text-caption font-medium',
+                  'flex flex-col items-center gap-1 py-2 text-caption font-medium transition-colors',
                   active ? 'text-terracotta-600' : 'text-stone-500',
                 )}
               >
                 <span className="relative inline-flex">
                   <Icon
                     className={cn(
-                      'size-5',
+                      'size-5 transition-colors',
                       active ? 'text-terracotta-600' : 'text-stone-500',
                     )}
                   />
@@ -129,6 +148,15 @@ function MobileBottomNavInner({ isAuthenticated }: { isAuthenticated: boolean })
                     >
                       {badge}
                     </span>
+                  ) : null}
+                  {/* Pending dot — shows only on the tapped tab while
+                      its destination renders. Cleared automatically
+                      when pathname matches. */}
+                  {isPending ? (
+                    <span
+                      aria-hidden
+                      className="absolute -bottom-0.5 left-1/2 size-1.5 -translate-x-1/2 animate-pulse rounded-full bg-terracotta-600"
+                    />
                   ) : null}
                 </span>
                 <span>{label}</span>
