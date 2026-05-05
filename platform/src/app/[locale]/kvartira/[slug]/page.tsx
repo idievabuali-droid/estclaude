@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { MapPin, ArrowUpRight } from 'lucide-react';
+import { MapPin, ArrowUpRight, BadgeCheck, Calendar } from 'lucide-react';
 import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
@@ -14,6 +14,7 @@ import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { getExchangeRates } from '@/services/currency';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { supabasePublicUrl } from '@/services/photos';
+import { STAGE_INFO } from '@/lib/building-stages';
 import { ContactBarWithModal } from './ContactBarWithModal';
 
 const FINISHING_TONE = {
@@ -252,10 +253,12 @@ export default async function ListingDetailPage({
           </h1>
 
           {/* Building name link → /zhk; small "На карте" pill → map.
-              Developer name added on a second line so the building
-              summary card lower on the page can be dropped (was
-              effectively re-stating the same building + developer
-              info with a redundant CTA). */}
+              Below: stage + handover quarter (when can I move in?)
+              and developer name + verified badge (is this developer
+              trustworthy?). Both questions earlier required clicking
+              through to /zhk to answer — they belong on the apartment
+              page too because they shape the buyer's decision before
+              they make contact. */}
           <div className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <Link
@@ -276,8 +279,38 @@ export default async function ListingDetailPage({
                 <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
               </Link>
             </div>
-            <span className="text-caption text-stone-500">
-              Застройщик: {developer.display_name.ru}
+            {/* Stage + handover line — answers "когда сдача?" without
+                making the buyer drill into the building page. For
+                delivered buildings we show "Сдан" alone (the quarter
+                is in the past and irrelevant); under-construction
+                buildings show stage + quarter. */}
+            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-stone-600">
+              <span className="font-medium text-stone-900">
+                {STAGE_INFO[building.status].label}
+              </span>
+              {building.status !== 'delivered' && building.handover_estimated_quarter ? (
+                <span className="inline-flex items-center gap-1 text-stone-600">
+                  <Calendar className="size-3 text-stone-500" aria-hidden />
+                  Сдача {building.handover_estimated_quarter}
+                </span>
+              ) : null}
+            </span>
+            {/* Developer line — verified badge inline so the trust
+                signal appears together with the developer name, not
+                only on /zhk. Compact: small icon + "Проверенный"
+                wording so it reads as one element next to the name. */}
+            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-stone-500">
+              <span>Застройщик: {developer.display_name.ru}</span>
+              {developer.is_verified ? (
+                <Link
+                  href="/tsentr-pomoshchi#verified-developer"
+                  className="inline-flex items-center gap-1 rounded-sm bg-amber-50 px-1.5 py-0.5 font-medium text-amber-800 hover:bg-amber-100"
+                  title="Что значит «Проверенный»?"
+                >
+                  <BadgeCheck className="size-3" aria-hidden />
+                  Проверенный
+                </Link>
+              ) : null}
             </span>
           </div>
 
@@ -324,14 +357,26 @@ export default async function ListingDetailPage({
               belong. Carrying the descriptor inline ("полная отделка
               от застройщика, готова к заселению") means buyers don't
               have to scroll past 5 redundant facts cards just to find
-              what condition the apartment is actually in. */}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <AppChip asStatic tone={FINISHING_TONE[listing.finishing_type]}>
-              {tFinishing(listing.finishing_type)}
-            </AppChip>
-            <span className="text-caption text-stone-500">
-              {finishingDescription(listing.finishing_type)}
-            </span>
+              what condition the apartment is actually in.
+              Bathroom-layout (раздельный/совмещённый) reads on the
+              same line — it's a layout attribute, not a number; the
+              bathroom COUNT was dropped per the founder's call (Tajik
+              market doesn't shop by it; buyers who care about more
+              than one bathroom mention it in the description). */}
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <AppChip asStatic tone={FINISHING_TONE[listing.finishing_type]}>
+                {tFinishing(listing.finishing_type)}
+              </AppChip>
+              <span className="text-caption text-stone-500">
+                {finishingDescription(listing.finishing_type)}
+              </span>
+            </div>
+            {listing.bathroom_separate != null ? (
+              <span className="text-caption text-stone-500">
+                Санузел {listing.bathroom_separate ? 'раздельный' : 'совмещённый'}
+              </span>
+            ) : null}
           </div>
 
           {/* Tertiary signal — small + muted so it doesn't compete with
@@ -382,12 +427,18 @@ export default async function ListingDetailPage({
       ) : null}
 
       {/* ─── 6. DESCRIPTION (seller's free-text) ────────────────── */}
-      <section className="border-t border-stone-200 py-6">
-        <AppContainer className="flex flex-col gap-3">
-          <h2 className="text-h2 font-semibold text-stone-900">Описание</h2>
-          <p className="text-body text-stone-700">{listing.unit_description.ru}</p>
-        </AppContainer>
-      </section>
+      {/* Hide the entire section when the seller didn't write
+          anything. An empty "Описание:" header followed by a blank
+          paragraph reads as a broken page; better to skip the section
+          entirely than render the heading with no content. */}
+      {listing.unit_description.ru?.trim() ? (
+        <section className="border-t border-stone-200 py-6">
+          <AppContainer className="flex flex-col gap-3">
+            <h2 className="text-h2 font-semibold text-stone-900">Описание</h2>
+            <p className="text-body text-stone-700">{listing.unit_description.ru}</p>
+          </AppContainer>
+        </section>
+      ) : null}
 
       {/* Anonymous-friendly callback widget. Logged-in visitors already
           have ContactBarWithModal as the primary surface and we'd
