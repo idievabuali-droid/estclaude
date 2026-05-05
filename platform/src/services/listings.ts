@@ -17,6 +17,7 @@ import {
   LISTING_SELECT,
 } from './buildings';
 import { getDistrictBenchmark } from './benchmarks';
+import { hydratePhotos } from './photos';
 import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
 import type { FinishingType, SourceType } from '@/types/domain';
 
@@ -147,31 +148,36 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
   //   - 'newest' → published_at descending
   //   - default 'recommended' → trust tier first, then newest
   const sortMode = filters.sort ?? 'recommended';
+  let sorted: MockListing[];
   if (sortMode === 'cheapest') {
-    return [...listings].sort((a, b) =>
+    sorted = [...listings].sort((a, b) =>
       a.price_total_dirams < b.price_total_dirams ? -1 : 1,
     );
-  }
-  if (sortMode === 'expensive') {
-    return [...listings].sort((a, b) =>
+  } else if (sortMode === 'expensive') {
+    sorted = [...listings].sort((a, b) =>
       a.price_total_dirams > b.price_total_dirams ? -1 : 1,
     );
-  }
-  if (sortMode === 'newest') {
-    return [...listings].sort((a, b) =>
+  } else if (sortMode === 'newest') {
+    sorted = [...listings].sort((a, b) =>
       a.published_at < b.published_at ? 1 : -1,
     );
+  } else {
+    sorted = [...listings].sort((a, b) => {
+      const aDevVer =
+        a.source_type === 'developer' && verifiedDevs.has(buildingToDevId.get(a.building_id) ?? '');
+      const bDevVer =
+        b.source_type === 'developer' && verifiedDevs.has(buildingToDevId.get(b.building_id) ?? '');
+      const aRank = aDevVer ? -1 : (TIER_RANK[a.verification_tier] ?? 99);
+      const bRank = bDevVer ? -1 : (TIER_RANK[b.verification_tier] ?? 99);
+      if (aRank !== bRank) return aRank - bRank;
+      return a.published_at < b.published_at ? 1 : -1;
+    });
   }
-  return [...listings].sort((a, b) => {
-    const aDevVer =
-      a.source_type === 'developer' && verifiedDevs.has(buildingToDevId.get(a.building_id) ?? '');
-    const bDevVer =
-      b.source_type === 'developer' && verifiedDevs.has(buildingToDevId.get(b.building_id) ?? '');
-    const aRank = aDevVer ? -1 : (TIER_RANK[a.verification_tier] ?? 99);
-    const bRank = bDevVer ? -1 : (TIER_RANK[b.verification_tier] ?? 99);
-    if (aRank !== bRank) return aRank - bRank;
-    return a.published_at < b.published_at ? 1 : -1;
-  });
+
+  // One batch query for all photos so the in-card carousel works
+  // without N+1. Done after sort so we only hydrate the survivors.
+  await hydratePhotos('listing', sorted);
+  return sorted;
 }
 
 export async function getListing(slug: string): Promise<{
@@ -241,6 +247,9 @@ export async function getListing(slug: string): Promise<{
     : null;
 
   const similar = (similarRes.data ?? []).map(mapListing);
+  // Hydrate photos so similar-listing cards on /kvartira detail also
+  // show the swipeable carousel.
+  await hydratePhotos('listing', similar);
   // Seller phone — when the user row is missing (transferred listings,
   // deleted users, mock data), fall back to the founder's number from
   // founder-contacts.ts. The buyer reaches the founder, who then

@@ -26,6 +26,7 @@ import {
   BUILDING_SELECT,
   LISTING_SELECT,
 } from '@/services/buildings';
+import { hydratePhotos } from '@/services/photos';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 
 interface SaveRef {
@@ -187,6 +188,27 @@ export async function POST(req: Request): Promise<Response> {
       matchingUnits: matchingUnitsMap.get(b.id) ?? [],
     };
   });
+
+  // Hydrate photo_urls for the in-card carousel — same pattern as
+  // getMySavedItems.
+  await Promise.all([
+    hydratePhotos(
+      'building',
+      buildings.map((b) => b.building),
+    ),
+    hydratePhotos(
+      'building',
+      listings.map((l) => l.building),
+    ),
+    hydratePhotos(
+      'listing',
+      listings.map((l) => l.listing),
+    ),
+    hydratePhotos(
+      'listing',
+      buildings.flatMap((b) => b.matchingUnits),
+    ),
+  ]);
 
   // MockListing/MockBuilding have bigint fields; NextResponse.json
   // can't serialize them, so we stringify via a replacer first and

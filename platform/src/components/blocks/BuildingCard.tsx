@@ -9,6 +9,7 @@ import { STAGE_INFO } from '@/lib/building-stages';
 import { VerificationBadge } from './VerificationBadge';
 import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
+import { CardPhotoCarousel } from './CardPhotoCarousel';
 import { BuildingContactButton } from './BuildingContactButton';
 import { FEATURES } from '@/lib/feature-flags';
 import { PriceConversion } from './PriceConversion';
@@ -77,63 +78,65 @@ export function BuildingCard({
         className,
       )}
     >
-      {/* Cover area. When the building has an uploaded cover photo we
-          render it edge-to-edge; otherwise we fall back to the colored
-          placeholder + glyph + name overlay so empty inventory still
-          looks intentional rather than broken. The chip + save buttons
-          on top stay positioned the same way in both modes. */}
-      <div
-        className="relative aspect-[16/9] w-full bg-stone-100"
-        style={building.cover_photo_url ? undefined : { backgroundColor: building.cover_color }}
+      {/* Cover area. CardPhotoCarousel takes over photo rendering and
+          lets the buyer swipe through every uploaded photo of the
+          building inline. When `photo_urls` is empty we still mount it
+          so the coloured placeholder + Building glyph show through. */}
+      <CardPhotoCarousel
+        photos={building.photo_urls}
+        aspect="16/9"
+        alt={building.name.ru}
+        className="bg-stone-100"
+        style={building.photo_urls.length === 0 ? { backgroundColor: building.cover_color } : undefined}
+        persistentOverlay={
+          <>
+            {/* Soft inner gradient for legibility (kept across all
+                slides so the white chip text stays readable on bright
+                photos too). */}
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/30" />
+            {/* Centered building glyph + name — only on the placeholder
+                (when there are no photos), so we don't cover real
+                photos with text. */}
+            {building.photo_urls.length === 0 ? (
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
+                <Building className="size-8 text-white/70" aria-hidden />
+                <span className="text-h3 font-semibold text-white drop-shadow-sm">
+                  {building.name.ru}
+                </span>
+              </div>
+            ) : null}
+          </>
+        }
       >
-        {building.cover_photo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={building.cover_photo_url}
-            alt={building.name.ru}
-            className="absolute inset-0 size-full object-cover"
-            loading="lazy"
-          />
-        ) : null}
-        {/* Soft inner gradient for legibility (kept in both modes so
-            the white chip text stays readable on bright photos too). */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/30" />
-        {/* Centered building glyph + name — only on the placeholder, so
-            we don't cover real photos with text. */}
-        {building.cover_photo_url ? null : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
-            <Building className="size-8 text-white/70" aria-hidden />
-            <span className="text-h3 font-semibold text-white drop-shadow-sm">{building.name.ru}</span>
-          </div>
-        )}
-        {/* Stage chip + help popover. The "?" lets buyers learn what
-            the stage means and how long it usually takes without
-            leaving the card. stopParentClick prevents the help-button
-            click from also triggering the parent card Link. */}
-        <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-sm bg-white/90 px-2 py-1 text-caption font-medium text-stone-900">
+        {/* Stage chip + help popover. Sits below the carousel's "1/N"
+            counter when there are multiple photos so they don't fight
+            for the same corner. The "?" lets buyers learn what the
+            stage means without leaving the card. */}
+        <div
+          className={cn(
+            'absolute left-3 inline-flex items-center gap-1 rounded-sm bg-white/90 px-2 py-1 text-caption font-medium text-stone-900',
+            building.photo_urls.length > 1 ? 'top-12' : 'top-3',
+          )}
+        >
           {STAGE_INFO[building.status].label}
           <StageInfoPopover status={building.status} stopParentClick />
         </div>
         <div className="absolute right-3 top-3 flex flex-col gap-2">
           <SaveToggle type="building" id={building.id} />
-          {/* Связаться: WhatsApp tap with prefilled context. Was
-              missing entirely — buyers had to click through to the
-              detail page just to ask a pre-purchase question, then
-              dig further. The pill funnels to the founder (no per-
-              developer phone in V1) but the WhatsApp message carries
-              the building name so context lands in chat. */}
+          {/* Связаться: WhatsApp tap with prefilled context. The pill
+              funnels to the founder (no per-developer phone in V1) but
+              the WhatsApp message carries the building name so context
+              lands in chat. */}
           <BuildingContactButton
             buildingName={building.name.ru}
             buildingAddress={`${district.name.ru} · ${building.address.ru}`}
           />
-          {/* Compare hidden in V1 — see lib/feature-flags.ts. With ~6
-              buildings the icon adds visual weight for marginal value.
-              Re-enable when inventory crosses ~20 active buildings. */}
+          {/* Compare hidden in V1 — see lib/feature-flags.ts. */}
           {FEATURES.compare ? (
             <CompareToggle type="buildings" id={building.id} />
           ) : null}
         </div>
-      </div>
+      </CardPhotoCarousel>
 
       <div className="flex flex-col gap-3 p-4">
         {/* Identity row + verified badge stacked vertically so long badge text doesn't squeeze */}

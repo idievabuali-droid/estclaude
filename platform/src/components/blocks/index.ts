@@ -65,6 +65,8 @@ export { NearbyChips } from './NearbyChips';
 export type { NearbyChipsProps, NearbyChipsItem } from './NearbyChips';
 export { PhotoGallery } from './PhotoGallery';
 export type { PhotoGalleryProps } from './PhotoGallery';
+export { CardPhotoCarousel } from './CardPhotoCarousel';
+export type { CardPhotoCarouselProps } from './CardPhotoCarousel';
 export { BuildingContactButton } from './BuildingContactButton';
 export type { BuildingContactButtonProps } from './BuildingContactButton';
 export { MessagingPopoverButton } from './MessagingPopoverButton';

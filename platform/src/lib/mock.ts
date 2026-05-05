@@ -51,6 +51,11 @@ export type MockBuilding = {
   /** Public Storage URL of the building's cover photo, or null when
    *  none has been uploaded yet (we then fall back to cover_color). */
   cover_photo_url: string | null;
+  /** All photo URLs in display order, cover first. Drives the in-card
+   *  carousel so buyers can swipe through photos without clicking into
+   *  the detail page. Empty array when the building has no uploaded
+   *  photos (cards then render the colored placeholder). */
+  photo_urls: string[];
   price_from_dirams: bigint | null;
   price_per_m2_from_dirams: bigint | null;
   description: Bilingual;
@@ -82,6 +87,11 @@ export type MockListing = {
   /** Public Storage URL of the listing's cover photo, or null when
    *  none has been uploaded yet (we then fall back to cover_color). */
   cover_photo_url: string | null;
+  /** All photo URLs in display order, cover first. Drives the in-card
+   *  carousel so buyers can swipe through photos without clicking into
+   *  the detail page. Empty array when the listing has no uploaded
+   *  photos (cards then render the colored placeholder). */
+  photo_urls: string[];
   unit_description: Bilingual;
   view_count: number;
   published_at: string;
@@ -170,6 +180,7 @@ export const mockBuildings: MockBuilding[] = [
     price_from_dirams: TJS(168_000),
     price_per_m2_from_dirams: TJS(4_100),
     cover_photo_url: null,
+    photo_urls: [],
     description: {
       ru: 'Современный жилой комплекс в центре Вахдата. Закрытая территория, подземный паркинг, детская площадка.',
       tg: 'Маҷмааи зисти муосир дар маркази Ваҳдат.',
@@ -194,6 +205,7 @@ export const mockBuildings: MockBuilding[] = [
     price_from_dirams: TJS(333_000),
     price_per_m2_from_dirams: TJS(4_900),
     cover_photo_url: null,
+    photo_urls: [],
     description: {
       ru: 'Камерный жилой комплекс рядом со школой и поликлиникой.',
       tg: 'Маҷмааи камерӣ дар назди мактаб ва поликлиника.',
@@ -218,6 +230,7 @@ export const mockBuildings: MockBuilding[] = [
     price_from_dirams: TJS(218_000),
     price_per_m2_from_dirams: TJS(3_900),
     cover_photo_url: null,
+    photo_urls: [],
     description: {
       ru: 'Новый проект в микрорайоне Шарора. Видовые квартиры на верхних этажах.',
       tg: 'Лоиҳаи нав дар микроноҳияи Шарора.',
@@ -242,6 +255,7 @@ export const mockBuildings: MockBuilding[] = [
     price_from_dirams: TJS(211_000),
     price_per_m2_from_dirams: TJS(3_900),
     cover_photo_url: null,
+    photo_urls: [],
     description: {
       ru: 'Сданный дом с готовой инфраструктурой. Магазины и кафе на первом этаже.',
       tg: 'Бинои супоридашуда бо инфрасохтори тайёр.',
@@ -266,6 +280,7 @@ export const mockBuildings: MockBuilding[] = [
     price_from_dirams: TJS(270_000),
     price_per_m2_from_dirams: TJS(4_200),
     cover_photo_url: null,
+    photo_urls: [],
     description: {
       ru: 'Жилой квартал на берегу реки Кофарнихон. Прогулочная зона и детский сад.',
       tg: 'Микроноҳияи зисти дар соҳили дарёи Кофарнихон.',
@@ -290,6 +305,7 @@ export const mockBuildings: MockBuilding[] = [
     price_from_dirams: TJS(142_000),
     price_per_m2_from_dirams: TJS(3_600),
     cover_photo_url: null,
+    photo_urls: [],
     description: {
       ru: 'Доступное жильё для молодых семей. Рассрочка от застройщика.',
       tg: 'Манзили дастрас барои оилаҳои ҷавон.',
@@ -338,6 +354,7 @@ function mkListing(seed: {
     verification_tier: seed.tier,
     cover_color: seed.cover,
     cover_photo_url: null,
+    photo_urls: [],
     unit_description: {
       ru: seed.desc ?? 'Просторная квартира с хорошей планировкой и видом во двор.',
       tg: 'Хонаи васеъ бо нақшаи хуб.',

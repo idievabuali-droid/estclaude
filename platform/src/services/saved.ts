@@ -21,6 +21,7 @@ import {
   BUILDING_SELECT,
   LISTING_SELECT,
 } from './buildings';
+import { hydratePhotos } from './photos';
 
 /** Set on a saved item when something interesting changed since the
  *  user last visited /izbrannoe — drives the "● Обновлено" pill on
@@ -247,6 +248,29 @@ export async function getMySavedItems(userId: string): Promise<{
       changeBadge: buildingChangeBadge(building),
     };
   });
+
+  // Hydrate photo_urls so the in-card carousel works on /izbrannoe.
+  // Three groups (saved buildings, the buildings of saved listings,
+  // saved listings + the matchingUnits previews on building cards) so
+  // every card on /izbrannoe gets its swipeable photos.
+  await Promise.all([
+    hydratePhotos(
+      'building',
+      buildings.map((b) => b.building),
+    ),
+    hydratePhotos(
+      'building',
+      listings.map((l) => l.building),
+    ),
+    hydratePhotos(
+      'listing',
+      listings.map((l) => l.listing),
+    ),
+    hydratePhotos(
+      'listing',
+      buildings.flatMap((b) => b.matchingUnits),
+    ),
+  ]);
 
   return { listings, buildings };
 }

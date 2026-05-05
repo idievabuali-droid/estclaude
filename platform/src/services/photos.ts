@@ -9,6 +9,7 @@
  * parent listing/building id, which is when these helpers fire to
  * link the storage objects to actual photos rows.
  */
+import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 const PHOTO_BUCKET = 'listing-photos';
@@ -96,6 +97,60 @@ export async function attachPhotos(
     storage_path: row.storage_path as string,
     is_cover: photos[i]?.is_cover ?? false,
   }));
+}
+
+/**
+ * Hydrates `photo_urls` on a list of buildings or listings. Single
+ * batch query so the caller never N+1s — costs one extra round-trip
+ * per list page (negligible at V1 scale).
+ *
+ * Order: cover photo first (if set), then remaining photos by
+ * display_order. The cover is materialised separately on the parent
+ * row so we always honour the founder's chosen cover even if its
+ * display_order isn't 0.
+ *
+ * Mutates each item in place.
+ */
+export async function hydratePhotos<
+  T extends { id: string; cover_photo_url: string | null; photo_urls: string[] },
+>(parentKind: 'building' | 'listing', items: T[]): Promise<void> {
+  if (items.length === 0) return;
+  const supabase = await createClient();
+  const ids = items.map((i) => i.id);
+  const fkColumn = parentKind === 'building' ? 'building_id' : 'listing_id';
+
+  const { data: rows, error } = await supabase
+    .from('photos')
+    .select(`${fkColumn}, storage_path, display_order`)
+    .in(fkColumn, ids)
+    .order('display_order', { ascending: true });
+  if (error) {
+    console.error(`[hydratePhotos] failed for ${parentKind}:`, error);
+    return;
+  }
+
+  const byParent = new Map<string, string[]>();
+  for (const r of rows ?? []) {
+    const parentId = (r as Record<string, unknown>)[fkColumn] as string;
+    const url = supabasePublicUrl((r as { storage_path: string }).storage_path);
+    if (!url) continue;
+    const arr = byParent.get(parentId) ?? [];
+    arr.push(url);
+    byParent.set(parentId, arr);
+  }
+
+  for (const item of items) {
+    const allUrls = byParent.get(item.id) ?? [];
+    if (item.cover_photo_url) {
+      // Cover stays at index 0; drop any duplicate of it from the rest.
+      item.photo_urls = [
+        item.cover_photo_url,
+        ...allUrls.filter((u) => u !== item.cover_photo_url),
+      ];
+    } else {
+      item.photo_urls = allUrls;
+    }
+  }
 }
 
 /**

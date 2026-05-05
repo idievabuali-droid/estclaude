@@ -10,6 +10,7 @@ import { FairnessIndicator, computeFairness, type FairnessLevel } from './Fairne
 import { InstallmentDisplay } from './InstallmentDisplay';
 import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
+import { CardPhotoCarousel } from './CardPhotoCarousel';
 import { FEATURES } from '@/lib/feature-flags';
 import { PriceConversion } from './PriceConversion';
 import { track } from '@/lib/analytics/track';
@@ -97,47 +98,58 @@ export function ListingCard({
         className,
       )}
     >
-      {/* Cover area. With an uploaded photo we render the image edge-
-          to-edge and demote the rooms+m² label to a small bottom-corner
-          chip so it doesn't bury the photo. Without a photo we keep the
-          colored placeholder with the giant centered label so empty
-          listings still look intentional. */}
-      <div
-        className="relative aspect-[4/3] w-full bg-stone-100"
-        style={listing.cover_photo_url ? undefined : { backgroundColor: listing.cover_color }}
+      {/* Cover area. CardPhotoCarousel takes over photo rendering when
+          we have any uploaded photos and lets the buyer swipe through
+          all of them inline (no need to drill into the detail page just
+          to check if the place looks decent). When `photo_urls` is
+          empty we still render the carousel container so the coloured
+          placeholder + giant rooms label show through — keeps no-photo
+          listings visually intentional. */}
+      <CardPhotoCarousel
+        photos={listing.photo_urls}
+        aspect="4/3"
+        alt={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
+        className="bg-stone-100"
+        style={listing.photo_urls.length === 0 ? { backgroundColor: listing.cover_color } : undefined}
+        persistentOverlay={
+          <>
+            {/* Bottom gradient — keeps the white chip text readable on
+                bright photos (and the placeholder gets a subtle vignette). */}
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/30" />
+            {listing.photo_urls.length === 0 ? (
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="text-h1 font-semibold text-white drop-shadow-sm tabular-nums">
+                  {listing.rooms_count}-комн
+                </span>
+                <span className="text-meta font-medium text-white/85 tabular-nums">
+                  {formatM2(listing.size_m2)}
+                </span>
+              </div>
+            ) : (
+              <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-sm bg-stone-900/70 px-2 py-1 text-caption font-medium text-white tabular-nums">
+                {listing.rooms_count}-комн · {formatM2(listing.size_m2)}
+              </span>
+            )}
+            <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-sm bg-stone-900/70 px-2 py-1 text-caption font-medium text-white tabular-nums">
+              <Layers className="size-3" /> {formatFloor(listing.floor_number, listing.total_floors)}
+            </span>
+          </>
+        }
       >
-        {listing.cover_photo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={listing.cover_photo_url}
-            alt={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
-            className="absolute inset-0 size-full object-cover"
-            loading="lazy"
-          />
-        ) : null}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/30" />
-        {listing.cover_photo_url ? (
-          <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-sm bg-stone-900/70 px-2 py-1 text-caption font-medium text-white tabular-nums">
-            {listing.rooms_count}-комн · {formatM2(listing.size_m2)}
-          </span>
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <span className="text-h1 font-semibold text-white drop-shadow-sm tabular-nums">
-              {listing.rooms_count}-комн
-            </span>
-            <span className="text-meta font-medium text-white/85 tabular-nums">
-              {formatM2(listing.size_m2)}
-            </span>
-          </div>
-        )}
         {/* Installment badge — only for listings that offer financing.
-            Top-left placement makes it scannable while flipping through
-            cards: buyers shopping by monthly budget can spot eligible
-            apartments without reading each card. The detailed terms
-            (first-payment %, monthly amount, term) still live at the
-            bottom of the card body for buyers who want the numbers. */}
+            Sits below the carousel's "1/N" counter so they don't fight
+            for the same corner. For listings without installment the
+            counter top-left has the corner to itself. */}
         {listing.installment_available ? (
-          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-sm bg-white/95 px-2 py-1 text-caption font-medium text-[color:var(--color-fairness-great)] shadow-sm">
+          <span
+            className={cn(
+              'absolute left-3 inline-flex items-center gap-1 rounded-sm bg-white/95 px-2 py-1 text-caption font-medium text-[color:var(--color-fairness-great)] shadow-sm',
+              // When the counter is present (multiple photos) push the
+              // installment chip below it; otherwise it can take the
+              // top corner.
+              listing.photo_urls.length > 1 ? 'top-12' : 'top-3',
+            )}
+          >
             <CreditCard className="size-3" />
             Рассрочка
           </span>
@@ -149,10 +161,7 @@ export function ListingCard({
             <CompareToggle type="listings" id={listing.id} />
           ) : null}
         </div>
-        <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-sm bg-stone-900/70 px-2 py-1 text-caption font-medium text-white tabular-nums">
-          <Layers className="size-3" /> {formatFloor(listing.floor_number, listing.total_floors)}
-        </span>
-      </div>
+      </CardPhotoCarousel>
 
       <div className="flex flex-1 flex-col gap-3 p-4">
         {/* VerificationBadge hidden in V1 — tier claims are hollow when

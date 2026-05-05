@@ -12,7 +12,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import type { BuildingStatus } from '@/types/domain';
 import { getNearbyPOIs, type PoiCategory } from './poi';
-import { supabasePublicUrl } from './photos';
+import { supabasePublicUrl, hydratePhotos } from './photos';
 
 /** Supabase select clauses for embedding the cover photo. PostgREST
  *  requires disambiguating the FK because both photos→buildings (via
@@ -119,6 +119,10 @@ function rowToBuilding(row: BuildingRowWithJoins): MockBuilding {
     // embed as either an object or an array depending on the relation
     // shape; defensive narrow handles both.
     cover_photo_url: supabasePublicUrl(extractCoverStoragePath(row.cover_photo)),
+    // Populated by hydratePhotos() at the list-query layer. Stays empty
+    // when the caller skips hydration (single-record fetches that don't
+    // need the in-card carousel — e.g. compare page).
+    photo_urls: [],
     price_from_dirams: row.price_from_dirams != null ? BigInt(row.price_from_dirams) : null,
     price_per_m2_from_dirams:
       row.price_per_m2_from_dirams != null ? BigInt(row.price_per_m2_from_dirams) : null,
@@ -301,6 +305,11 @@ export async function listBuildings(filters: BuildingFilters = {}): Promise<Mock
   // 'newest' would need created_at on buildings; deferred until the
   // rowToBuilding mapper plumbs it through. Sort 'recommended' = SQL.
 
+  // Hydrate photo_urls for the in-card carousel. Done last so we only
+  // pay the photo round-trip for buildings that actually survived
+  // filtering. One batch query, not N+1.
+  await hydratePhotos('building', buildings);
+
   return buildings;
 }
 
@@ -317,6 +326,7 @@ export async function listFeaturedBuildings(limit = 3): Promise<MockBuilding[]> 
   if (error) throw error;
   const buildings = (data ?? []).map((r) => rowToBuilding(r as BuildingRowWithJoins));
   await fillPriceFrom(supabase, buildings);
+  await hydratePhotos('building', buildings);
   return buildings;
 }
 
@@ -386,6 +396,13 @@ export async function getBuilding(slug: string): Promise<{
   const developer = mapDeveloper(developerRes.data);
   const district = mapDistrict(districtRes.data);
   const listings = (listingsRes.data ?? []).map(mapListing);
+
+  // Hydrate photos for both the building and its listings so the
+  // /zhk/[slug] hero + the per-unit cards both show real carousels.
+  await Promise.all([
+    hydratePhotos('building', [building]),
+    hydratePhotos('listing', listings),
+  ]);
 
   return { building, developer, district, listings };
 }
@@ -502,7 +519,9 @@ export async function getListingsForBuildingId(buildingId: string): Promise<Mock
     .eq('status', 'active')
     .order('price_total_dirams', { ascending: true });
   if (error) throw error;
-  return (data ?? []).map(mapListing);
+  const listings = (data ?? []).map(mapListing);
+  await hydratePhotos('listing', listings);
+  return listings;
 }
 
 // ─── Internal mappers ────────────────────────────────────────
@@ -599,6 +618,9 @@ function mapListing(r: {
     verification_tier: r.verification_tier as MockListing['verification_tier'],
     cover_color: LISTING_COVER_BY_SOURCE[r.source_type] ?? 'oklch(0.704 0.14 40)',
     cover_photo_url: supabasePublicUrl(extractCoverStoragePath(r.cover_photo)),
+    // Populated by hydratePhotos() at the list-query layer. Empty when
+    // the caller skips hydration (single-record fetches).
+    photo_urls: [],
     unit_description: r.unit_description ?? { ru: '', tg: '' },
     view_count: r.view_count,
     published_at: r.published_at ?? new Date().toISOString(),
