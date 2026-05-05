@@ -73,5 +73,3 @@ export { BuildingStickyContact } from './BuildingStickyContact';
 export type { BuildingStickyContactProps } from './BuildingStickyContact';
 export { MessagingPopoverButton } from './MessagingPopoverButton';
 export type { MessagingPopoverButtonProps } from './MessagingPopoverButton';
-export { WizardResultBanner } from './WizardResultBanner';
-export type { WizardResultBannerProps } from './WizardResultBanner';

@@ -2,7 +2,7 @@ import { ChevronLeft, X } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
-import { ListingCard, LocationSearch, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion, SortChip, WizardResultBanner, type SortMode } from '@/components/blocks';
+import { ListingCard, LocationSearch, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion, SortChip, type SortMode } from '@/components/blocks';
 import { displayNameFromFilters } from '@/lib/saved-searches/format';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { getExchangeRates } from '@/services/currency';
@@ -226,26 +226,12 @@ export default async function KvartiryPage({
 
       <section className="py-6">
         <AppContainer className="flex flex-col gap-5">
-          {/* Wizard payoff — buyer answered 5 questions in
-              /pomoshch-vybora and landed here with ?wizard=1.
-              Acknowledge the effort: count + filter recap + a
-              prominent subscribe-to-alerts CTA. Was the wizard's
-              biggest UX gap (no payoff for the effort). */}
-          {sp.wizard ? (
-            <WizardResultBanner
-              resultCount={filtered.length}
-              filterSummary={displayNameFromFilters('kvartiry', sp)}
-            />
-          ) : null}
-          {/* "Save this search" prompt — same affordance as on
-              /novostroyki. Skip when no filters are active (a bare
-              /kvartiry visit isn't a search worth saving) and when
-              the page is scoped to a single building (the buyer is
-              already on that building's set). When wizard=1 we
-              ALWAYS show this — the WizardResultBanner above is
-              just visual celebration; the actual subscribe form is
-              this SaveSearchPrompt. Earlier suppression made the
-              banner's button do nothing. */}
+          {/* Single consolidated subscribe panel. When wizard=1 it
+              ALSO renders the result-count + filter summary headline
+              (so the buyer sees one panel, not two stacked ones).
+              Earlier we had a separate WizardResultBanner above this
+              prompt — buyers reported it as "two places say subscribe
+              to this", confusing. Now it's one card with one CTA. */}
           {(sp.wizard ||
             countActiveFiltersK(sp) >= 2 ||
             filtered.length === 0) &&
@@ -255,6 +241,10 @@ export default async function KvartiryPage({
               page="kvartiry"
               filters={sp}
               noResults={filtered.length === 0}
+              resultCount={sp.wizard ? filtered.length : undefined}
+              filterSummary={
+                sp.wizard ? displayNameFromFilters('kvartiry', sp) : undefined
+              }
             />
           ) : null}
           {filtered.length <= 1 && countActiveFiltersK(sp) >= 2 ? (

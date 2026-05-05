@@ -2,7 +2,7 @@ import { Map as MapIcon, List, ArrowLeft, X } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
-import { BuildingCard, LocationSearch, MapView, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion, SortChip, WizardResultBanner } from '@/components/blocks';
+import { BuildingCard, LocationSearch, MapView, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion, SortChip } from '@/components/blocks';
 import { displayNameFromFilters } from '@/lib/saved-searches/format';
 import {
   listBuildings,
@@ -336,25 +336,11 @@ export default async function NovostroykiPage({
       {!isMap && (
         <section className="py-6">
           <AppContainer className="flex flex-col gap-5">
-            {/* Wizard payoff banner — see /kvartiry for the rationale.
-                When ?wizard=1 is set, replace the SaveSearchPrompt
-                with the celebratory recap so the buyer sees a count
-                and an explicit subscribe CTA. */}
-            {sp.wizard ? (
-              <WizardResultBanner
-                resultCount={filtered.length}
-                filterSummary={displayNameFromFilters('novostroyki', sp)}
-              />
-            ) : null}
-            {/* "Save this search" prompt — always rendered when at
-                least one filter is active. The 0-results variant is
-                bigger and more directive (the buyer literally told us
-                what's missing from inventory).
-
-                Wizard payoff: when ?wizard=1 is set we ALWAYS show
-                this — the banner above is just visual celebration,
-                the actual subscribe form lives here. Earlier
-                suppression made the banner's CTA do nothing. */}
+            {/* Single consolidated subscribe panel. Wizard mode
+                (?wizard=1) drops the count + filter summary into the
+                same card as the subscribe buttons — buyers reported
+                the previous stacked-banner layout as "two places say
+                subscribe to this", confusing. */}
             {(sp.wizard ||
               countActiveFilters(sp) >= 2 ||
               filtered.length === 0) &&
@@ -363,6 +349,10 @@ export default async function NovostroykiPage({
                 page="novostroyki"
                 filters={sp}
                 noResults={filtered.length === 0}
+                resultCount={sp.wizard ? filtered.length : undefined}
+                filterSummary={
+                  sp.wizard ? displayNameFromFilters('novostroyki', sp) : undefined
+                }
               />
             ) : null}
             {/* Filter-relax: when results are tight (0 or 1) and the

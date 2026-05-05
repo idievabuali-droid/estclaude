@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bell, Send, Phone } from 'lucide-react';
+import { Bell, Send, Phone, Sparkles } from 'lucide-react';
 import { AppCard, AppCardContent, AppButton, AppInput } from '@/components/primitives';
 import { toast } from '@/components/primitives/AppToast';
 import { track } from '@/lib/analytics/track';
@@ -14,6 +14,15 @@ export interface SaveSearchPromptProps {
   /** Show the "buyers told us nothing matches" version of the copy.
    *  Visually larger and more directive than the always-on prompt. */
   noResults?: boolean;
+  /** When set, render a wizard-acknowledgement headline ABOVE the
+   *  subscribe form: count + filter summary in the same card. Used on
+   *  ?wizard=1 destinations so the buyer sees one consolidated panel
+   *  instead of a stacked banner+form pair (the user reported the
+   *  duplication felt confusing — "two places say subscribe to this"). */
+  resultCount?: number;
+  /** Plain-Russian filter recap for the wizard headline, e.g.
+   *  "2-комн · без ремонта · до 4к TJS / мес". */
+  filterSummary?: string;
 }
 
 /**
@@ -31,7 +40,13 @@ export interface SaveSearchPromptProps {
  * whether to mount it (we hide it on bare /novostroyki visits with
  * no active filters, since there's nothing meaningful to "save").
  */
-export function SaveSearchPrompt({ page, filters, noResults }: SaveSearchPromptProps) {
+export function SaveSearchPrompt({
+  page,
+  filters,
+  noResults,
+  resultCount,
+  filterSummary,
+}: SaveSearchPromptProps) {
   const [submitting, setSubmitting] = useState(false);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [phone, setPhone] = useState('');
@@ -113,26 +128,63 @@ export function SaveSearchPrompt({ page, filters, noResults }: SaveSearchPromptP
     );
   }
 
+  // Wizard mode = caller passed resultCount. Promotes the headline to
+  // a celebration line ("Мы подобрали 2 варианта по вашим ответам")
+  // and inlines the filter summary right below — same content the
+  // standalone WizardResultBanner used to render in a separate card
+  // above this one. Merging eliminates the "two places say subscribe"
+  // confusion buyers reported.
+  const isWizard = resultCount != null;
+  const countWord =
+    resultCount === 1
+      ? 'вариант'
+      : resultCount && resultCount >= 2 && resultCount <= 4
+        ? 'варианта'
+        : 'вариантов';
+  const wizardHeadline =
+    resultCount === 0
+      ? 'Пока ничего не подходит'
+      : `Мы подобрали ${resultCount} ${countWord} по вашим ответам`;
+  const headline = isWizard
+    ? wizardHeadline
+    : noResults
+      ? 'Подходящих квартир пока нет'
+      : 'Получать уведомления о новых';
+  const helper = isWizard
+    ? resultCount === 0
+      ? 'Подпишитесь — пришлём в Telegram или WhatsApp, как только появится подходящая квартира.'
+      : 'Хотите получать новые квартиры по этим параметрам? Подпишитесь — пришлём в Telegram или WhatsApp.'
+    : noResults
+      ? 'Подпишитесь — мы напишем, как только появится подходящая квартира.'
+      : 'Сохраните этот поиск — мы напишем сразу, как появится новое объявление.';
+
+  // Wizard panel uses the warmer terracotta gradient that the old
+  // banner had, so the wizard payoff still reads as a "moment" rather
+  // than a generic alert prompt. No-results stays in its existing
+  // softer terracotta tint.
+  const cardClass = isWizard
+    ? 'border-terracotta-200 bg-gradient-to-br from-terracotta-50/80 to-amber-50/60'
+    : noResults
+      ? 'border-terracotta-300 bg-terracotta-50/50'
+      : undefined;
+
+  const HeaderIcon = isWizard ? Sparkles : Bell;
+  const iconClass = isWizard
+    ? 'size-5 shrink-0 text-terracotta-700'
+    : `size-5 shrink-0 ${noResults ? 'text-terracotta-700' : 'text-stone-500'}`;
+
   return (
-    <AppCard className={noResults ? 'border-terracotta-300 bg-terracotta-50/50' : undefined}>
+    <AppCard className={cardClass}>
       <AppCardContent>
         <div className="flex flex-col gap-3">
           <div className="flex items-start gap-3">
-            <Bell
-              className={`size-5 shrink-0 ${noResults ? 'text-terracotta-700' : 'text-stone-500'}`}
-              aria-hidden
-            />
-            <div className="flex flex-col gap-1">
-              <h3 className="text-h3 font-semibold text-stone-900">
-                {noResults
-                  ? 'Подходящих квартир пока нет'
-                  : 'Получать уведомления о новых'}
-              </h3>
-              <p className="text-meta text-stone-700">
-                {noResults
-                  ? 'Подпишитесь — мы напишем, как только появится подходящая квартира.'
-                  : 'Сохраните этот поиск — мы напишем сразу, как появится новое объявление.'}
-              </p>
+            <HeaderIcon className={iconClass} aria-hidden />
+            <div className="flex min-w-0 flex-col gap-1">
+              <h3 className="text-h3 font-semibold text-stone-900">{headline}</h3>
+              {isWizard && filterSummary ? (
+                <p className="text-caption text-stone-600">{filterSummary}</p>
+              ) : null}
+              <p className="text-meta text-stone-700">{helper}</p>
             </div>
           </div>
 
