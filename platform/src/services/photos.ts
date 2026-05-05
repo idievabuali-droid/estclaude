@@ -99,10 +99,32 @@ export async function attachPhotos(
   }));
 }
 
+/** Photo kinds suitable for the in-card carousel.
+ *
+ *  Buildings: the carousel is for buyers scanning what the place looks
+ *  like — exterior, interior, amenity shots only. The `progress` kind
+ *  is for the /zhk/[slug]/progress timeline (monthly construction
+ *  snapshots) and the seed inserts six placeholder rows per under-
+ *  construction building whose storage files were never uploaded; if
+ *  we let them into the carousel, slides 2..7 render as broken images.
+ *  `unit_floor_plan` is for the listing detail's floor-plan slot, not
+ *  the building card.
+ *
+ *  Listings: keep all unit-level kinds plus `other`. Floor-plan stays
+ *  excluded so the card carousel is photos only — a technical drawing
+ *  inline with bedroom shots breaks the browsing rhythm. */
+const CARD_PHOTO_KINDS = {
+  building: ['building_exterior', 'building_interior', 'building_amenity'],
+  listing: ['unit_living', 'unit_bedroom', 'unit_kitchen', 'unit_bathroom', 'unit_view', 'other'],
+} as const;
+
 /**
  * Hydrates `photo_urls` on a list of buildings or listings. Single
  * batch query so the caller never N+1s — costs one extra round-trip
  * per list page (negligible at V1 scale).
+ *
+ * Photo selection is scoped via CARD_PHOTO_KINDS — see that constant
+ * for why progress + floor-plan kinds are excluded.
  *
  * Order: cover photo first (if set), then remaining photos by
  * display_order. The cover is materialised separately on the parent
@@ -118,11 +140,13 @@ export async function hydratePhotos<
   const supabase = await createClient();
   const ids = items.map((i) => i.id);
   const fkColumn = parentKind === 'building' ? 'building_id' : 'listing_id';
+  const allowedKinds = CARD_PHOTO_KINDS[parentKind];
 
   const { data: rows, error } = await supabase
     .from('photos')
-    .select(`${fkColumn}, storage_path, display_order`)
+    .select(`${fkColumn}, storage_path, display_order, kind`)
     .in(fkColumn, ids)
+    .in('kind', allowedKinds)
     .order('display_order', { ascending: true });
   if (error) {
     console.error(`[hydratePhotos] failed for ${parentKind}:`, error);
