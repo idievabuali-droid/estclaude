@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { ChevronLeft, MapPin, Coins, Bed, Brush, Calendar } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { AppButton, AppCard, AppCardContent } from '@/components/primitives';
 import { LocationSearch } from '@/components/blocks';
@@ -10,6 +11,12 @@ import { cn } from '@/lib/utils';
 
 type Answers = {
   districts: string[];
+  /** Optional POI / building / developer anchor picked from the
+   *  LocationSearch in Q1. When set, the wizard's final navigation
+   *  appends the right URL params (e.g. ?near_lat=… for POIs,
+   *  ?developer=… for devs). Mutually informative with `districts`
+   *  — both can be set; the destination page handles either. */
+  anchor: PickedAnchor | null;
   budget: string | null;
   /** Multi-select: buyer can pick "1 OR 2 rooms" (Faridun's case).
    *  Treats the special "any" value as mutually exclusive with
@@ -21,6 +28,15 @@ type Answers = {
   finishing: string[];
   timing: string | null;
 };
+
+/** Discriminated union for whatever the buyer picked in the Q1
+ *  search box. Each variant carries the data needed to extend the
+ *  destination URL params on completion. */
+type PickedAnchor =
+  | { kind: 'district'; slug: string; label: string }
+  | { kind: 'poi'; lat: number; lng: number; label: string }
+  | { kind: 'building'; slug: string; label: string }
+  | { kind: 'developer'; id: string; label: string };
 
 const STEPS = [
   { key: 'districts' as const, title: 'Какие районы вам подходят?', Icon: MapPin },
@@ -47,7 +63,12 @@ const ROOMS = [
   { value: '1', label: '1' },
   { value: '2', label: '2' },
   { value: '3', label: '3' },
-  { value: '4', label: '4+' },
+  { value: '4', label: '4' },
+  // 5+ as a separate chip — the previous "4+" lumped 4/5/6 together
+  // so a buyer who specifically wanted 4-комн couldn't say so. The
+  // listings filter already accepts CSV (?rooms=4,5) and treats 5+
+  // as ">= 5" via the same path.
+  { value: '5', label: '5+' },
   { value: 'any', label: 'Не важно' },
 ];
 
@@ -75,6 +96,7 @@ export function GuidedFinder() {
   const [stepIdx, setStepIdx] = useState(0);
   const [answers, setAnswers] = useState<Answers>({
     districts: [],
+    anchor: null,
     budget: null,
     rooms: [],
     finishing: [],
@@ -98,30 +120,42 @@ export function GuidedFinder() {
 
   function next() {
     if (!isLast) return setStepIdx((i) => i + 1);
-    // JOURNEY-5: pass ALL collected answers to the apartments page
-    // (rooms + finishing make sense at the unit level, so /kvartiry not /novostroyki)
-    const params = new URLSearchParams();
-    if (answers.districts.length) {
-      // SPEC-GAP: /kvartiry doesn't currently filter by district at the listing
-      // level — district lives on the building. Defer to /novostroyki for that
-      // dimension; the user will land there if they picked districts but no rooms/finishing.
+
+    // Anchor: a building or developer pick is decisive — the buyer
+    // wanted that specific thing, send them to its detail/scoped
+    // page directly rather than a filtered list. Wizard answers
+    // get carried via URL params where applicable.
+    if (answers.anchor?.kind === 'building') {
+      router.push(`/zhk/${answers.anchor.slug}`);
+      return;
     }
+    if (answers.anchor?.kind === 'developer') {
+      const p = new URLSearchParams();
+      p.set('developer', answers.anchor.id);
+      p.set('wizard', '1');
+      if (answers.budget && answers.budget !== 'any') p.set('price_to', answers.budget);
+      router.push(`/novostroyki?${p.toString()}`);
+      return;
+    }
+
+    // POI anchor → near-radius filter. Apartment-level criteria
+    // (rooms / finishing) carried into /kvartiry where they apply.
+    // District anchor → ?district=, but allow alongside existing
+    // district chip selection (deduped).
+    const params = new URLSearchParams();
     if (answers.budget && answers.budget !== 'any') params.set('price_to', answers.budget);
-    // Multi-select: drop the "any" sentinel before joining; if "any"
-    // was the only pick the param is omitted, matching the "no filter"
-    // semantic the destination pages expect.
     const roomsClean = answers.rooms.filter((r) => r !== 'any');
     if (roomsClean.length) params.set('rooms', roomsClean.join(','));
     const finishingClean = answers.finishing.filter((f) => f !== 'any');
     if (finishingClean.length) params.set('finishing', finishingClean.join(','));
-    // Wizard flag — destination page reads this and renders the
-    // WizardResultBanner so the buyer's 5 questions of effort get
-    // an explicit acknowledgement instead of an identical-to-normal
-    // filtered list page.
+    if (answers.anchor?.kind === 'poi') {
+      params.set('near_lat', String(answers.anchor.lat));
+      params.set('near_lng', String(answers.anchor.lng));
+      params.set('near_label', answers.anchor.label);
+      params.set('radius', '1500');
+    }
     params.set('wizard', '1');
 
-    // Choose target: /kvartiry is the right destination when buyer picked
-    // unit-level criteria; /novostroyki is right when they only picked districts.
     const hasUnitCriteria =
       answers.rooms.some((r) => r !== 'any') ||
       answers.finishing.some((f) => f !== 'any');
@@ -129,8 +163,17 @@ export function GuidedFinder() {
       router.push(`/kvartiry?${params.toString()}`);
     } else {
       const projectParams = new URLSearchParams();
-      if (answers.districts.length) projectParams.set('district', answers.districts.join(','));
+      // Merge district chips + anchor district (if any) — dedup.
+      const allDistricts = new Set(answers.districts);
+      if (answers.anchor?.kind === 'district') allDistricts.add(answers.anchor.slug);
+      if (allDistricts.size) projectParams.set('district', [...allDistricts].join(','));
       if (answers.budget && answers.budget !== 'any') projectParams.set('price_to', answers.budget);
+      if (answers.anchor?.kind === 'poi') {
+        projectParams.set('near_lat', String(answers.anchor.lat));
+        projectParams.set('near_lng', String(answers.anchor.lng));
+        projectParams.set('near_label', answers.anchor.label);
+        projectParams.set('radius', '1500');
+      }
       projectParams.set('wizard', '1');
       router.push(`/novostroyki?${projectParams.toString()}`);
     }
@@ -183,25 +226,61 @@ export function GuidedFinder() {
             {step.key === 'districts' ? (
               <div className="flex flex-col gap-4">
                 {/* LocationSearch as the richer location input —
-                    leverages the multi-source search (district / ЖК /
-                    застройщик / POI). Picking a result navigates the
-                    visitor away from the wizard with the right
-                    destination URL (POI → /novostroyki?near_...,
-                    district → ?district=, ЖК → /zhk/<slug>, dev →
-                    /novostroyki?developer=). Buyers who already know
-                    their anchor skip Q2-Q5 entirely — the wizard
-                    is for buyers WITHOUT a specific place in mind,
-                    so this is correct. */}
+                    leverages the multi-source search. `onPick` keeps
+                    the buyer IN the wizard (set anchor → continue
+                    with budget/rooms/finishing) instead of navigating
+                    away on first pick (which broke the wizard flow). */}
                 <div className="flex flex-col gap-1">
                   <LocationSearch
                     destinationPath="/novostroyki"
                     variant="compact"
+                    onPick={(hit) => {
+                      const anchor: PickedAnchor =
+                        hit.sourceKind === 'district'
+                          ? { kind: 'district', slug: hit.slug, label: hit.name }
+                          : hit.sourceKind === 'poi'
+                            ? { kind: 'poi', lat: hit.latitude, lng: hit.longitude, label: hit.name }
+                            : hit.sourceKind === 'building'
+                              ? { kind: 'building', slug: hit.slug, label: hit.name }
+                              : { kind: 'developer', id: hit.id, label: hit.name };
+                      setAnswers((a) => {
+                        const next: Answers = { ...a, anchor };
+                        // If buyer picked a district via the search,
+                        // also reflect it in the chips below so the
+                        // selection state is consistent.
+                        if (anchor.kind === 'district' && !a.districts.includes(anchor.slug)) {
+                          next.districts = [...a.districts, anchor.slug];
+                        }
+                        return next;
+                      });
+                    }}
                   />
                   <p className="text-caption text-stone-500">
                     Знаете конкретное место — школу, ЖК, район? Введите
-                    название и сразу увидите подходящие квартиры.
+                    название.
                   </p>
                 </div>
+
+                {/* Picked anchor chip — shows what the buyer chose
+                    via the search box, with X to clear. Without this
+                    feedback they'd type, see the dropdown disappear,
+                    and not know whether the pick "took". */}
+                {answers.anchor ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-terracotta-300 bg-terracotta-50 px-3 py-1 text-meta font-medium text-terracotta-800">
+                      Выбрано: {answers.anchor.label}
+                      <button
+                        type="button"
+                        onClick={() => setAnswers((a) => ({ ...a, anchor: null }))}
+                        aria-label="Убрать"
+                        className="inline-flex size-4 items-center justify-center rounded-full hover:bg-terracotta-100"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  </div>
+                ) : null}
+
                 <div className="flex items-center gap-3 text-caption uppercase tracking-wide text-stone-400">
                   <span className="h-px flex-1 bg-stone-200" />
                   или

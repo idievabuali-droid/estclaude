@@ -349,14 +349,15 @@ export default async function NovostroykiPage({
             {/* "Save this search" prompt — always rendered when at
                 least one filter is active. The 0-results variant is
                 bigger and more directive (the buyer literally told us
-                what's missing from inventory). */}
-            {/* Defer SaveSearchPrompt until ≥2 filters OR 0 results.
-                Earlier it fired on any filter at all and the 25% of
-                viewport it eats pushed results below the fold for a
-                visitor who hadn't even narrowed seriously yet. ≥2 is
-                "serious enough to be worth saving as an alert." */}
-            {!sp.wizard &&
-            (countActiveFilters(sp) >= 2 || filtered.length === 0) &&
+                what's missing from inventory).
+
+                Wizard payoff: when ?wizard=1 is set we ALWAYS show
+                this — the banner above is just visual celebration,
+                the actual subscribe form lives here. Earlier
+                suppression made the banner's CTA do nothing. */}
+            {(sp.wizard ||
+              countActiveFilters(sp) >= 2 ||
+              filtered.length === 0) &&
             hasActiveFilters(sp) ? (
               <SaveSearchPrompt
                 page="novostroyki"

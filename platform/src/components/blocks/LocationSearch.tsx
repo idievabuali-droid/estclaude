@@ -6,7 +6,9 @@ import { useRouter } from '@/i18n/navigation';
 
 // SearchHit shape mirrors services/search.ts. Pages can't import that
 // service module (admin client) so we duplicate the type minimally.
-type SearchHit =
+// Exported so wizards / other UIs that pass `onPick` can type the
+// callback parameter.
+export type SearchHit =
   | { sourceKind: 'district'; id: string; name: string; slug: string }
   | { sourceKind: 'building'; id: string; name: string; slug: string; districtName: string | null }
   | { sourceKind: 'developer'; id: string; name: string; isVerified: boolean }
@@ -77,6 +79,13 @@ export interface LocationSearchProps {
   radiusMeters?: number;
   /** Style variant: hero on home, compact on filter pages. */
   variant?: 'hero' | 'compact';
+  /** When provided, the component calls this on pick INSTEAD of
+   *  navigating. Used by the /pomoshch-vybora wizard so the buyer
+   *  picks a location and stays in the wizard for budget/rooms/
+   *  finishing — was navigating away by default which broke the
+   *  flow. The callback gets the full hit so the caller can decide
+   *  what to do (set state, advance step, etc.). */
+  onPick?: (hit: SearchHit) => void;
 }
 
 /**
@@ -94,6 +103,7 @@ export function LocationSearch({
   initialQuery = '',
   radiusMeters = 1500,
   variant = 'hero',
+  onPick,
 }: LocationSearchProps) {
   const router = useRouter();
   const [q, setQ] = useState(initialQuery);
@@ -152,6 +162,13 @@ export function LocationSearch({
 
   function pick(hit: SearchHit) {
     setOpen(false);
+    // Caller-supplied onPick wins over default navigation. Used by
+    // the wizard so the buyer's pick sets a wizard answer + advances
+    // the step instead of leaving the wizard mid-flow.
+    if (onPick) {
+      onPick(hit);
+      return;
+    }
     if (hit.sourceKind === 'district') {
       // District — narrow the destination list to that microdistrict.
       router.push(`${destinationPath}?district=${encodeURIComponent(hit.slug)}`);

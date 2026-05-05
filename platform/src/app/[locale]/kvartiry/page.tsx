@@ -241,15 +241,14 @@ export default async function KvartiryPage({
               /novostroyki. Skip when no filters are active (a bare
               /kvartiry visit isn't a search worth saving) and when
               the page is scoped to a single building (the buyer is
-              already on that building's set). */}
-          {/* Same deferral as /novostroyki — only show this when the
-              search is "serious" (≥2 filters or 0 results), so single-
-              chip browsing isn't interrupted. Building scope is treated
-              as navigation, not a filter (already excluded). The
-              wizard banner above already prompts subscription so we
-              skip this redundant block when wizard=1 is set. */}
-          {!sp.wizard &&
-          (countActiveFiltersK(sp) >= 2 || filtered.length === 0) &&
+              already on that building's set). When wizard=1 we
+              ALWAYS show this — the WizardResultBanner above is
+              just visual celebration; the actual subscribe form is
+              this SaveSearchPrompt. Earlier suppression made the
+              banner's button do nothing. */}
+          {(sp.wizard ||
+            countActiveFiltersK(sp) >= 2 ||
+            filtered.length === 0) &&
           hasActiveFiltersK(sp) &&
           !scopedBuilding ? (
             <SaveSearchPrompt
