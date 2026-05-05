@@ -1,13 +1,5 @@
 import { notFound } from 'next/navigation';
-import {
-  MapPin,
-  Layers,
-  Ruler,
-  Bath,
-  ArrowUpRight,
-  Move3D,
-  Square,
-} from 'lucide-react';
+import { MapPin, ArrowUpRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
@@ -326,6 +318,22 @@ export default async function ListingDetailPage({
             </div>
           </div>
 
+          {/* Finishing — small chip + 1-line caption. Used to live in
+              its own "stats" section below; promoting it here puts it
+              next to the price where buying-decision attributes
+              belong. Carrying the descriptor inline ("полная отделка
+              от застройщика, готова к заселению") means buyers don't
+              have to scroll past 5 redundant facts cards just to find
+              what condition the apartment is actually in. */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <AppChip asStatic tone={FINISHING_TONE[listing.finishing_type]}>
+              {tFinishing(listing.finishing_type)}
+            </AppChip>
+            <span className="text-caption text-stone-500">
+              {finishingDescription(listing.finishing_type)}
+            </span>
+          </div>
+
           {/* Tertiary signal — small + muted so it doesn't compete with
               price or building info above. */}
           <span className="text-caption text-stone-400">
@@ -352,75 +360,6 @@ export default async function ListingDetailPage({
         </AppContainer>
       </section>
 
-      {/* ─── 4. SPECS + FINISHING (the "stats" zone) ────────────── */}
-      {/* The Fact grid now renders every spec field that exists on the
-          listing — earlier this only showed Площадь / Этаж / Санузел,
-          silently dropping bathroom_count / ceiling_height_cm / balcony
-          even when the seller had filled them in. Buyers (especially
-          Saidakbar shopping for a family) actively look for ceiling
-          height + balcony before contacting; without those rows on the
-          page they assumed the data wasn't captured at all. */}
-      <section className="bg-stone-50 py-5">
-        <AppContainer className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-            <Fact
-              icon={<Ruler className="size-4 text-stone-500" />}
-              label="Площадь"
-              value={formatM2(listing.size_m2)}
-            />
-            <Fact
-              icon={<Layers className="size-4 text-stone-500" />}
-              label="Этаж"
-              value={formatFloor(listing.floor_number, listing.total_floors)}
-            />
-            {listing.bathroom_count != null ? (
-              <Fact
-                icon={<Bath className="size-4 text-stone-500" />}
-                label="Санузлов"
-                value={
-                  listing.bathroom_separate != null
-                    ? `${listing.bathroom_count} · ${listing.bathroom_separate ? 'раздельный' : 'совмещённый'}`
-                    : String(listing.bathroom_count)
-                }
-              />
-            ) : listing.bathroom_separate != null ? (
-              <Fact
-                icon={<Bath className="size-4 text-stone-500" />}
-                label="Санузел"
-                value={listing.bathroom_separate ? 'раздельный' : 'совмещённый'}
-              />
-            ) : null}
-            {listing.ceiling_height_cm != null ? (
-              <Fact
-                icon={<Move3D className="size-4 text-stone-500" />}
-                label="Потолок"
-                value={`${(listing.ceiling_height_cm / 100).toFixed(2).replace(/\.?0+$/, '')} м`}
-              />
-            ) : null}
-            {listing.balcony != null ? (
-              <Fact
-                icon={<Square className="size-4 text-stone-500" />}
-                label="Балкон"
-                value={listing.balcony ? 'есть' : 'нет'}
-              />
-            ) : null}
-          </div>
-
-          {/* Finishing — chip is self-explanatory (its semantic colour
-              IS the signal); a small caption underneath spells out
-              what the buyer actually gets. No "Отделка:" prefix
-              needed — the chip text says "Без ремонта" / "С ремонтом"
-              etc., which already names the attribute. */}
-          <div className="flex flex-col gap-1">
-            <AppChip asStatic tone={FINISHING_TONE[listing.finishing_type]} className="w-fit">
-              {tFinishing(listing.finishing_type)}
-            </AppChip>
-            <span className="text-caption text-stone-500">
-              {finishingDescription(listing.finishing_type)}
-            </span>
-          </div>
-        </AppContainer>
-      </section>
 
       {/* ─── 5. INSTALLMENT (only when offered) ─────────────────── */}
       {listing.installment_available && listing.installment_monthly_amount_dirams ? (
@@ -539,26 +478,6 @@ export default async function ListingDetailPage({
       {/* Mobile sticky contact bar is rendered by ContactBarWithModal
           in section 3 — it floats fixed regardless of scroll position. */}
     </>
-  );
-}
-
-function Fact({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-3">
-      {icon}
-      <div className="flex flex-col">
-        <span className="text-caption text-stone-500">{label}</span>
-        <span className="text-meta font-medium tabular-nums text-stone-900">{value}</span>
-      </div>
-    </div>
   );
 }
 
