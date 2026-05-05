@@ -29,11 +29,17 @@ const STEPS = [
   { key: 'timing' as const, title: 'Когда хотите въехать?', Icon: Calendar },
 ];
 
-const BUDGETS = [
-  { value: '500000', label: 'до 500 000 TJS' },
-  { value: '800000', label: 'до 800 000 TJS' },
-  { value: '1200000', label: 'до 1 200 000 TJS' },
-  { value: 'any', label: 'Не важно — покажите все' },
+// Budget ceiling presets — start from 250 000 so Faridun's 200k
+// real budget shows him real options instead of the previous floor
+// of 500 000 (which made him think nothing was for him). Up to
+// 1.2M covers the diaspora / family-relocation segment. Free-text
+// input below the chips for everything else.
+const BUDGET_PRESETS = [
+  { value: '250000', label: 'до 250 000' },
+  { value: '350000', label: 'до 350 000' },
+  { value: '500000', label: 'до 500 000' },
+  { value: '800000', label: 'до 800 000' },
+  { value: '1200000', label: 'до 1 200 000' },
 ];
 
 const ROOMS = [
@@ -80,6 +86,12 @@ export function GuidedFinder() {
     if (step.key === 'districts') return true; // skip allowed
     if (step.key === 'rooms') return answers.rooms.length > 0;
     if (step.key === 'finishing') return answers.finishing.length > 0;
+    if (step.key === 'budget') {
+      // Treat empty string (free-input cleared) the same as null —
+      // buyer hasn't chosen yet. Numeric strings + presets + "any"
+      // all advance.
+      return answers.budget != null && answers.budget !== '';
+    }
     return answers[step.key] != null;
   })();
 
@@ -176,8 +188,7 @@ export function GuidedFinder() {
               />
             ) : null}
             {step.key === 'budget' ? (
-              <CardChoice
-                options={BUDGETS}
+              <BudgetChoice
                 value={answers.budget}
                 onChange={(v) => setAnswers((a) => ({ ...a, budget: v }))}
               />
@@ -325,6 +336,99 @@ function CardChoice(props: CardChoiceProps) {
           hint={opt.hint}
         />
       ))}
+    </div>
+  );
+}
+
+/**
+ * Budget Q2 choice — replaces the rigid 4-option card list. Three
+ * surfaces in priority order:
+ *
+ *   1. Quick-pick chips (5 ceiling presets, starting at 250k so
+ *      Faridun's actual 200k budget gets meaningful results).
+ *   2. Free-text "Или введите свой максимум" input — the buyer
+ *      types their actual ceiling. Selecting a preset clears the
+ *      typed value and vice versa.
+ *   3. "Не важно — покажите все" CardOption to skip the filter
+ *      entirely. Mutually exclusive with the chips + input.
+ *
+ * Discriminating which mode is active: if value is "any" → "Не
+ * важно" wins; if value matches a preset → that chip is highlighted;
+ * otherwise the input shows the value.
+ */
+function BudgetChoice({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (v: string) => void;
+}) {
+  const presetValues = new Set(BUDGET_PRESETS.map((p) => p.value));
+  const inputValue =
+    value && value !== 'any' && !presetValues.has(value) ? value : '';
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Quick-pick presets */}
+      <div className="flex flex-wrap gap-2">
+        {BUDGET_PRESETS.map((p) => {
+          const active = value === p.value;
+          return (
+            <button
+              key={p.value}
+              type="button"
+              onClick={() => onChange(p.value)}
+              className={cn(
+                'inline-flex items-center rounded-full border px-3 py-1.5 text-meta font-medium tabular-nums transition-colors',
+                active
+                  ? 'border-terracotta-600 bg-terracotta-600 text-white'
+                  : 'border-stone-200 bg-stone-50 text-stone-700 hover:border-terracotta-300 hover:bg-terracotta-50',
+              )}
+            >
+              {p.label} TJS
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Free-text input — for buyers whose ceiling doesn't match a
+          preset (e.g. Faridun at 220k, or 600k cash buyers). */}
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="wizard-budget-input"
+          className="text-caption text-stone-500"
+        >
+          Или введите свой максимум, TJS
+        </label>
+        <input
+          id="wizard-budget-input"
+          type="number"
+          inputMode="numeric"
+          min={0}
+          placeholder="220 000"
+          value={inputValue}
+          onChange={(e) => {
+            const raw = e.target.value.trim();
+            if (!raw) {
+              // Empty input clears the budget answer entirely (so the
+              // "Далее" button disables until the buyer picks again).
+              onChange('');
+              return;
+            }
+            onChange(raw);
+          }}
+          className="h-11 rounded-md border border-stone-300 bg-white px-3 text-meta tabular-nums text-stone-900 focus:border-terracotta-600 focus:outline-none"
+        />
+      </div>
+
+      {/* "Не важно" — the catch-all skip. Card-style for prominence
+          since it's the most-clicked option for low-effort buyers. */}
+      <CardOption
+        active={value === 'any'}
+        onClick={() => onChange('any')}
+        label="Не важно — покажите все"
+        hint="Без ограничения по цене"
+      />
     </div>
   );
 }
