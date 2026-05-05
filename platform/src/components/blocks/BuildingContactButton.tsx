@@ -24,9 +24,11 @@ export interface BuildingContactButtonProps {
  * Single channel = WhatsApp (dominant in market). Prefilled text
  * carries the building name so the founder can answer in context.
  *
- * Client component because the wrapping BuildingCard <Link> needs
- * onClick stop-propagation to prevent navigating away when this
- * affordance is tapped.
+ * Rendered as a button (not anchor) — BuildingCard wraps the whole
+ * card in a <Link>, and HTML doesn't allow nested <a>. The earlier
+ * anchor version triggered a hydration error every render which forced
+ * full page reloads and on mobile interrupted the photo carousel
+ * swipe gesture. window.open keeps the new-tab behaviour anchors get.
  */
 export function BuildingContactButton({
   buildingName,
@@ -41,11 +43,13 @@ export function BuildingContactButton({
   const text = encodeURIComponent(lines.join(' '));
   const href = `${FOUNDER_CONTACTS.whatsappLink}?text=${text}`;
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={(e) => e.stopPropagation()}
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.open(href, '_blank', 'noopener,noreferrer');
+      }}
       aria-label={`Связаться по ЖК ${buildingName}`}
       title="Спросить о ЖК"
       className={
@@ -54,6 +58,6 @@ export function BuildingContactButton({
       }
     >
       <MessageCircle className="size-4" aria-hidden />
-    </a>
+    </button>
   );
 }

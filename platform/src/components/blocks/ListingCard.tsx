@@ -1,6 +1,6 @@
 'use client';
 
-import { Layers, MapPin, ArrowUpRight, CreditCard } from 'lucide-react';
+import { MapPin, ArrowUpRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
@@ -98,13 +98,12 @@ export function ListingCard({
         className,
       )}
     >
-      {/* Cover area. CardPhotoCarousel takes over photo rendering when
-          we have any uploaded photos and lets the buyer swipe through
-          all of them inline (no need to drill into the detail page just
-          to check if the place looks decent). When `photo_urls` is
-          empty we still render the carousel container so the coloured
-          placeholder + giant rooms label show through — keeps no-photo
-          listings visually intentional. */}
+      {/* Cover area. CardPhotoCarousel takes over photo rendering and
+          lets the buyer swipe through every uploaded photo inline.
+          Overlays are kept to a minimum: counter + save toggle only.
+          Floor / rooms+m² / installment chips were dropped from the
+          photo because they all repeat what row 2 + the InstallmentDisplay
+          row already say — buyers reported the duplication felt cluttered. */}
       <CardPhotoCarousel
         photos={listing.photo_urls}
         aspect="4/3"
@@ -112,11 +111,12 @@ export function ListingCard({
         className="bg-stone-100"
         style={listing.photo_urls.length === 0 ? { backgroundColor: listing.cover_color } : undefined}
         persistentOverlay={
-          <>
-            {/* Bottom gradient — keeps the white chip text readable on
-                bright photos (and the placeholder gets a subtle vignette). */}
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/30" />
-            {listing.photo_urls.length === 0 ? (
+          listing.photo_urls.length === 0 ? (
+            // Placeholder mode — there's no photo to compete with, so
+            // the giant rooms+m² label keeps the empty card looking
+            // intentional rather than blank.
+            <>
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/30" />
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
                 <span className="text-h1 font-semibold text-white drop-shadow-sm tabular-nums">
                   {listing.rooms_count}-комн
@@ -125,35 +125,10 @@ export function ListingCard({
                   {formatM2(listing.size_m2)}
                 </span>
               </div>
-            ) : (
-              <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-sm bg-stone-900/70 px-2 py-1 text-caption font-medium text-white tabular-nums">
-                {listing.rooms_count}-комн · {formatM2(listing.size_m2)}
-              </span>
-            )}
-            <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-sm bg-stone-900/70 px-2 py-1 text-caption font-medium text-white tabular-nums">
-              <Layers className="size-3" /> {formatFloor(listing.floor_number, listing.total_floors)}
-            </span>
-          </>
+            </>
+          ) : null
         }
       >
-        {/* Installment badge — only for listings that offer financing.
-            Sits below the carousel's "1/N" counter so they don't fight
-            for the same corner. For listings without installment the
-            counter top-left has the corner to itself. */}
-        {listing.installment_available ? (
-          <span
-            className={cn(
-              'absolute left-3 inline-flex items-center gap-1 rounded-sm bg-white/95 px-2 py-1 text-caption font-medium text-[color:var(--color-fairness-great)] shadow-sm',
-              // When the counter is present (multiple photos) push the
-              // installment chip below it; otherwise it can take the
-              // top corner.
-              listing.photo_urls.length > 1 ? 'top-12' : 'top-3',
-            )}
-          >
-            <CreditCard className="size-3" />
-            Рассрочка
-          </span>
-        ) : null}
         <div className="absolute right-3 top-3 flex flex-col gap-2">
           <SaveToggle type="listing" id={listing.id} />
           {/* Compare hidden in V1 — see lib/feature-flags.ts. */}

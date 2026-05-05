@@ -162,17 +162,23 @@ export function BuildingCard({
           </button>
           {developer.is_verified ? (
             // Click-through to the FAQ entry that explains what
-            // "Проверенный застройщик" actually means — closes the
-            // most-asked first-time-buyer question without forcing them
-            // to dig through /tsentr-pomoshchi.
-            <Link
-              href="/tsentr-pomoshchi#verified-developer"
+            // "Проверенный застройщик" actually means. Rendered as a
+            // button (not Link) because the whole card is wrapped in a
+            // parent <Link> and HTML disallows nested anchors — the
+            // earlier Link version triggered hydration errors that on
+            // mobile interrupted the photo carousel swipe gesture.
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                router.push('/tsentr-pomoshchi#verified-developer');
+              }}
               className="inline-flex w-fit"
-              onClick={(e) => e.stopPropagation()}
               title="Что значит «Проверенный»?"
             >
               <VerificationBadge tier="phone_verified" developerVerified />
-            </Link>
+            </button>
           ) : null}
         </div>
 

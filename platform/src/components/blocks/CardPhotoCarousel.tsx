@@ -101,10 +101,15 @@ export function CardPhotoCarousel({
       <div
         ref={carouselRef}
         className={cn(
-          'flex size-full snap-x snap-mandatory overflow-x-auto',
+          'flex size-full snap-x snap-mandatory overflow-x-auto select-none',
           // Hide scrollbar — Tailwind v4 lacks a first-class utility
           // for this; the bracketed properties work on Firefox + WebKit.
           '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          // iOS Safari: kill the long-press context menu (Save image,
+          // Open in new tab) — its chooser pops up mid-swipe when the
+          // touch lingers, blocking the scroll. Same reason real-estate
+          // apps disable it on photo carousels.
+          '[-webkit-touch-callout:none]',
         )}
       >
         {photos.map((url, i) => (
