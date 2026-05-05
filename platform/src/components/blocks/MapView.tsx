@@ -477,11 +477,31 @@ export function MapView({
       root.setAttribute('role', 'button');
       root.setAttribute('tabindex', '0');
       root.setAttribute('aria-label', `${b.name.ru} — открыть превью`);
-      root.addEventListener('click', () => setSelected(b));
+      // Pan the camera so the clicked marker lands roughly two-thirds
+      // up the visible map. Without this, markers at the bottom of the
+      // viewport stay at the bottom — and the preview card (anchored
+      // at bottom-20) renders on top of the marker's price pill,
+      // making the popup title look clipped. Centering shifts the pin
+      // above the popup so they read as separate elements.
+      const centerOnMarker = () => {
+        if (!map) return;
+        const target = map.project([b.longitude, b.latitude]);
+        // Offset by ~30% of the map height upward so the pin appears
+        // above the popup card (the popup occupies ~bottom 25%).
+        const offsetY = map.getCanvas().height * 0.18;
+        const newCentrePx = { x: target.x, y: target.y + offsetY };
+        const newCentre = map.unproject([newCentrePx.x, newCentrePx.y]);
+        map.easeTo({ center: newCentre, duration: 400 });
+      };
+      root.addEventListener('click', () => {
+        setSelected(b);
+        centerOnMarker();
+      });
       root.addEventListener('keydown', (e: KeyboardEvent) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           setSelected(b);
+          centerOnMarker();
         }
       });
 

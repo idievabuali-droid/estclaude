@@ -204,11 +204,17 @@ export default async function BuildingDetailPage({
       </div>
 
       {/* ─── 2. STICKY SUB-NAV ──────────────────────────────────── */}
+      {/* Outer wrapper hosts the right-edge fade gradient — without it
+          the last tab gets clipped at 375px and buyers don't realise
+          there's more to scroll to (Что рядом + Застройщик were
+          getting silently dropped off the screen). The fade is
+          pointer-events-none so taps on the last visible tab still
+          work normally. */}
       <nav
         aria-label="Разделы"
         className="sticky top-14 z-20 border-b border-stone-200 bg-white/95 backdrop-blur"
       >
-        <AppContainer>
+        <AppContainer className="relative">
           <div className="-mx-1 flex items-center gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <a
               href="#units"
@@ -249,6 +255,13 @@ export default async function BuildingDetailPage({
               Застройщик
             </a>
           </div>
+          {/* Right-edge fade — visual cue that the tab row scrolls
+              horizontally. md:hidden because at desktop widths every
+              tab fits and the gradient would just look like clipping. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-white/95 to-transparent md:hidden"
+          />
         </AppContainer>
       </nav>
 

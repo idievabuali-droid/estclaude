@@ -1,8 +1,35 @@
+import {
+  Landmark,
+  School,
+  Baby,
+  Hospital,
+  ShoppingBag,
+  Bus,
+  Trees,
+  Pill,
+  type LucideIcon,
+} from 'lucide-react';
 import { POI_LABELS, type PoiCategory, type PoiResult } from '@/services/poi';
 
 export interface NearbyPoisProps {
   pois: PoiResult;
 }
+
+/** Lucide icon per POI category — keeps the row lightweight (one
+ *  icon, one short label, one address line, one distance). Lucide
+ *  doesn't ship a Mosque glyph; Landmark is the closest neutral
+ *  building-with-spire icon and reads well next to the "Мечети"
+ *  label. Per AI_CONTRACT.md: Lucide-only, no emoji as functional UI. */
+const POI_ICONS: Record<PoiCategory, LucideIcon> = {
+  mosque: Landmark,
+  school: School,
+  kindergarten: Baby,
+  hospital: Hospital,
+  supermarket: ShoppingBag,
+  transit: Bus,
+  park: Trees,
+  pharmacy: Pill,
+};
 
 /**
  * "Что рядом" section — WEDGE-2.
@@ -49,14 +76,15 @@ export function NearbyPois({ pois }: NearbyPoisProps) {
 
       <ul className="flex flex-col rounded-md border border-stone-200 bg-white">
         {rows.map(({ cat, item }) => {
-          const { ru, emoji } = POI_LABELS[cat];
+          const { ru } = POI_LABELS[cat];
+          const Icon = POI_ICONS[cat];
           return (
             <li
               key={cat}
               className="flex items-center justify-between gap-3 border-t border-stone-100 px-4 py-3 first:border-t-0"
             >
               <span className="inline-flex min-w-0 items-center gap-2 text-meta">
-                <span className="shrink-0 text-base" aria-hidden>{emoji}</span>
+                <Icon className="size-4 shrink-0 text-stone-500" aria-hidden />
                 <span className="shrink-0 font-medium text-stone-900">{ru}</span>
                 <span className="truncate text-stone-500">· {item!.name}</span>
               </span>
