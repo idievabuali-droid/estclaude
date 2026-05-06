@@ -66,7 +66,11 @@ export function HomeSubscribeButton() {
       size="lg"
       onClick={handleSubscribe}
       disabled={pending}
-      className="bg-[color:var(--color-semantic-info)] hover:bg-[color:var(--color-semantic-info)]/90 active:bg-[color:var(--color-semantic-info)]/80"
+      // text-white explicit because tailwind-merge collapses
+      // primary variant's text-white when our className adds bg-* /
+      // sees text-body size class. Without this the icon + label
+      // render near-black on dark blue — unreadable.
+      className="bg-[color:var(--color-semantic-info)] text-white hover:bg-[color:var(--color-semantic-info)]/90 active:bg-[color:var(--color-semantic-info)]/80"
     >
       <MessageSquare className="size-4" />
       {pending ? 'Открываем Telegram...' : 'Подписаться в Telegram'}
