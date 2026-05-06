@@ -163,29 +163,32 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             {minTotalDirams != null ? (
               <Link
                 href={chipHref}
-                /* Green-toned, value/affordability surface — colour
-                   role-coded distinct from terracotta brand CTAs.
-                   Reuses --color-fairness-great (the same green users
-                   already learn means "good deal" on listing-card
-                   fairness chips). Restraint discipline: terracotta
-                   reserved for brand identity + primary search action. */
-                className="inline-flex w-fit items-center gap-3 rounded-md border border-emerald-200 bg-white px-3 py-2 text-meta font-medium text-[color:var(--color-fairness-great)] transition-colors hover:border-emerald-400 hover:bg-emerald-50"
+                /* Stone-only chip with terracotta arrow as the single
+                   brand moment. Earlier green attempt added a third
+                   hue and read as "two random greens picked from
+                   nowhere"; the role-coding logic was over-applied
+                   versus the senior premium-brand rule (Linear /
+                   Compass / Sonder all run a 1-accent palette).
+                   Emphasis here is positional (right under the
+                   search) and typographic (bold tabular price), not
+                   hue-driven. */
+                className="inline-flex w-fit items-center gap-3 rounded-md border border-stone-300 bg-white px-3 py-2 text-meta transition-colors hover:border-stone-400 hover:bg-stone-50"
               >
                 <span className="flex flex-col items-start gap-0.5">
                   <span>
                     <span className="text-stone-500">От </span>
-                    <span className="tabular-nums text-stone-900">
+                    <span className="font-semibold tabular-nums text-stone-900">
                       {formatPriceNumber(minTotalDirams)} TJS
                     </span>
                   </span>
                   {minMonthlyDirams != null ? (
-                    <span>
+                    <span className="text-stone-700">
                       Рассрочка от{' '}
                       <span className="tabular-nums">{formatPriceNumber(minMonthlyDirams)} TJS / мес</span>
                     </span>
                   ) : null}
                 </span>
-                <ArrowUpRight className="size-3.5 shrink-0" aria-hidden />
+                <ArrowUpRight className="size-3.5 shrink-0 text-terracotta-700" aria-hidden />
               </Link>
             ) : null}
           </div>

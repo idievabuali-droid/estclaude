@@ -56,21 +56,21 @@ export function HomeSubscribeButton() {
   }
 
   return (
-    // Telegram-blue background instead of brand terracotta — this is
-    // a messaging surface, not a brand-CTA surface. Decoupling the
-    // color signals "Telegram action" before the user reads the label,
-    // and keeps the home's brand-color budget reserved for the search +
-    // header. Token: --color-semantic-info (blue, oklch 0.554 0.135 240).
+    // Premium-dark "secondary primary" button — stone-900 solid.
+    // Earlier blue (semantic-info) introduced a fourth hue that
+    // fragmented the palette and clashed with the warm stone brand.
+    // Stone-900 differentiates from the header's terracotta CTA
+    // through value (near-black vs warm orange) without adding a hue.
+    // Same pattern Notion / Stripe use for important secondary
+    // actions — the visual weight comes from contrast, not colour.
+    // text-white explicit so tailwind-merge doesn't drop it when
+    // primary variant's bg-* gets overridden.
     <AppButton
       variant="primary"
       size="lg"
       onClick={handleSubscribe}
       disabled={pending}
-      // text-white explicit because tailwind-merge collapses
-      // primary variant's text-white when our className adds bg-* /
-      // sees text-body size class. Without this the icon + label
-      // render near-black on dark blue — unreadable.
-      className="bg-[color:var(--color-semantic-info)] text-white hover:bg-[color:var(--color-semantic-info)]/90 active:bg-[color:var(--color-semantic-info)]/80"
+      className="bg-stone-900 text-white hover:bg-stone-800 active:bg-stone-700"
     >
       <MessageSquare className="size-4" />
       {pending ? 'Открываем Telegram...' : 'Подписаться в Telegram'}
