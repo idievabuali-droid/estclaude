@@ -1,334 +1,103 @@
 # DECISIONS
 
-Direction changes that override the original spec stack. Read at session start. Append (don't rewrite) when a new direction lands. Each entry: short title · date · what changed · why · what it affects.
+Direction changes that override the original spec stack. Read at session start. Append when a new direction lands.
+
+**Format rule — strictly enforced:** each entry is 4–6 lines max: title + date, what locked (1–2 lines), why (1 line), what it affects (key files/routes/tables only). No commit SHAs, persona notes, deferred lists, or verification logs — those belong in `git log`.
 
 Newest at top.
 
 ---
 
-## 2026-05-04 · Saidakbar walkthrough → 4-commit "complete value" batch
+## 2026-05-04 · Share, photo carousel, contact affordances, USP strip, developer filter
 
-**What changed:** ran a third role-play walkthrough using a deliberately different persona (Saidakbar Khurshedov, 41, IT consultant in Dubai, browses MacBook + iPhone, Russian + English fluent — no Tajik, used to Bayut + Property Finder, decision style: research deeply + share with wife in Dushanbe). Surfaced ~20 friction items across home / list / detail / save / share / diaspora.
-
-**Role lens chosen for the fix batch** (V1 stage, zero users, every line of code is a bet on first-user impression):
-1. **Founder PM at zero-users** — ruthless cutter. Asked "if we ship only 4 fixes from this list, which 4 deliver complete value to the FIRST user?" Cut everything that needs >2 users to validate.
-2. **Trust-first UX strategist** — each shipped item must close a fail or add a "real product, not side project" feel. Polish-without-behavior-change cut.
-3. **Real-user advocate** — Madina + Faridun + Saidakbar combined-persona lens; replays each fix mentally before it ships.
-
-**Cut from the audit list (deferred until the user data exists):**
-- English locale toggle (no confirmed English-only user)
-- Currency picker AED/TRY/KZT (no confirmed UAE/Turkey/KZ user)
-- /izbrannoe notes field (needs 5+ saves to matter)
-- Multi-apartment compare re-enable (re-enabling /sravnenie before polish is worse than no compare)
-- /diaspora video-tour service explainer (the service doesn't exist yet; fake page worse than no page)
-- "О нас" page + trust counters (numbers too small to help; copy not written)
-
-**4 commits shipped (the "complete value" cut):**
-
-**Commit e3153e5 — ShareButton on /kvartira + /zhk hero + OpenGraph link previews (S1)**
-Multi-decision-maker buyers (Saidakbar→Hilola, Madina→parents, Faridun→Zarrina) had ZERO share affordance — copied URLs by hand. Now `ShareButton` mounted next to SaveToggle on both detail heroes. New `compact` icon-only variant matches SaveToggle's visual weight. `url` is optional now — resolves `window.location.href` at click time so server components can drop the button without plumbing URLs. Mobile uses native Web Share API; desktop falls back to a 3-channel popover (WhatsApp / Telegram / copy-link). OpenGraph + Twitter card metadata: /kvartira gets a price-forward title ("3-комн 88 м² · 484 000 TJS · ЖК Гулистон Резиденс") + cover image; /zhk gets building name + district + price floor + cover. WhatsApp/Telegram link previews now answer "is this in budget?" before Hilola opens.
-
-**Commit d504cc4 — Photo carousel + fullscreen lightbox on /kvartira (S2)**
-The static 2/3-column thumbnail grid (cover hero + all photos shown at once) looked broken next to Cian/Bayut/Krisha and pushed the price below the fold on mobile. New `PhotoGallery` block: mobile = full-bleed scroll-snap carousel with 1/N counter; desktop = hero + 4-thumb strip with "+ ещё N" overlay on the 4th when there are more photos; tap any photo → fullscreen `<dialog>` with prev/next arrows, keyboard nav, click-backdrop-to-close. No 3rd-party library. The gallery IS the hero now, with title + Save + Share overlay. /zhk skipped this commit — building photo gallery is data-dependent (only cover currently uploaded).
-
-**Commit 6c0d050 — Contact affordances on BuildingCard + /zhk Застройщик card (S3)**
-Buyers had ZERO way to ask a question about a building before clicking through. BuildingCard had 3 buttons (stage tooltip / save / map) — no contact channel. /zhk Застройщик card had a dead "Все проекты застройщика" button (button with no href, no onClick — verified during audit). Two fixes: new `BuildingContactButton` block (small green WhatsApp pill in BuildingCard's top-right cluster, stop-propagation so the wrapping `<Link>` doesn't navigate away) + a primary "Связаться с застройщиком" CTA on the /zhk Застройщик card. Both funnel to FOUNDER_CONTACTS (no per-developer phone in V1) but the WhatsApp prefilled text carries the building/developer name so context lands in chat instantly.
-
-**Commit 544f3a7 — 3-USP home strip + developer filter on /novostroyki (S4)**
-3-USP strip on home answers Saidakbar's "what is this platform actually FOR?" question in 10 seconds. Three concrete proofs sit right under the search: ShieldCheck + "Проверенные застройщики · Команда вычитывает каждое объявление и подтверждает компанию по телефону офиса" / Camera + "Реальные фото со стройки · Ежемесячные снимки с площадки с верификацией метаданных съёмки" / Plane + "Покупка из-за границы · Видеообзор и проверка документов без поездки в Таджикистан". Each maps to something we actually do — mirrors Bayut / Property Finder / Krisha home-page proof strips.
-
-Plus: fixed the dead "Все проекты застройщика" button. `BuildingFilters.developerId` now narrows the SQL query; FilterParams gets a `developer` URL param; /novostroyki resolves the developer server-side via `getDeveloperById`, scopes the listings, and swaps the H1 to "Проекты от {Кофарнихон Девелопмент}" when filtered. The button on /zhk is now a real `<Link>` to `/novostroyki?developer={id}`.
-
-**Anti-pattern locked out:** "audit produces a 20-item list, ship it all." At zero-users we don't have data to validate guesses, so we can't afford to spread thin. Better to ship 4 cohesive items that feel polished than 20 that feel half-built. The "what to defer" decisions are as important as the "what to ship" decisions — each deferral is a bet on "this will only matter once we have real user signal."
-
-**Verified in browser:** all 4 ships confirmed live. /kvartira hero has Share + Save icons, photo carousel, lightbox via `<dialog>`. BuildingCard top-right shows Save + green WhatsApp contact stacked. /zhk Застройщик card has primary "Связаться с застройщиком" button + working "Все проекты застройщика" link. Home page has the 3-USP strip + working "Первый раз? Поможем подобрать" wizard CTA. /novostroyki?developer=… shows "Проекты от {name}" header with filtered count + price range.
+**Locked:** ShareButton on /kvartira + /zhk heroes (Web Share API / popover fallback). Photo carousel + fullscreen lightbox on /kvartira. WhatsApp contact pill on BuildingCard. 3-USP strip on home. Developer filter on /novostroyki. OpenGraph metadata on both detail pages.
+**Why:** Multi-decision-maker buyers had no share affordance; static photo grid looked broken vs Cian/Bayut; buyers couldn't ask questions before clicking through.
+**Affects:** `ShareButton`, `PhotoGallery`, `BuildingContactButton` blocks; `/novostroyki` FilterParams (`developer` param); `BuildingFilters.developerId`; OG metadata in both detail layouts.
 
 ---
 
-## 2026-05-04 · Faridun walkthrough → 6-commit fix batch
+## 2026-05-04 · Faridun walkthrough — anon saves, WhatsApp login, price chip, sort, relax counts
 
-**What changed:** I role-played a second persona — Faridun (28, taxi driver) + Zarrina (25, nurse), 200k TJS budget, mobile-first, WhatsApp-only, installment-decisive — and walked every public page. The audit surfaced ~20 items Madina hadn't (different demographic exposes different friction). Fixed in 6 focused commits:
-
-**Commit 95a06e9 — Critical anonymity + save fixes**
-- C1. Anon saves now render on /izbrannoe via new `AnonSavedView` client component + `/api/anon-saves/hydrate` endpoint. Was the lie of the platform: localStorage saves stuck on cards but the saved page kept saying "Войдите чтобы видеть сохранённое". Banner: "Сохранения только в этом браузере" + "Войти через Telegram" CTA. Bigint price columns serialised over the wire as strings, revived client-side.
-- C2. SaveToggle in /kvartira hero (top-right of cover photo). Was missing entirely — deep-link visitors couldn't save without scrolling 2000px to "Похожие" cards.
-- C4. Russian custom 404 page (`app/[locale]/not-found.tsx`) — the generic English Next 404 read as broken; now Russian copy + 3 CTAs inside the [locale] layout so SiteHeader/Footer persist.
-- M17. LocationSearch dropdown no longer auto-opens on pre-populated input — gated behind a `touched` state so `?near_label=…` page loads don't reopen the same POI dropdown.
-
-**Commit c1b205d — WhatsApp acquisition unlock**
-- C3. /voyti was Telegram-only: hard wall for WhatsApp-first Tajik market. Now: "Что вы получите" benefits panel + Telegram card + "или" divider + new `WhatsAppCallback` card backed by new `/api/login-callback` endpoint. Captures phone, fires founder Telegram nudge for manual onboarding. By design not an automated login — V1 leverages the founder relationship.
-- H5. SaveSearchPrompt: WhatsApp option promoted from buried "У меня нет Telegram" link to a second equal-weight button. New event type `login_callback_submitted` whitelisted.
-
-**Commit 31d66af — Price chip overhaul + chip reorder + range hint**
-- M12. PriceChip on /novostroyki retargeted from per-m² to total price. Faridun thinks "до 220k", not "до 4 000 TJS/м²". URL params: `price_from`/`price_to`. Sheet copy: "Общая цена" with friendly placeholders + 5 quick-pick "до X TJS" presets. Per-m² preserved at the service layer for future advanced UI.
-- H1. Filter chip order: was Цена·Стадия·Сдача·Удобства·Что рядом — most-distinctive chip ("Что рядом", our POI search magic) was hidden behind horizontal scroll. New: Цена·Что рядом·Стадия·Сдача·Удобства.
-- H8. Result-count line shows price range — "7 проектов · от 142К до 422К TJS · в радиусе 1.5 км". BigInt min/max from filtered set.
-
-**Commit 6fef211 — Sort + monthly-payment filter**
-- H3. SortChip on /novostroyki + /kvartiry: 4 modes (recommended/cheapest/expensive/newest). `?sort=…` URL param.
-- H2. New MonthlyChip on /kvartiry: "В рассрочку · до X TJS / мес". Filters listings to `installment_available=true AND monthly_amount ≤ ceiling`. Quick-pick presets 2K–7K. Wired through `ListingFilters.maxMonthlyDirams`.
-- Bonus: relax-options reordered to "soft preferences first" so the suggestion never tells Faridun to drop his price ceiling.
-
-**Commit 06ef401 — Relax-button counts + drop no-op options**
-- H7. Each relax-suggestion button now shows the count after dropping that filter — "Снять «Цена» (5)". Server-side per-option `listListings`/`listBuildings` re-runs (~3 extra queries on the prompt; V1 fine). Options where count ≤ resultCount are dropped (no value in suggesting a no-op relax).
-
-**Commit 848005f — Magic moments surfaced + retention loops**
-- H4. Home wizard CTA: "✨ Первый раз? Поможем подобрать за 2 минуты" near the search-box hint, pointing to /pomoshch-vybora. Wizard existed but home had no link.
-- H6. SaveSearchPrompt deferred: now fires only when ≥2 filters active OR 0 results, not on a single chip.
-- H9. /zhk/.../progress: emerald "Получать новые фото стройки" callout with building-scoped SaveToggle. Reuses the existing «Изменения» badge pipeline (saved building + monthly upload bumps `updated_at` → badge fires on /izbrannoe).
-- H10. `getListingsForBuildingId` orders ASC by `price_total_dirams` so building-card previews lead with the cheapest unit. Faridun (200k) used to see "2-комн 285k" and bounce.
-- M11. /tsentr-pomoshchi gains "Не нашли ответ?" card with WhatsApp + Telegram CTAs.
-
-**Commit a2ad238 — Detail-page polish**
-- M4. /kvartira "Похожие в этом ЖК" header gains "Все квартиры в ЖК →" link to `/kvartiry?building=<slug>`.
-- M5. /zhk Застройщик stat tiles (Сдано/Строится/Котлован) drill into `/novostroyki?status=…`. Zero-value stats stay non-clickable.
-- M6. "Что значит «Проверенный»?" badges Link to `/tsentr-pomoshchi#verified-developer`. FAQ entries gain id anchors; new `FaqAutoOpen` client effect opens the targeted `<details>`.
-- M7. StickyContactBar: 4 secondary buttons gain icon+label stacks ("TG/IMO/Звонок/Визит"). WhatsApp keeps the labeled-primary slot.
-- M8. /kvartira posted-ago shows BOTH relative AND absolute date — "Опубликовано 2 дня назад · 2 мая". New `formatPostedAgoLong` helper.
-- M9. CallbackWidget moved from above-fold to below the description section.
-
-**Commit 32d7238 — Fuller footer + POI map polish**
-- M14. SiteFooter rewritten as 4-column layout: Поиск/Помощь/О платформе/Связаться. Direct contact channels (WhatsApp/Telegram/phone), about tagline, links to centre помощи + wizard + post.
-- M15. POI map pin upgraded from 32px barely-visible dot to 40px orange star with deeper shadow + colored label pill. Camera fit-bounds includes the full radius circle so the dashed ring no longer clips on mobile.
-
-**Audit false alarms (verified, no work needed):**
-- D1 desktop layout cap: `AppContainer` already 1200px max — earlier audit screenshots looked narrow because of low-res capture, not actual layout.
-- D2 MobileBottomNav: already `md:hidden` (display: none at md+).
-
-**Commit 6b1bcf0 — Mini-map embeds (the deferred M2)**
-- M2. New `MiniMap` block (compact MapLibre instance, single terracotta dot + label pill, no chip bar). Embedded on `/kvartira/[slug]` (220px) inside the "Что рядом" section above the chips, and on `/zhk/[slug]` (260px) inside `#nearby` above `NearbyPois`. Russian-first label override. Closes the spatial-answer gap — buyers no longer have to tap "На карте" to see where the building IS.
-
-**Deferred (still real but lower priority):**
-- M16 hide chips in POI mode — judged unnecessary; the "Рядом с «X»" header establishes POI primacy and keeping chips lets buyer narrow further.
-
-The full Madina + Faridun audit list is now zero open.
-
-**Method change locked in CLAUDE.md** (will write next time we touch it):
-- Re-verify "audit findings" by inspecting the actual DOM (computed widths / display values), not just by screenshot interpretation. D1 + D2 in this batch were both screenshot-misinterpretation false alarms — saved a commit's worth of unnecessary work by checking via `getBoundingClientRect` first.
+**Locked:** Anon saves via localStorage (migrated on login). WhatsApp callback card on /voyti (manual onboarding by design). PriceChip retargeted to total price. SortChip on list pages. MonthlyChip on /kvartiry. Relax-option buttons show live counts; no-op options dropped.
+**Why:** Login wall on save heart killed shopping intent; WhatsApp-first market was Telegram-only; buyers think "до 220k total" not per-m².
+**Affects:** `SaveToggle`, `AnonSavedView`, `/api/anon-saves/hydrate`, `/api/login-callback`, `/api/saved/migrate-anon`, `ListingFilters.maxMonthlyDirams`.
 
 ---
 
-## 2026-05-04 · Retention loop closed: Madina-walkthrough remaining fixes
+## 2026-05-04 · Retention loop — «Изменения» badge, view count, POI map, location filter in matcher
 
-**What changed:** four follow-up commits closing the remaining friction points from the Madina walkthrough — every problem her persona hit on the first browse now has a concrete fix.
-
-1. **«Изменения» badge in /izbrannoe.** `saved_items.change_badges_seen_at` (already in schema 0004) now drives a small emerald "● Обновлено · 2 дня назад" pill in the top-left of each saved card when `listings.updated_at` (or for buildings: any child listing's `published_at` or the building's own `updated_at`) is newer than the user's last visit. Header reads "5 объектов · 2 обновления с прошлого визита" so Madina knows in 2 seconds whether anything changed. Uses jet-fresh client effect (`MarkSavedItemsSeen` → `/api/saved/mark-seen`) to stamp `change_badges_seen_at = now()` after page render — badges persist for the current visit but clear for the next. Reason this is non-trivial: the Cian/Avito-style "did anything happen since I left" signal is *the* feature that gives buyers a reason to come back.
-
-2. **View count + price history on /kvartira.** `getListingStats(listingId, slug)` aggregates from the existing `events` table: total page_view count + today's count → "247 просмотров · 12 за сегодня"; plus the most recent price-change event → "Цена снижена на 200 000 TJS · 8 апр". `updateListing` now fires `listing_price_changed` events with `{from_dirams, to_dirams, delta_pct}` properties for ANY price change (not just ≥10% as for re-moderation). `ListingTrustSignals` block renders both signals beneath the published-ago line — calm caption tier, emerald icon for drops, amber for raises. Renders nothing when both views and price-history are empty so brand-new listings don't look stale.
-
-3. **POI map view.** `MapView` gains a `nearPoi` prop. When `?view=karta&near_lat=…&near_lng=…&near_label=…&radius=…` is in the URL, the map overlays an orange ★ landmark pin at the POI plus a translucent dashed-orange radius polygon (64-vertex circle approximation in lat/lng). Camera fits POI + the in-radius buildings together. Closes the POI loop — when Madina searches "Школа №4" she lands on a list, taps map, and sees the school + the buildings around it in one view.
-
-4. **Saved-search by location.** The `near_lat / near_lng / radius` URL params already flowed into `saved_searches.filters`, but the matcher didn't use them — anyone subscribing to "near Гулистон школа" got every Vahdat match. Both `lib/filters/listings.ts` and `lib/filters/buildings.ts` now check distance against the building's lat/lng (haversine, default 1500m radius). The matcher's SELECT pulls `latitude, longitude` through. `displayNameFromFilters` prepends "рядом с {label}" so the saved-search title reads naturally: "рядом с Школа №4 · 2-комн · до 350к TJS".
-
-**Why:**
-- The «Изменения» badge was the missing 4th item from the Madina-walkthrough "smaller fixes" bundle. Without it, /izbrannoe has no new-content signal — there's no reason for a saved buyer to revisit.
-- View count + price history are the two trust signals Cian users said are most decisive when comparing two listings. We had the data; we weren't surfacing it.
-- POI map closes the map view's largest UX gap: searching by place but only seeing a list is half the magic moment.
-- Saved-search location filter prevents the trust-killing "I subscribed to alerts near my mom's house, you sent me listings on the other side of town" outcome.
-
-**What it affects:**
-- New columns surfaced (read-only) on the buyer side: `listings.updated_at`, `buildings.updated_at` (already populated by Postgres / our update flows; just plumbed through the type system + mappers in `services/buildings.ts`).
-- New event type fired: `listing_price_changed`. Server-side write, bypasses the API event-type whitelist.
-- New API endpoint: `POST /api/saved/mark-seen`.
-- New service: `services/listing-stats.ts`. Performance fine at V1 volume (<10k events); upgrade path noted in code (partial index on `properties->>listing_id` if/when needed).
-- New components: `MarkSavedItemsSeen`, `ListingTrustSignals`. SavedCardWrapper inline in /izbrannoe (no need for a separate block component).
-- MapView now has 3 modes: BROWSE / FOCUS / BROWSE+POI (POI overlay). FOCUS still wins if both `focusedBuilding` and `nearPoi` are set.
-
-**Anti-pattern locked out:** "ship the data, surface it later." The events table already had the signals for view count + price changes; they sat unused because the surfacing work was deferred. Insight only matters when it's visible to the user it's about.
-
-**Deferred (next batch):**
-- Multi-POI saved searches ("near X AND Y") — V1 keeps single-POI for clarity.
-- Full price-history timeline view (currently shows latest entry only). Sparkline + per-row table is a future expansion when listings start having 3+ price changes.
-- Building cover photo as the FOCUS mode anchor (currently a coloured dot).
-- Per-listing watch-button granularity (some buyers may want price-only alerts vs all-changes).
-- "Что значит «Проверенный застройщик»" tooltip (Madina paused on this; small polish).
-- Login page copy: "what login unlocks" (Madina paused at /voyti).
+**Locked:** «Изменения» badge on /izbrannoe (from `saved_items.change_badges_seen_at`). View count + price-history trust signals on /kvartira. POI map overlay (pin + radius polygon). Saved-search matcher filters by `near_lat/lng` (haversine).
+**Why:** No "did anything change?" signal meant no reason to revisit. View count + price drops are Cian's two most decisive comparison signals.
+**Affects:** `services/listing-stats.ts`, `ListingTrustSignals` block, `MarkSavedItemsSeen`, `/api/saved/mark-seen`, `MapView` POI mode, `lib/filters/{listings,buildings}.ts`, `match.ts`.
 
 ---
 
-## 2026-05-04 · Browse-by-location + anon-friendliness (commits 07a6a84 / c42f7e0 / TBD)
+## 2026-05-04 · POI search + browse-by-location
 
-**What changed:** three commits reshape how a first-time anonymous Madina actually starts looking.
-
-1. **Demo photos seed** (`07a6a84`). Buildings + listings had placeholder cards. Wired Unsplash CDN URLs through `supabasePublicUrl` (it now passes `http(s)://` URLs through unchanged) and seeded 6 buildings + 25 listings with real-looking photos via `scripts/seed-mock-photos.mjs`. Also flipped `BuildingCard` to lead with the total "от X TJS" instead of per-m² (Cian comparison: total is what first-time browsers think in). Removable when real seller uploads dominate.
-
-2. **Anonymous saves via localStorage** (`c42f7e0`). Hearts on cards used to require login — anonymous taps lost the save. Now `SaveToggle` writes to `localStorage` (`zhktj.anon_saves.v1`) when no user; the heart stays filled across reloads, a toast says "Сохранено в этом браузере" with a "Войти" action. On login `/api/auth/poll` triggers `migrateAnonSavesToUser()` which POSTs to `/api/saved/migrate-anon`, dedupes via the existing unique constraint on `saved_items`. Acceptable V1 limitation: single-device only. Also added `FilterRelaxSuggestion` block — when results ≤1 with ≥2 filters active, surfaces 1-tap "Снять «X»" buttons.
-
-3. **POI search end-to-end** (TBD). Replaces the "Новостройки vs Квартиры" entry-point confusion with a search-first hero. Schema: `pois` table (`0017_pois.sql`) with `pg_trgm` GIN index on `name->>'ru'` for fast substring autocomplete. Seed: one-shot Overpass query for the Vahdat bbox (`scripts/seed-vahdat-pois.mjs`) — mosques / schools / markets / hospitals / pharmacies / parks / squares / named streets, with popularity boosts for known landmarks (Дусти, Гулистон, Истиқлол, Сомони, Айни, Бухоро). Service: `searchPois()` and `getPoiById()`. Endpoint: `/api/pois/search?q=`. Component: `LocationSearch` with debounced fetch, keyboard nav, two variants (hero on `/`, compact on `/novostroyki` and `/kvartiry`). Filter wiring: `BuildingFilters` and `ListingFilters` gain `nearLat / nearLng / nearRadiusM`; pages translate URL `near_lat / near_lng / near_label / radius` (defaults 1500m ≈ 15-min walk). On list pages the title swaps to "Рядом с «X»" with `· в радиусе 1.5 км` subtitle and a "× Убрать «X»" link.
-
-**Why:**
-- **Photos**: Madina-the-buyer walkthrough flagged "no photos" as the single biggest trust-killer on browse cards.
-- **Anon saves**: same walkthrough flagged that the auth wall on the heart drops out shopping intent at the cheapest possible action.
-- **POI search**: Madina (and the audit) flagged that "Новостройки" / "Квартиры" / "Все ЖК" speak product-language, not buyer-language. Buyers think "near my mom in Гулистон" not "I want a 2BR under 800K". Cian's hero search box does the same job.
-
-**What it affects:**
-- New table `pois`, new public endpoint `/api/pois/search`, new `services/pois-search.ts`. Storage cost negligible (a few thousand rows, all of Vahdat).
-- Service-layer filter: building radius is computed in-memory after the city scope (V1 has ~50 buildings, fine); listings pre-resolve in-radius building ids then SQL-filter `building_id IN (...)`.
-- Home hero now leads with `LocationSearch` + secondary "или просто:" chip row. The 3 direction chips moved below the search.
-- `/novostroyki` + `/kvartiry` mount `LocationSearch` (compact) above the chip bar; building-scoped `/kvartiry?building=...` hides it (location filter is moot inside one project).
-- `seed-mock-photos.mjs` is a one-shot — re-running is idempotent (already-set covers are skipped).
-- `migrate-anon` endpoint caps at 50 saves per request to bound abuse.
-
-**Anti-pattern locked out:** "speak product taxonomy at the buyer." The browse entry should match how the buyer phrases their need (place names) before falling back to attribute filters.
-
-**Deferred (next batch):**
-- POI map view: render the picked POI as a pin with a 1.5 km radius circle on `?view=karta`.
-- Save the location as part of a saved search (currently `near_*` flows through but the matcher doesn't filter by it — anyone subscribing to "рядом с Гулистон школа" gets all matches in Vahdat).
-- Multi-POI ("near Гулистон школа AND рядом с парком") — V1 keeps single-POI for clarity.
-- Ingest POIs for Dushanbe + other cities when scope expands.
+**Locked:** `pois` table + `/api/pois/search` + `LocationSearch` component. `near_lat/lng/radius` filter params on /novostroyki + /kvartiry. Home hero leads with LocationSearch.
+**Why:** "Новостройки / Квартиры" speaks product taxonomy; buyers think "near my mom in Гулистон."
+**Affects:** Migration 0017 (`pois`), `services/pois-search.ts`, `LocationSearch` block, `BuildingFilters` + `ListingFilters` `nearLat/nearLng/nearRadiusM`.
 
 ---
 
-## 2026-05-04 · Audit-driven fixes (commits 5b6a5b2 / 07473af / d79c4f4)
+## 2026-05-04 · Audit fixes — auth nav, V1-cut 404s, mobile overflow, analytics hardening
 
-**What changed:** ran a full audit + walkthrough vs `CLAUDE.md` + `AI_CONTRACT.md`, then shipped three commits of fixes.
-
-**Why:** the audit found that long-standing code (header, mobile nav, cards, V1-cut routes) had been treated as "must be fine" while only my recent work was being critiqued. Once I actually browsed every page as the relevant role, real bugs appeared.
-
-**What it affects:**
-- **Auth-aware nav**: `SiteHeader` is now an async server component that branches on `getCurrentUser()` — anonymous see Войти, logged-in see Кабинет. Mobile-only Search button stub deleted (V1 doesn't need site-wide search). `MobileBottomNav` takes `isAuthenticated` prop from layout — anonymous see Войти + LogIn icon instead of Кабинет (which would just bounce to /voyti).
-- **V1-cut routes return 404**: `/verifikatsiya/tier-2`, `/verifikatsiya/tier-3` now `notFound()` server-side instead of rendering full multi-step flows. Code preserved for re-enable.
-- **Founder Telegram handle fixed**: was `@zhk_tj_bot` (the auth bot, no human reads it) → now `@idievabuali`. ContactCard's Telegram CTA now lands in a real conversation.
-- **Mobile card overflow fixed**: ListingCard + BuildingCard address chips had `w-fit` only, causing internal horizontal scroll inside cards on 375px. Added `max-w-full` + `min-w-0` on the truncate wrapper.
-- **Analytics dashboard hardening**:
-  - `/api/events` adds event_type whitelist + per-anon in-memory rate limit (60/min)
-  - `/api/saved-searches/save` adds 30-search cap per anon (returns 429 above)
-  - Funnel split: was one bucket "Связались / сохранили" lumping save-search / callback / contact-click. Now three sub-counters because they represent very different intent levels.
-  - Top quartira / Top ЖК / "Чаще всего смотрели" / district list in buyer profile all show human Russian names instead of slugs (batched lookups in the server component).
-  - 0-result rows are now `<Link>`s to `/novostroyki?<filters>` so the operator can jump straight to "what we currently have for these filters".
-- **Filter logic extracted to `lib/filters/{listings,buildings}.ts`**: matcher (lib/saved-searches/match.ts) used to inline the per-row predicates, creating a drift hazard with the SQL bulk path in services/. Now both can call into the same predicates as services adopts them.
-- **`notifyMatchingListing` is idempotent**: was sending Telegram messages then updating `last_seen_listing_id`. A retry sent duplicates. Now claims the row first, then sends. Trade: a send failure after the claim means the buyer doesn't get that match (acceptable at V1 volume).
-- **Seller phone fallback**: services/listings.ts no longer hardcodes the founder's number — reads `FOUNDER_CONTACTS.phone` and logs a console.warn when the fallback fires (so silent FK breakage becomes visible).
-
-**Anti-pattern locked out**: "audit by reading code, not by browsing." `CLAUDE.md` now says: navigate the rendered app as the relevant user role, do mobile resize tests, compare to mature platforms with their pages actually open. Skipping the navigation step misses whole-page bugs (header auth state, mobile-bottom-nav vs desktop nav, card-scroll-overflow at 375px).
-
-**Deferred (intentionally — track for next batch):**
-- RangeInput primitive to replace raw `<input>` in PriceChip / SizeChip (audit finding 9)
-- Slim SiteFooter → fuller (contact info, terms/privacy, "О нас")
-- Card structure overhaul vs Cian (photo carousel + counter, total-price hierarchy on building card, inline contact CTAs, posted-ago + absolute date) — these are bigger refactors, ship after we see real user behaviour
-- View count + price history exposed to buyers (audit findings 0k + 0l) — high-value trust signals but multi-step
-- /izbrannoe "Все" tab (audit finding 0i)
-- /kvartira sticky sub-section nav (audit finding 0j)
-- Per-page metadata exports / SEO titles (audit finding 0n)
-- Components from cut features (VerificationBadge, CompareBar, etc.) still in `components/blocks/` — move or delete in a cleanup pass
+**Locked:** SiteHeader is async server component (auth-aware). `/verifikatsiya/tier-2` + `/tier-3` → `notFound()`. Founder Telegram = `@idievabuali`. Mobile card chips: `max-w-full min-w-0`. Events API whitelist + rate limit. Filter logic in `lib/filters/`. `notifyMatchingListing` idempotent (claim-before-send).
+**Why:** Browsing as actual user role surfaced whole-page bugs invisible from reading code alone.
+**Affects:** `SiteHeader`, `MobileBottomNav`, `/api/events`, `lib/filters/`, `lib/saved-searches/match.ts`.
 
 ---
 
-## 2026-05-04 · Analytics rebuild: decision-ready, not data-dump
+## 2026-05-04 · Analytics rebuild — decision-ready operator view
 
-**What changed:** First analytics dashboard (commits `47cc956` / `e72edee` / `0ba13e1`) shipped raw counts + JSON event blobs. Replaced with a decision-ready operator view (`bf32fc7`).
-
-**Why:** Founder needs to glance at it for 30 seconds and know what to do — call this lead, fix this inventory gap, follow up on this stuck flow. Raw counts + JSON force the operator to reverse-engineer behaviour from events.
-
-**What it affects:**
-- `/kabinet/analytics` headlines a 4-stage funnel (visited → searched → viewed → converted) with absolute counts + drop-off %.
-- "Горячие лиды" surfaces high-intent uncontacted visitors with direct WhatsApp/Telegram CTAs.
-- "Чего не хватает в каталоге" ranks 0-result searches by **unique visitors** (not raw occurrences) and renders filter labels via `displayNameFromFilters()`.
-- "Без команды" toggle, ON by default — staff/admin activity is excluded everywhere so the founder's own browsing doesn't pollute counts.
-- Date range toggle: today / 7d / 30d.
-- Per-visitor drill-down gains: lead temperature badge, "Что они ищут" derived buyer profile, "Что сохранили" with hydrated names, "Точки трения" friction signals, anonymous callbacks (via the new `anon_id` column on `contact_requests`), human-Russian event feed with collapsible raw JSON.
-- New libs: `src/lib/analytics/profile.ts` (visitor bundle, buyer profile, frictions, hot leads, staff exclusion) and `src/lib/analytics/event-format.ts` (humanise an event row).
-- Migration 0016 adds `contact_requests.anon_id`.
-
-**Anti-pattern locked out:** "ship the raw events first, polish later." For analytics that operators read daily, the polish IS the feature.
+**Locked:** `/kabinet/analytics` shows 4-stage funnel + "Горячие лиды" + 0-result inventory gaps via `displayNameFromFilters()`. "Без команды" toggle on by default. Per-visitor drill-down with buyer profile + frictions.
+**Why:** Raw counts + JSON events force reverse-engineering. Founder needs 30-second glance → know what to do.
+**Affects:** `src/lib/analytics/profile.ts`, `src/lib/analytics/event-format.ts`, migration 0016 (`contact_requests.anon_id`).
 
 ---
 
-## 2026-05-03 · Visitor analytics + saved searches with Telegram alerts
+## 2026-05-03 · Visitor analytics + saved searches + Telegram alerts
 
-**What changed:** Built the events / saved-search / Telegram-alert pipeline (`47cc956` Phase A, `e72edee` Phase B, `0ba13e1` Phase C).
-
-**Why:** Founder needs to know what anonymous visitors do, what they search for and don't find, and how to follow up — the input signal for inventory acquisition + product iteration.
-
-**What it affects:**
-- `events` table is the analytics source of truth. Free-form `properties jsonb`, no enum on `event_type`.
-- `anon_id` cookie set in `proxy.ts` on every request (1y, HttpOnly). Stitched to `user_id` at login by `/api/auth/poll`.
-- `saved_searches` table with two notification destinations: `notify_chat_id` (Telegram-direct) or `notify_phone` (founder gets a relay nudge, WhatsApps the buyer manually).
-- `subscribe_sessions` table mirrors `auth_sessions` for the Telegram bot deep-link subscribe flow. Bot's `/start subscribe_<token>` handler binds chat_id.
-- Match-on-publish runs INLINE in `/api/inventory/create` and `/api/listings/moderate`. No cron — Vercel Hobby is daily-only and inline beats it on UX anyway.
-- Filter-against-listing matcher in `src/lib/saved-searches/match.ts`. Drift hazard noted: when `services/{listings,buildings}.ts` add a new filter, the matcher needs the same change.
-- Migration 0015 created events, saved_searches, subscribe_sessions tables.
+**Locked:** `events` table is analytics source of truth (free-form `properties jsonb`). `anon_id` cookie in `proxy.ts` (1y, HttpOnly). `saved_searches` + `subscribe_sessions` tables. Match-on-publish runs inline in `/api/inventory/create` + `/api/listings/moderate` (not cron).
+**Why:** Founder needs to know what anonymous visitors do and how to follow up for inventory + iteration.
+**Affects:** Migration 0015, `src/lib/saved-searches/match.ts`, `notifyMatchingListing()`, `/api/auth/poll` (anon_id stitch).
 
 ---
 
-## 2026-05-03 · Founder-only publishing + ContactCard for everyone else
+## 2026-05-03 · Founder-only publishing + ContactCard
 
-**What changed:** Removed the self-serve `/post` form for non-founders; replaced with a contact card pointing at WhatsApp / Telegram / phone (`241f916`).
-
-**Why:** At V1 volume the founder reviews every listing anyway via the moderation queue. Skipping the moderation cycle and having the founder post directly is faster, gives more curation control, and removes a whole UX surface (the post form) for non-founders who'll never use it well.
-
-**What it affects:**
-- `/post` branches by role: founder sees `PostFlow`, everyone else sees `ContactCard` (no auth gate; even logged-out visitors see the contact card).
-- `/kabinet` drops "Новое объявление" and "Разместить" CTAs for non-founders.
-- Home page gains "Хотите разместить квартиру?" banner pointing to `/post`.
-- Founder contacts live in `src/lib/founder-contacts.ts` (single source of truth, edit once).
-- Migration 0014 transferred all existing test listings to founder ownership (test accounts were the user's own anyway).
-- The moderation queue + re-moderation policy + building auto-publish-on-first-approval still exist as code paths but won't fire in V1 because non-founder posting is gated. Kept in case we re-enable later.
-
-**Anti-pattern locked out:** "let users self-serve, gate via moderation queue" — too much surface to maintain at this stage.
+**Locked:** `/post` shows `PostFlow` for founder role only; everyone else sees `ContactCard` (WhatsApp / Telegram / phone). Founder contacts in `src/lib/founder-contacts.ts`.
+**Why:** Founder reviews every listing anyway — removing self-serve removes a whole UX surface with no benefit at V1 volume.
+**Affects:** `/post` route, `/kabinet` CTAs, migration 0014.
 
 ---
 
-## 2026-05-03 · Post form round 2: location, district context, developer modal, number-input bug
+## 2026-05-03 · Post form — location picker, developer modal, number input fix
 
-**What changed:** Major UX work on the founder's post form (`0ea7bab`).
-
-**Why:** First round shipped a working form with several confusing/missing pieces — no location picking on a map, district names with no context, address as bare free-text, developer dropdown closed (couldn't add new), and a clearing-bug on number inputs.
-
-**What it affects:**
-- New `LocationPicker` (maplibre, drag pin) — founder picks the exact spot rather than every building stacking on the district centroid.
-- New `NewDeveloperModal` triggered from a "+ Добавить нового застройщика" entry in the developer dropdown. Posts to `/api/developers/create` with `status='pending'`.
-- New `NumberField` helper replaces every `type="number"` input with `type="text"` + `inputMode="numeric"`/`decimal` + digit filter. Fixes the "can't fully clear" bug.
-- District dropdown labels now include hardcoded short hints in `/post/page.tsx` (Vahdat's 5 districts).
-- New optional "Ориентир" field for landmarks ("напротив парка Дусти"); appended to building description until we add a column.
-- API receives explicit lat/lng; the centroid fallback in `createBuilding` stays as a safety net but the picker should always win.
+**Locked:** `LocationPicker` (MapLibre drag pin) replaces centroid fallback. `NewDeveloperModal` for inline developer creation. `NumberField` replaces all `type="number"` inputs (fixes clear-on-type bug).
+**Why:** Buildings were stacking on district centroids; developer dropdown was a dead end; number inputs couldn't be fully cleared.
+**Affects:** `LocationPicker` block, `NewDeveloperModal`, `NumberField` primitive, `/api/developers/create`.
 
 ---
 
-## 2026-05-02 · Photos end-to-end (storage, picker, upload, gallery)
+## 2026-05-02 · Photos end-to-end
 
-**What changed:** Built the photos pipeline (`7bdc1ea`).
-
-**Why:** Cards always showed `cover_color` placeholders. Real users would think the platform is empty/fake. Photos are the most concrete trust signal we have.
-
-**What it affects:**
-- `listing-photos` Supabase Storage bucket (migration 0012, public read + service-role write policies).
-- `buildings.cover_photo_id` column added (migration 0013) with a NAMED FK constraint `buildings_cover_photo_fk` so PostgREST embeds disambiguate.
-- `BUILDING_SELECT` / `LISTING_SELECT` constants in `services/buildings.ts` join photos via `cover_photo:photos!buildings_cover_photo_fk(storage_path)`. Use these constants everywhere instead of bare `select('*')` on buildings or listings.
-- `PhotoPicker` client component (multi-file, max 15, jpg/png/webp ≤10MB, reads dimensions in browser, uploads on pick). Used in PostFlow + EditApartmentForm.
-- `/api/storage/upload` endpoint (auth-gated, multipart). `services/photos.ts` (`attachPhotos`, `setCoverPhoto`, `attachAndSetCover`, `deletePhotos`).
-- `/api/inventory/create` and `/api/listings/[id]/update` accept `pendingPhotos` + `removePhotoIds`.
-- BuildingCard, ListingCard, /zhk hero, /kvartira hero render `cover_photo_url` when present (fallback to color block).
-- /kvartira gains a photo gallery section beneath the hero.
-- Auto-publish parent building when first listing in it gets approved (closes the orphan-listings-of-invisible-building hole for non-founder posts).
-
-**Anti-pattern locked out:** "ship cards with placeholder colors and add photos in V2" — photos ARE V1.
+**Locked:** `listing-photos` Storage bucket. `buildings.cover_photo_id` with named FK `buildings_cover_photo_fk`. Always use `BUILDING_SELECT` / `LISTING_SELECT` constants in `services/buildings.ts` — never bare `select('*')`. Auto-publish building on first listing approval.
+**Why:** Placeholder color cards read as empty/fake to real users. Photos are a V1 trust requirement, not V2.
+**Affects:** Migrations 0012–0013, `services/photos.ts`, `PhotoPicker`, `/api/storage/upload`, all card + hero components.
 
 ---
 
-## 2026-05-01 · Listing lifecycle, bathroom convention, edit form, /kabinet cleanup
+## 2026-05-01 · Listing lifecycle, bathroom convention, edit form
 
-**What changed:** Real backend for posting + lifecycle actions (Edit / Hide / Show / Mark Sold / Delete) + bathroom field + UI cleanup (`1a7a894` + earlier `1f61417`).
-
-**Why:** First-pass was 60% UI / 0% data persistence. Real listing creation didn't write to DB. Bathroom field followed Western convention (count of bathrooms) when Tajik convention is type (раздельный / совмещённый) — most apartments have one bathroom, the type is what matters.
-
-**What it affects:**
-- `createListing`, `createBuilding`, `setListingStatus`, `softDeleteListing`, `updateListing`, `listingOwnedBy` in services.
-- Re-moderation policy in `updateListing`: non-founder edits to active listings flip to `pending_review` on price drop ≥10% / rooms change / size change > 5m².
-- `bathroom_separate` boolean column (migration 0011): NULL=unknown, TRUE=раздельный, FALSE=совмещённый. Old `bathroom_count` / `balcony` / `ceiling_height_cm` fields kept in schema but not collected in form.
-- `/kabinet` dropped fake-zero stats grid + always-empty notifications inbox.
-- `/post/edit/[id]` page wired to API.
-- Compare hidden in V1 via `FEATURES.compare = false` (`5002cf4`).
+**Locked:** `bathroom_separate` boolean (migration 0011) — TJ convention is type (раздельный / совмещённый), not count. Re-moderation on non-founder edits: price drop ≥10% / rooms change / size >5m². Compare hidden via `FEATURES.compare = false`.
+**Why:** First-pass had no data persistence; bathroom count is the wrong convention for the TJ market.
+**Affects:** `services/buildings.ts` lifecycle methods, migration 0011, `/post/edit/[id]`.
 
 ---
 
 ## 2026-04-25 · V1 = Vahdat-only
 
-**What changed:** Original PRD targets Dushanbe + Vahdat. V1 launches Vahdat-only.
-
-**Why:** Smaller market = simpler problem to validate. Founder is in Vahdat, can do the manual operator work locally. Dushanbe re-introduction is a flip of `ACTIVE_CITY` once the playbook is proven.
-
-**What it affects:**
-- `services/buildings.ts` `ACTIVE_CITY = 'vahdat'` is the master filter; every public query enforces it. District filter UI hidden because Vahdat has 5 microdistricts and splitting 6 mock buildings across them makes filters land on 1-2 results (feels broken).
-- All seed data is Vahdat-themed.
-- Diaspora landing kept (Russia-based Tajiks looking at Vahdat are the high-intent diaspora segment).
+**Locked:** `ACTIVE_CITY = 'vahdat'` in `services/buildings.ts` is the master filter on every public query. District filter UI hidden (too few buildings per district to be useful).
+**Why:** Smaller market validates the playbook; founder can do manual ops locally. Flip the constant to re-introduce Dushanbe.
+**Affects:** All public queries in `services/buildings.ts`.

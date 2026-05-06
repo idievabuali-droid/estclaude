@@ -7,12 +7,12 @@ You are working on a trust-first, mobile-first new-build apartment platform. The
 ## Read at session start (in this order)
 
 1. **This file (`CLAUDE.md`)** — current rules + V1 scope reality
-2. **`DECISIONS.md`** — locked direction changes from prior sessions (skip nothing here, or you'll re-litigate settled choices)
-3. **`AI_CONTRACT.md`** — non-negotiable engineering + UI rules (tokens, primitives, halal-by-design, source transparency)
-4. **`AGENTS.md`** — your role + working method
-5. **`ARCHITECTURE.md`** — system structure, route layout, component layering
-6. **The user's prompt** — that's the actual task
-7. **`docs/` specs** — only when needed for pattern/style guidance for what the user asked for. **Treat as reference for HOW (tokens, components, data shape, naming), NOT a checklist of WHAT to build.** The specs were written before V1 scope cuts; many features they describe are intentionally cut from V1.
+2. **`DECISIONS.md`** — locked direction changes from prior sessions (skip nothing, or you'll re-litigate settled choices)
+3. **The user's prompt** — the actual task
+4. **`ARCHITECTURE.md`** — read only when building a new route, new component, or new service. Skip for bugfix/polish/copy tasks.
+5. **`docs/` specs** — reference only when needed for pattern/style guidance. HOW (tokens, components, data shape, naming), not WHAT to build. Specs predate V1 cuts; many features they describe are intentionally out of scope.
+
+`AI_CONTRACT.md` and `AGENTS.md` are archived in `docs/archive/` — their live rules are folded into this file.
 
 ## V1 scope reality (locked — do not re-expand)
 
@@ -82,7 +82,7 @@ If a step is skipped, say so explicitly with the reason — don't quietly omit.
 
 ## How prompts work
 
-Short prompts from the user are normal. The full task is: their prompt + this file + DECISIONS + AI_CONTRACT. If a request is ambiguous, ask before building. For non-trivial work, expect plan mode — wireframe first, plan first, then implement after approval.
+Short prompts from the user are normal. The full task is: their prompt + this file + DECISIONS. If a request is ambiguous, ask before building. For non-trivial work, expect plan mode — wireframe first, plan first, then implement after approval.
 
 ## Scope discipline rules
 
@@ -156,9 +156,22 @@ If any item is skipped, say so with the reason — don't quietly omit.
 - Hex literals, ad-hoc spacing, raw shadcn outside primitives
 - Generic gray-white admin-panel aesthetic (calm ≠ boring; trust-first ≠ generic SaaS)
 - Long task summaries restating what the diff already shows
-- Decision amnesia — read `DECISIONS.md` at session start; log direction changes there at end
+- Decision amnesia — read `DECISIONS.md` at session start; log direction changes there at end. **Every completed decision gets logged in the same session it lands — not deferred.** Format: title + date, what locked (1–2 lines — specific enough to be unambiguous cold), why (1 line), key files/routes/tables affected. Strip: commit SHAs, persona walkthroughs, deferred lists, verification logs. Target: 5–7 lines. Compress until it would confuse a cold reader, then stop.
 - Re-adding V1-cut features as "while we're here" cleanup
 - Trying to make manual-by-design things automated without explicit ask
+
+## Non-negotiable product + UI rules
+
+These apply to every task, no exceptions:
+
+- **Halal by design.** No "% годовых" anywhere. No fake urgency, no countdown timers, no "X people viewing now." Installments show monthly amount + first payment + duration only — never a rate.
+- **Trust colors.** Green / stone / gold only for fairness/trust signals. Amber for status changes. Stone-700 for price rises. **Never red** for non-emergency states.
+- **44px touch targets.** Baked into primitives — never override to smaller.
+- **Tabular figures** for all prices, m², and counts (CSS `font-variant-numeric: tabular-nums`).
+- **No emoji as functional UI.** Lucide icons are the icon system. Emoji in Russian copy is fine.
+- **Contact stays low-friction.** WhatsApp and Call are zero-tap. Never add auth gates before a contact action.
+- **Tokens only.** No hex literals, no `text-[`, no `p-[`, no raw shadcn outside primitives.
+- **Prefer small slices.** Schema-only → service-only → one route → one component → one form. Avoid multi-concern diffs.
 
 ## Tone in user-facing text
 
