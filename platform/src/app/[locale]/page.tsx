@@ -1,36 +1,43 @@
-import { Building, Home as HomeIcon, Globe2, Sparkles, ShieldCheck, Camera, Plane } from 'lucide-react';
+import { Sparkles, ArrowUpRight } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { AppContainer } from '@/components/primitives';
-import { BuildingCard, ListingCard, LocationSearch } from '@/components/blocks';
+import { BuildingCard, LocationSearch, HomeSubscribeButton } from '@/components/blocks';
 import { Link } from '@/i18n/navigation';
 import {
   listFeaturedBuildings,
-  listBuildings,
   getDeveloperById,
   getDistrictById,
   getListingsForBuildingId,
 } from '@/services/buildings';
 import { listListings } from '@/services/listings';
-import { getDistrictBenchmarks } from '@/services/benchmarks';
+import { formatPriceNumber } from '@/lib/format';
 
 /**
- * Home page (V1, tight). Above-the-fold goal: title + 3 nav chips +
- * the first featured project card visible on a typical mobile screen.
+ * Home page (V1, first-5-seconds redesign).
  *
- * Removed in this V1 pass (was bloating the page):
- *   - Hero subtitle (only rendered on desktop anyway)
- *   - Search input (free-text search across 6 buildings is overkill;
- *     filters on /novostroyki cover the real use cases — re-add when
- *     project count crosses ~30)
- *   - "Куда идём" section heading (the chips speak for themselves)
- *   - Big direction CARDS (icon + title + subtitle + "Открыть →" each)
- *     compressed into a single inline chip row
- *   - Featured-projects subtitle (the cards' own verified badges +
- *     listing counts already say what the subtitle was restating)
+ * Mobile-first, ≤5 visible elements above the fold. Buyer is in
+ * 5-second-judgment mode: identity → trust → action → benefit, in
+ * that order. Every surface earns its place against "what does this
+ * solve at this exact moment in their journey?" — anything that
+ * forces a decision before the buyer has decided to engage is cut.
  *
- * Added: a "Свежие квартиры" section so buyers shopping by individual
- * unit see actual listings on the home page instead of having to drill
- * into /kvartiry first.
+ * Section order:
+ *   1. Hero — H1 + 1-line trust subhead + LocationSearch + magic
+ *      moment affordability chip
+ *   2. Featured ЖК — 3 BuildingCards (curated by featured_rank)
+ *   3. §R Retention — one-tap Vahdat-wide Telegram subscribe
+ *   4. Footer-band — quiet seller CTA, de-emphasised
+ *
+ * Cut from prior version (deliberate, see plan file):
+ *   - 3 USP cards (verified devs / construction photos / diaspora) —
+ *     folded into a single subhead line under H1.
+ *   - 3 direction chips (новостройки / квартиры / диаспора) —
+ *     redundant with the site header nav.
+ *   - Recent listings (3 cards) — overlapped Featured at our V1
+ *     inventory scale; Featured wins on quality. Re-add post-launch
+ *     when the freshness signal carries real activity.
+ *   - "Хотите разместить?" banner from middle position — moved to a
+ *     quiet footer-band line so it doesn't compete with buyer funnel.
  */
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -38,7 +45,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const t = await getTranslations('Homepage');
   const tNav = await getTranslations('Nav');
 
-  // Featured buildings — top 3 marked is_featured.
+  // Featured buildings — top 3 marked is_featured, with their
+  // developer + district + first 2 unit previews each.
   const featured = await listFeaturedBuildings(3);
   const featuredWithRefs = await Promise.all(
     featured.map(async (b) => {
@@ -51,55 +59,57 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     }),
   );
 
-  // Recent listings — listListings already sorts by trust tier first,
-  // then published_at DESC, so slicing the top 3 gives the freshest
-  // high-trust apartments. Need the parent buildings + benchmarks for
-  // ListingCard's price-fairness rendering, batch-fetched once.
-  const recentRaw = (await listListings({})).slice(0, 3);
-  const recentBuildingIds = [...new Set(recentRaw.map((l) => l.building_id))];
-  const allBuildings = await listBuildings({});
-  const recentBuildingMap = new Map(
-    allBuildings.filter((b) => recentBuildingIds.includes(b.id)).map((b) => [b.id, b]),
-  );
-  const recentDeveloperIds = [
-    ...new Set([...recentBuildingMap.values()].map((b) => b.developer_id)),
-  ];
-  const recentDistrictIds = [
-    ...new Set([...recentBuildingMap.values()].map((b) => b.district_id)),
-  ];
-  const [recentDeveloperEntries, recentBenchmarkMap] = await Promise.all([
-    Promise.all(
-      recentDeveloperIds.map(async (id) => [id, await getDeveloperById(id)] as const),
-    ),
-    getDistrictBenchmarks(recentDistrictIds),
-  ]);
-  const recentDeveloperMap = new Map(recentDeveloperEntries);
+  // Magic moment data — cheapest active listing in the city + the
+  // cheapest installment monthly across listings. listListings({})
+  // already enforces ACTIVE_CITY + status='active' server-side; we
+  // reduce client-side here. Negligible compute at V1 inventory.
+  const allListings = await listListings({});
+  const minTotalDirams =
+    allListings.length > 0
+      ? allListings.reduce(
+          (min, l) => (l.price_total_dirams < min ? l.price_total_dirams : min),
+          allListings[0]!.price_total_dirams,
+        )
+      : null;
+  const monthlyVals = allListings
+    .filter((l) => l.installment_available && l.installment_monthly_amount_dirams != null)
+    .map((l) => l.installment_monthly_amount_dirams as bigint);
+  const minMonthlyDirams =
+    monthlyVals.length > 0 ? monthlyVals.reduce((a, b) => (a < b ? a : b)) : null;
+  // Chip is INFORMATIONAL — text describes the city's price floor.
+  // Tap → /kvartiry (no filter applied). Earlier version pre-filtered
+  // by `?maxMonthly={cheapest}` which trapped mid-budget buyers in
+  // a tier narrower than their actual interest. Filter dropped on
+  // purpose; buyers refine on /kvartiry themselves.
+  const chipHref = '/kvartiry';
 
   return (
     <>
-      {/* ─── Hero — title + LocationSearch as the primary entry
-           point. The Madina walkthrough showed buyers got stuck on
-           "what's the difference between Новостройки and Квартиры?"
-           when those were the only entry points. The search box
-           cuts straight to "I want a place near X" which is how
-           buyers actually think. The 3 direction chips remain as a
-           secondary "browse" row underneath for visitors who don't
-           know what to type. */}
+      {/* ─── HERO ─────────────────────────────────────────────────
+          ≤5 visible elements: H1 + trust subhead + LocationSearch +
+          search-help inline link + magic moment chip. Mobile first
+          viewport reads as: identity → trust → action → benefit. */}
       <section className="border-b border-stone-200 bg-stone-50 py-6 md:py-8">
         <AppContainer className="flex flex-col gap-5">
-          <h1 className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display">
-            {t('heroTitle')}
-          </h1>
-          <div className="max-w-2xl">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display">
+              {t('heroTitle')}
+            </h1>
+            {/* Trust subhead — replaces the 3 USP cards. Same
+                content (verified developers / real construction
+                photos / diaspora support) compressed to one line so
+                the buyer reads identity + trust in 3 seconds without
+                scanning three card layouts. */}
+            <p className="text-meta text-stone-700 md:text-body">
+              Только проверенные застройщики. Реальные фото со стройки. Команда вычитывает каждое объявление.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 max-w-2xl">
             <LocationSearch destinationPath="/novostroyki" variant="hero" />
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <p className="text-caption text-stone-500">
-                Введите район, ЖК, школу, мечеть или адрес — покажем квартиры рядом.
+                Введите район, ЖК, школу, мечеть или адрес — покажем новостройки рядом.
               </p>
-              {/* Surfaces /pomoshch-vybora — the 5-step wizard buyers
-                  never found because the home had no link to it. The
-                  "Первый раз?" framing speaks to the same buyer that
-                  needs the most help. */}
               <Link
                 href="/pomoshch-vybora"
                 className="inline-flex items-center gap-1 text-caption font-medium text-terracotta-700 hover:text-terracotta-800"
@@ -108,47 +118,79 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 Первый раз? Поможем подобрать за 2 минуты
               </Link>
             </div>
-          </div>
-          {/* 3-USP strip — answers the "what is this platform actually
-              FOR?" question Saidakbar asked in 10 seconds. Three
-              concrete, verifiable proofs of value: trust signal,
-              construction transparency, diaspora-friendly. Replaces
-              the previous brand-identity gap where the home page only
-              said "with confidence" but didn't show why. Mirrors the
-              Bayut / Property Finder / Krisha home-page proof strips. */}
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <UspCard
-              Icon={ShieldCheck}
-              title="Проверенные застройщики"
-              body="Команда вычитывает каждое объявление и подтверждает компанию по телефону офиса."
-            />
-            <UspCard
-              Icon={Camera}
-              title="Реальные фото со стройки"
-              body="Ежемесячные снимки с площадки с верификацией метаданных съёмки."
-            />
-            <UspCard
-              Icon={Plane}
-              title="Покупка из-за границы"
-              body="Видеообзор и проверка документов без поездки в Таджикистан."
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-caption font-medium text-stone-500">или просто:</span>
-            <DirectionChip
-              href="/novostroyki"
-              Icon={Building}
-              label="Все новостройки"
-              tone="terracotta"
-            />
-            <DirectionChip href="/kvartiry" Icon={HomeIcon} label="Все квартиры" tone="stone" />
-            <DirectionChip href="/diaspora" Icon={Globe2} label={tNav('diaspora')} tone="stone" />
+            {/* Quiet navigation strip — recovers the 1-tap path to
+                /kvartiry (Faridun: unit-shopping intent), /diaspora
+                (Saidakbar: remote-buying intent), and the "browse
+                without typing" path to /novostroyki. Visually
+                subordinate text-links replace the previous 3 styled
+                chip-buttons that crowded the hero. Functional access
+                preserved without the visual noise. */}
+            <p className="text-caption text-stone-500">
+              <span className="text-stone-400">или:</span>{' '}
+              <Link
+                href="/kvartiry"
+                className="font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+              >
+                Все квартиры
+              </Link>
+              <span className="text-stone-400" aria-hidden> · </span>
+              <Link
+                href="/novostroyki"
+                className="font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+              >
+                Все новостройки
+              </Link>
+              <span className="text-stone-400" aria-hidden> · </span>
+              <Link
+                href="/diaspora"
+                className="font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+              >
+                {tNav('diaspora')}
+              </Link>
+            </p>
+            {/* Magic moment — affordability chip. "Is this site in my
+                budget?" answered in 5 seconds. Tappable: lands Faridun
+                on /kvartiry?maxMonthly=Y filtered results in one tap.
+                For Madina it's a calm trust signal (not out of reach).
+                Hides if 0 listings; monthly half hides if no
+                installment exists. Same lever + visual styling as
+                /kvartira §2 and /zhk §B. */}
+            {minTotalDirams != null ? (
+              <Link
+                href={chipHref}
+                className="inline-flex w-fit items-center gap-3 rounded-md border border-terracotta-200 bg-white px-3 py-2 text-meta font-medium text-terracotta-700 transition-colors hover:border-terracotta-400 hover:bg-terracotta-50"
+              >
+                {/* Vertical 2-line stack inside the chip — earlier
+                    horizontal layout wrapped mid-content at 375px,
+                    breaking the price phrase across lines. Stacking
+                    keeps each clause on one row regardless of
+                    viewport. The arrow stays vertically centred to
+                    the right. */}
+                <span className="flex flex-col items-start gap-0.5">
+                  <span>
+                    <span className="text-stone-500">От </span>
+                    <span className="tabular-nums text-stone-900">
+                      {formatPriceNumber(minTotalDirams)} TJS
+                    </span>
+                  </span>
+                  {minMonthlyDirams != null ? (
+                    <span>
+                      Рассрочка от{' '}
+                      <span className="tabular-nums">{formatPriceNumber(minMonthlyDirams)} TJS / мес</span>
+                    </span>
+                  ) : null}
+                </span>
+                <ArrowUpRight className="size-3.5 shrink-0" aria-hidden />
+              </Link>
+            ) : null}
           </div>
         </AppContainer>
       </section>
 
-      {/* ─── Featured projects ─────────────────────────────────── */}
+      {/* ─── FEATURED ЖК ──────────────────────────────────────────
+          Curated by founder via `featured_rank`. Trust by quality.
+          At V1 scale (3 cards) this is the only listings showcase
+          on home — Recent listings cut (overlapped at our scale). */}
       {featuredWithRefs.length > 0 ? (
         <section className="py-7">
           <AppContainer className="flex flex-col gap-5">
@@ -180,119 +222,52 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </section>
       ) : null}
 
-      {/* ─── "Хотите разместить?" CTA — V1 publishes everything
-           through the founder, so this banner points sellers to the
-           contact card instead of a self-serve form they can't use. */}
-      <section className="border-t border-stone-200 py-6">
+      {/* ─── §R RETENTION ────────────────────────────────────────
+          One-tap Telegram subscribe to all new Vahdat listings.
+          Always renders — empty inventory is exactly when subscribing
+          carries the most value (capture intent now, deliver later
+          when listings exist). Reuses the saved-search → Telegram
+          pipeline; displayNameFromFilters({}) returns "Сохранённый
+          поиск" as a sensible empty-filter dashboard label. */}
+      <section className="border-t border-stone-200 bg-stone-50 py-7">
         <AppContainer>
-          <div className="flex flex-col items-start gap-3 rounded-md border border-terracotta-200 bg-terracotta-50/60 p-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col items-start gap-3 rounded-md border border-stone-200 bg-white p-5 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-col gap-1">
               <h2 className="text-h3 font-semibold text-stone-900">
-                Хотите разместить квартиру?
+                {allListings.length > 0 ? 'Не нашли подходящую?' : 'Узнаете первыми'}
               </h2>
               <p className="text-meta text-stone-700">
-                Напишите нам — зададим несколько вопросов и опубликуем за вас.
+                {allListings.length > 0
+                  ? 'Получайте новые квартиры в Вахдате в Telegram. Без спама — только новые объявления.'
+                  : 'Объявления появляются регулярно. Подпишитесь и узнаете первыми, когда появится подходящее.'}
               </p>
             </div>
-            <Link
-              href="/post"
-              className="inline-flex h-11 shrink-0 items-center rounded-md bg-terracotta-600 px-4 text-meta font-medium text-white transition-colors hover:bg-terracotta-700"
-            >
-              Связаться с нами
-            </Link>
+            <HomeSubscribeButton />
           </div>
         </AppContainer>
       </section>
 
-      {/* ─── Свежие квартиры — recent apartment listings ─────── */}
-      {recentRaw.length > 0 ? (
-        <section className="border-t border-stone-200 bg-stone-50 py-7">
-          <AppContainer className="flex flex-col gap-5">
-            <div className="flex items-end justify-between gap-3">
-              <h2 className="text-h2 font-semibold text-stone-900">Свежие квартиры</h2>
-              <Link
-                href="/kvartiry"
-                className="shrink-0 text-meta font-medium text-terracotta-600 hover:text-terracotta-700"
-              >
-                Все {tNav('apartments').toLowerCase()} →
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
-              {recentRaw.map((l) => {
-                const building = recentBuildingMap.get(l.building_id);
-                if (!building) return null;
-                const dev = recentDeveloperMap.get(building.developer_id);
-                const benchmark = recentBenchmarkMap.get(building.district_id);
-                return (
-                  <ListingCard
-                    key={l.id}
-                    listing={l}
-                    building={building}
-                    developerVerified={dev?.is_verified ?? false}
-                    districtMedianPerM2={
-                      benchmark ? Number(benchmark.median_per_m2_dirams) : null
-                    }
-                    districtSampleSize={benchmark?.sample_size ?? 0}
-                  />
-                );
-              })}
-            </div>
-          </AppContainer>
-        </section>
-      ) : null}
+      {/* ─── FOOTER-BAND SELLER CTA ──────────────────────────────
+          Moved here from a prominent middle-of-page banner. Sellers
+          landing on home still find /post; buyers stop seeing a
+          competing CTA in their decision zone. Quiet 1-line strip,
+          terracotta link styling — recoverable, not banner-loud. */}
+      <section className="border-t border-stone-200 py-5">
+        <AppContainer>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <p className="text-meta text-stone-600">
+              Хотите разместить квартиру в Вахдате?
+            </p>
+            <Link
+              href="/post"
+              className="inline-flex items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800"
+            >
+              Свяжитесь с нами
+              <ArrowUpRight className="size-3.5" aria-hidden />
+            </Link>
+          </div>
+        </AppContainer>
+      </section>
     </>
-  );
-}
-
-type DirectionTone = 'terracotta' | 'stone';
-
-const DIRECTION_TONE: Record<DirectionTone, string> = {
-  terracotta:
-    'border-terracotta-300 bg-terracotta-50 text-terracotta-800 hover:border-terracotta-500 hover:bg-terracotta-100',
-  stone:
-    'border-stone-300 bg-white text-stone-800 hover:border-stone-400 hover:bg-stone-100',
-};
-
-function UspCard({
-  Icon,
-  title,
-  body,
-}: {
-  Icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="flex items-start gap-3 rounded-md border border-stone-200 bg-white px-3 py-3">
-      <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-terracotta-50 text-terracotta-700">
-        <Icon className="size-4" aria-hidden />
-      </span>
-      <div className="flex flex-col gap-0.5">
-        <p className="text-meta font-semibold text-stone-900">{title}</p>
-        <p className="text-caption text-stone-600">{body}</p>
-      </div>
-    </div>
-  );
-}
-
-function DirectionChip({
-  href,
-  Icon,
-  label,
-  tone,
-}: {
-  href: string;
-  Icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  tone: DirectionTone;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`inline-flex h-10 items-center gap-2 rounded-md border px-3 text-meta font-medium transition-colors ${DIRECTION_TONE[tone]}`}
-    >
-      <Icon className="size-4" />
-      <span>{label}</span>
-    </Link>
   );
 }
