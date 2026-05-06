@@ -56,7 +56,18 @@ export function HomeSubscribeButton() {
   }
 
   return (
-    <AppButton variant="primary" size="lg" onClick={handleSubscribe} disabled={pending}>
+    // Telegram-blue background instead of brand terracotta — this is
+    // a messaging surface, not a brand-CTA surface. Decoupling the
+    // color signals "Telegram action" before the user reads the label,
+    // and keeps the home's brand-color budget reserved for the search +
+    // header. Token: --color-semantic-info (blue, oklch 0.554 0.135 240).
+    <AppButton
+      variant="primary"
+      size="lg"
+      onClick={handleSubscribe}
+      disabled={pending}
+      className="bg-[color:var(--color-semantic-info)] hover:bg-[color:var(--color-semantic-info)]/90 active:bg-[color:var(--color-semantic-info)]/80"
+    >
       <MessageSquare className="size-4" />
       {pending ? 'Открываем Telegram...' : 'Подписаться в Telegram'}
     </AppButton>

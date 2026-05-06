@@ -125,25 +125,30 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 subordinate text-links replace the previous 3 styled
                 chip-buttons that crowded the hero. Functional access
                 preserved without the visual noise. */}
+            {/* Nav-strip links: stone-700 at rest, terracotta only on
+                hover. Engagement-triggered colour, not at-rest
+                decoration — the eye should land on the search bar +
+                magic moment chip first, not on every link competing
+                for attention. */}
             <p className="text-caption text-stone-500">
               <span className="text-stone-400">или:</span>{' '}
               <Link
                 href="/kvartiry"
-                className="font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+                className="font-medium text-stone-700 hover:text-terracotta-700 hover:underline"
               >
                 Все квартиры
               </Link>
               <span className="text-stone-400" aria-hidden> · </span>
               <Link
                 href="/novostroyki"
-                className="font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+                className="font-medium text-stone-700 hover:text-terracotta-700 hover:underline"
               >
                 Все новостройки
               </Link>
               <span className="text-stone-400" aria-hidden> · </span>
               <Link
                 href="/diaspora"
-                className="font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+                className="font-medium text-stone-700 hover:text-terracotta-700 hover:underline"
               >
                 {tNav('diaspora')}
               </Link>
@@ -158,14 +163,14 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             {minTotalDirams != null ? (
               <Link
                 href={chipHref}
-                className="inline-flex w-fit items-center gap-3 rounded-md border border-terracotta-200 bg-white px-3 py-2 text-meta font-medium text-terracotta-700 transition-colors hover:border-terracotta-400 hover:bg-terracotta-50"
+                /* Green-toned, value/affordability surface — colour
+                   role-coded distinct from terracotta brand CTAs.
+                   Reuses --color-fairness-great (the same green users
+                   already learn means "good deal" on listing-card
+                   fairness chips). Restraint discipline: terracotta
+                   reserved for brand identity + primary search action. */
+                className="inline-flex w-fit items-center gap-3 rounded-md border border-emerald-200 bg-white px-3 py-2 text-meta font-medium text-[color:var(--color-fairness-great)] transition-colors hover:border-emerald-400 hover:bg-emerald-50"
               >
-                {/* Vertical 2-line stack inside the chip — earlier
-                    horizontal layout wrapped mid-content at 375px,
-                    breaking the price phrase across lines. Stacking
-                    keeps each clause on one row regardless of
-                    viewport. The arrow stays vertically centred to
-                    the right. */}
                 <span className="flex flex-col items-start gap-0.5">
                   <span>
                     <span className="text-stone-500">От </span>
@@ -198,7 +203,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               <h2 className="text-h2 font-semibold text-stone-900">Рекомендуемые проекты</h2>
               <Link
                 href="/novostroyki"
-                className="shrink-0 text-meta font-medium text-terracotta-600 hover:text-terracotta-700"
+                className="shrink-0 text-meta font-medium text-stone-700 hover:text-terracotta-700"
               >
                 Все {tNav('buildings').toLowerCase()} →
               </Link>
@@ -260,7 +265,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </p>
             <Link
               href="/post"
-              className="inline-flex items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800"
+              className="inline-flex items-center gap-1 text-meta font-medium text-stone-700 hover:text-terracotta-700"
             >
               Свяжитесь с нами
               <ArrowUpRight className="size-3.5" aria-hidden />

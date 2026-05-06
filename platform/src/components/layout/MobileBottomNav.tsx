@@ -140,15 +140,18 @@ function MobileBottomNavInner({ isAuthenticated }: { isAuthenticated: boolean })
                   if (!isCurrent) setTappedHref(href);
                 }}
                 className={cn(
-                  'flex flex-col items-center gap-1 py-2 text-caption font-medium transition-colors',
-                  active ? 'text-terracotta-600' : 'text-stone-500',
+                  // Active = stone-900 + bold, NOT terracotta. Hierarchy
+                  // through weight + darkness, not brand colour. Reserves
+                  // terracotta for genuine CTAs (search, brand identity).
+                  'flex flex-col items-center gap-1 py-2 text-caption transition-colors',
+                  active ? 'font-semibold text-stone-900' : 'font-medium text-stone-500',
                 )}
               >
                 <span className="relative inline-flex">
                   <Icon
                     className={cn(
                       'size-5 transition-colors',
-                      active ? 'text-terracotta-600' : 'text-stone-500',
+                      active ? 'text-stone-900' : 'text-stone-500',
                     )}
                   />
                   {badge != null && badge > 0 ? (
