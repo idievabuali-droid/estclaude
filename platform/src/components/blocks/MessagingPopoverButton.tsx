@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { MessageSquare, MessageCircle, Send, Image as ImageIcon } from 'lucide-react';
+import { MessageSquare, MessageCircle, Send } from 'lucide-react';
 import { AppButton } from '@/components/primitives';
 import { cn } from '@/lib/utils';
 
@@ -134,8 +134,13 @@ export function MessagingPopoverButton({
               onClick={() => setOpen(false)}
               className="flex items-center gap-3 px-3 py-2.5 text-meta text-stone-900 hover:bg-stone-50"
             >
-              <span className="inline-flex size-7 items-center justify-center rounded-full bg-stone-700 text-white" aria-hidden>
-                <ImageIcon className="size-3.5" />
+              {/* IMO wordmark on sky-blue — Lucide doesn't ship an IMO
+                  icon, and the previous generic image icon (stone-grey)
+                  read as a placeholder. The "imo" lowercase wordmark on
+                  the brand cyan-blue is recognisable to anyone who has
+                  used the app, with no asset dependency. */}
+              <span className="inline-flex size-7 items-center justify-center rounded-full bg-sky-500 text-white" aria-hidden>
+                <span className="text-[10px] font-bold leading-none">imo</span>
               </span>
               IMO
             </a>

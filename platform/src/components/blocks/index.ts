@@ -73,3 +73,5 @@ export { BuildingStickyContact } from './BuildingStickyContact';
 export type { BuildingStickyContactProps } from './BuildingStickyContact';
 export { MessagingPopoverButton } from './MessagingPopoverButton';
 export type { MessagingPopoverButtonProps } from './MessagingPopoverButton';
+export { RoomTypeFilter } from './RoomTypeFilter';
+export type { RoomTypeFilterProps } from './RoomTypeFilter';

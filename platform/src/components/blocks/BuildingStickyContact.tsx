@@ -17,6 +17,9 @@ export interface BuildingStickyContactProps {
    *  FOUNDER_CONTACTS so this component stays free of env access. */
   whatsappLink: string;
   telegramLink: string;
+  /** Full IMO deep-link, e.g. `imo://addContact?phone=992...`. Passed
+   *  through unchanged — IMO doesn't support text prefill, and the
+   *  phone is already encoded in the URL by buildContactLinks(). */
   imoHref?: string | null;
   /** Phone number for the tel: link, in raw +992... format. */
   phone: string;
@@ -57,7 +60,10 @@ export function BuildingStickyContact({
   const text = encodeURIComponent(lines.join(' '));
   const whatsappHref = `${whatsappLink}?text=${text}`;
   const telegramHref = `${telegramLink}?text=${text}`;
-  const imoHrefFinal = imoHref ? `${imoHref}?text=${text}` : null;
+  // IMO is passed through unchanged — the deep-link already contains
+  // `?phone=...` and IMO doesn't support text prefill. Appending an
+  // extra `?text=...` produced a malformed URL.
+  const imoHrefFinal = imoHref ?? null;
   const callHref = `tel:${phone}`;
 
   return (

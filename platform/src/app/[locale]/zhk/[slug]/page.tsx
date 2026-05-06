@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { MapPin, Calendar, Layers, Users, Camera, ArrowUpRight, BadgeCheck, MessageCircle } from 'lucide-react';
 import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
-import { setRequestLocale, getTranslations } from 'next-intl/server';
+import { buildContactLinks } from '@/lib/contact-links';
+import { setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import {
   AppContainer,
@@ -12,18 +13,22 @@ import {
   AppCardContent,
 } from '@/components/primitives';
 import {
-  ListingCard,
+  BuildingCard,
   NearbyChips,
   BuildingStageProgress,
   PriceConversion,
   ShareButton,
   SaveToggle,
   BuildingStickyContact,
+  RoomTypeFilter,
 } from '@/components/blocks';
 import type { PoiCategory } from '@/services/poi';
-import { getBuilding, getDeveloperStats } from '@/services/buildings';
+import { getBuilding, getDeveloperById, getDeveloperStats, listBuildings } from '@/services/buildings';
+import type { MockDeveloper } from '@/lib/mock';
 import { getDistrictBenchmark } from '@/services/benchmarks';
 import { getNearbyPOIs } from '@/services/poi';
+import { getBuildingProgress } from '@/services/progress';
+import { supabasePublicUrl } from '@/services/photos';
 import { getExchangeRates } from '@/services/currency';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { formatPriceNumber, pluralRu } from '@/lib/format';
@@ -37,27 +42,33 @@ const APARTMENTS_PREVIEW_LIMIT = 6;
 /**
  * Building detail page (/zhk/[slug]).
  *
- * Section order follows the convergent pattern across Krisha, Cian,
- * Bayut, Realestate.com.au, and Zillow:
+ * Section order — each block answers ONE buying-decision question for
+ * a project-level decision (vs the unit-level decision on /kvartira):
  *
- *   1. Hero (name, address, developer name as a small text link)
- *   2. Sticky sub-nav (anchors to sections below)
- *   3. Stage + key stats — what is this building, when ready
- *   4. Available apartments — the buying funnel, brought up close to top
- *   5. About / description — project narrative
- *   6. Location & nearby POIs
- *   7. Developer (single consolidated surface — was previously
- *      duplicated across hero badge + standalone trust block + this card)
- *   8. Finishing legend (small footer)
+ *   1. Hero — visual fit + name + address + developer (verified pill)
+ *   2. Sticky sub-nav — anchor jumps to sections below
+ *   3. §A Стадия + ключевая статистика — what kind of building, when
+ *   4. §B В этом ЖК — affordability hook (от X TJS · рассрочка от Y/мес)
+ *      [magic moment: anchors to #units]
+ *   5. §C Доступные квартиры — the funnel, with room-type chip filter
+ *      (Cian-pattern; chips render only when inventory is varied)
+ *   6. §D Ход строительства — inline preview of latest progress photos
+ *      (only for under-construction projects with uploaded photos)
+ *   7. §E О проекте — description + amenities chips
+ *   8. §F Расположение — interactive nearby POIs + mini-map
+ *   9. §G Застройщик — single consolidated trust card with stats
+ *  10. §H Похожие ЖК — escape hatch (same developer, same district fallback)
  *
- * Trust info appears in TWO places only:
- *   - Hero: small "Проверенный застройщик" pill inline next to the
- *     developer name (visual confirmation, one line)
- *   - Developer card: full deep info (stats, "all projects" link)
+ * Cuts preserved from prior cleanup:
+ *   - Trust info in two places only: small "Проверенный" pill in the
+ *     hero (visual confirmation) + full developer card §G (deep info).
+ *   - The standalone "Trust block" between stats and description that
+ *     used to triplicate verified info — removed long ago.
  *
- * The standalone "Trust block" that used to sit between the stats
- * and description was removed — three surfaces of the same info read
- * as defensive, and "Trust block" duplicated the developer card below.
+ * Cut from this restructure:
+ *   - "Что значит отделка" finishing legend at the bottom — apartment
+ *     cards already carry finishing chips with hover/tap tooltip; the
+ *     legend was filler in the footer slot.
  */
 export async function generateMetadata({
   params,
@@ -104,19 +115,79 @@ export default async function BuildingDetailPage({
 }) {
   const { locale, slug } = await params;
   setRequestLocale(locale);
-  const tFinishing = await getTranslations('Finishing');
-
   const data = await getBuilding(slug);
   if (!data) notFound();
   const { building, developer, district, listings } = data;
-  const [benchmark, pois, devStats] = await Promise.all([
-    getDistrictBenchmark(district.id),
-    getNearbyPOIs(building.latitude, building.longitude),
-    getDeveloperStats(developer.id),
-  ]);
+  // Parallel batch — including the new §D progress lookup and §H
+  // similar-buildings queries. Two listBuildings() calls so we have
+  // both same-developer and same-district candidates ready at merge
+  // time without another sequential roundtrip.
+  const [benchmark, pois, devStats, progressMonths, sameDevBuildings, sameDistrictBuildings] =
+    await Promise.all([
+      getDistrictBenchmark(district.id),
+      getNearbyPOIs(building.latitude, building.longitude),
+      getDeveloperStats(developer.id),
+      getBuildingProgress(building.id),
+      listBuildings({ developerId: developer.id }),
+      listBuildings({ district: [district.slug] }),
+    ]);
   const median = benchmark
     ? { median: Number(benchmark.median_per_m2_dirams), sample: benchmark.sample_size }
     : null;
+
+  // §B affordability hook — cheapest total price + cheapest installment
+  // monthly across active listings. building.price_from_dirams is
+  // sometimes null on /zhk because services/buildings.ts only runs
+  // fillPriceFrom() in listBuildings(), not getBuilding(). Compute
+  // both here from the listings array as a single source of truth.
+  const totalDiramsValues = listings.map((l) => l.price_total_dirams);
+  const minPriceTotalDirams =
+    building.price_from_dirams ??
+    (totalDiramsValues.length > 0
+      ? totalDiramsValues.reduce((a, b) => (a < b ? a : b))
+      : null);
+  const monthlyDiramsValues = listings
+    .filter((l) => l.installment_available && l.installment_monthly_amount_dirams != null)
+    .map((l) => l.installment_monthly_amount_dirams as bigint);
+  const minMonthlyDirams =
+    monthlyDiramsValues.length > 0
+      ? monthlyDiramsValues.reduce((a, b) => (a < b ? a : b))
+      : null;
+
+  // §D progress preview — render only for projects that are actually
+  // building, AND only when at least one progress photo has been
+  // uploaded. Mock projects without photos hide the section cleanly.
+  const showProgressPreview =
+    (building.status === 'under_construction' || building.status === 'near_completion') &&
+    progressMonths.length > 0 &&
+    progressMonths[0]!.photos.length > 0;
+  const latestProgressMonth = showProgressPreview ? progressMonths[0]! : null;
+  const progressTotalCount = showProgressPreview
+    ? progressMonths.reduce((sum, m) => sum + m.photos.length, 0)
+    : 0;
+
+  // §H Похожие ЖК — prefer same developer, fall back to same district.
+  // Dedupe by id and exclude the current building.
+  const similarSeen = new Set<string>([building.id]);
+  const similarBuildings: typeof sameDevBuildings = [];
+  for (const b of [...sameDevBuildings, ...sameDistrictBuildings]) {
+    if (similarSeen.has(b.id)) continue;
+    similarSeen.add(b.id);
+    similarBuildings.push(b);
+    if (similarBuildings.length >= 3) break;
+  }
+  // Fetch the real developer for each unique developer_id used in the
+  // similar buildings, so the BuildingCard's verified-badge attribution
+  // is correct (BuildingCard renders the badge based on
+  // developer.is_verified). Up to 3 small queries — fired in parallel.
+  // Same-developer-fallback case has 1 unique id; same-district may
+  // have more.
+  const similarDevIds = [...new Set(similarBuildings.map((b) => b.developer_id))];
+  const similarDevs = await Promise.all(similarDevIds.map((id) => getDeveloperById(id)));
+  const similarDevsMap = new Map<string, MockDeveloper>();
+  for (const d of similarDevs) {
+    if (d != null) similarDevsMap.set(d.id, d);
+  }
   // Currency conversion for diaspora visitors. Skip the rates fetch
   // entirely for local buyers (cookie unset or TJS) so we don't pay
   // for an HTTP roundtrip nobody will see.
@@ -126,10 +197,12 @@ export default async function BuildingDetailPage({
 
   return (
     <>
-      {/* ─── 1. HERO ────────────────────────────────────────────── */}
-      {/* Hero uses the uploaded cover photo when present, else the
-          status-coded color block. The dark-bottom gradient stays in
-          both modes so the white title stays readable. */}
+      {/* ─── 1. HERO (clean photo, no text overlay) ─────────────
+          Same pattern as /kvartira after the recent cleanup: photos
+          read cleanest without text fighting them. The name + address
+          + developer line moved into a dedicated header section right
+          below the photo. Stage badge and Save/Share stay overlaid as
+          small chips — they don't compete with the image. */}
       <div
         className="relative aspect-[2/1] w-full bg-stone-100 md:aspect-[21/9]"
         style={building.cover_photo_url ? undefined : { backgroundColor: building.cover_color }}
@@ -142,15 +215,11 @@ export default async function BuildingDetailPage({
             className="absolute inset-0 size-full object-cover"
           />
         ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-stone-900/65 via-stone-900/20 to-transparent" />
-        <div className="absolute left-3 top-3">
-          <span className="inline-flex w-fit items-center gap-1 rounded-sm bg-white/90 px-2 py-1 text-caption font-medium text-stone-900">
+        <div className="absolute left-3 top-3 md:left-5 md:top-5">
+          <span className="inline-flex w-fit items-center gap-1 rounded-sm bg-white/90 px-2 py-1 text-caption font-medium text-stone-900 backdrop-blur">
             {STAGE_INFO[building.status].label}
           </span>
         </div>
-        {/* Save + Share top-right of hero — same pattern as /kvartira
-            so multi-decision-maker buyers (couples, families abroad)
-            can save AND share with one tap, no URL copy-paste. */}
         <div className="absolute right-3 top-3 flex items-center gap-2 md:right-5 md:top-5">
           <ShareButton
             compact
@@ -159,49 +228,46 @@ export default async function BuildingDetailPage({
           />
           <SaveToggle type="building" id={building.id} />
         </div>
-        <div className="absolute bottom-0 left-0 right-0">
-          <AppContainer className="pb-4 md:pb-5">
-            <div className="flex flex-col gap-2">
-              <h1 className="text-h1 font-semibold leading-[var(--leading-h1)] text-white md:text-display">
-                {building.name.ru}
-              </h1>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                {/* Address opens the map with this building's pin
-                    pre-selected — same affordance as cards. */}
-                <Link
-                  href={`/novostroyki?view=karta&focus=${building.slug}`}
-                  className="group inline-flex items-center gap-1 rounded-sm text-meta text-white/90 transition-colors hover:text-white"
-                  aria-label={`Показать на карте: ${building.name.ru}`}
-                >
-                  <MapPin className="size-3.5" />
-                  <span>{district.name.ru} · {building.address.ru}</span>
-                  <ArrowUpRight className="size-3 opacity-70 transition-opacity group-hover:opacity-100" />
-                </Link>
-                {/* Developer name as a text link to the consolidated
-                    section below — small "Проверенный" pill inline if
-                    developer is verified. This replaces the previous
-                    big VerifiedDeveloperButton in the hero corner.
-                    Single visual confirmation, full info lives below. */}
-                <a
-                  href="#developer"
-                  className="inline-flex items-center gap-1.5 text-meta text-white/90 hover:text-white"
-                >
-                  <span>от {developer.display_name.ru}</span>
-                  {developer.is_verified ? (
-                    <span
-                      className="inline-flex items-center gap-0.5 rounded-sm bg-amber-50 px-1.5 py-0.5 text-caption font-medium text-[color:var(--color-badge-tier-developer)]"
-                      title="Проверенный застройщик"
-                    >
-                      <BadgeCheck className="size-3" aria-hidden />
-                      Проверенный
-                    </span>
-                  ) : null}
-                </a>
-              </div>
-            </div>
-          </AppContainer>
-        </div>
       </div>
+
+      {/* ─── 1.5 HEADER (the title block, lifted out of the photo) ─
+          What the photo overlay used to carry: building name, address
+          (linked to map), and the "от Developer" + verified pill.
+          Cleaner here as solid text on white than fighting a dark
+          gradient over the photo. */}
+      <section className="border-b border-stone-200 bg-white py-4">
+        <AppContainer className="flex flex-col gap-2">
+          <h1 className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display">
+            {building.name.ru}
+          </h1>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <Link
+              href={`/novostroyki?view=karta&focus=${building.slug}`}
+              className="group inline-flex items-center gap-1 rounded-sm text-meta text-stone-700 transition-colors hover:text-terracotta-600"
+              aria-label={`Показать на карте: ${building.name.ru}`}
+            >
+              <MapPin className="size-3.5" />
+              <span>{district.name.ru} · {building.address.ru}</span>
+              <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
+            </Link>
+            <a
+              href="#developer"
+              className="inline-flex items-center gap-1.5 text-meta text-stone-700 hover:text-terracotta-600"
+            >
+              <span>от {developer.display_name.ru}</span>
+              {developer.is_verified ? (
+                <span
+                  className="inline-flex items-center gap-0.5 rounded-sm bg-amber-50 px-1.5 py-0.5 text-caption font-medium text-[color:var(--color-badge-tier-developer)]"
+                  title="Проверенный застройщик"
+                >
+                  <BadgeCheck className="size-3" aria-hidden />
+                  Проверенный
+                </span>
+              ) : null}
+            </a>
+          </div>
+        </AppContainer>
+      </section>
 
       {/* ─── 2. STICKY SUB-NAV ──────────────────────────────────── */}
       {/* Outer wrapper hosts the right-edge fade gradient — without it
@@ -292,10 +358,42 @@ export default async function BuildingDetailPage({
         </AppContainer>
       </section>
 
-      {/* ─── 4. AVAILABLE APARTMENTS (the funnel) ────────────────
+      {/* ─── §B В ЭТОМ ЖК (affordability hook, magic moment) ──
+           Quiet strip between stats and the apartments grid that
+           tells the buyer "you can enter this project from X TJS /
+           Y TJS-per-month" before they scroll through individual
+           units. Same lever as the affordability line on /kvartira
+           but project-scoped. Anchors to #units. */}
+      {minPriceTotalDirams != null ? (
+        <section className="border-t border-stone-200 bg-white py-5">
+          <AppContainer className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-baseline gap-x-3">
+              <span className="text-caption text-stone-500">Квартиры в этом ЖК</span>
+              <span className="text-h2 font-semibold tabular-nums text-stone-900">
+                от {formatPriceNumber(minPriceTotalDirams)} TJS
+              </span>
+            </div>
+            {minMonthlyDirams != null ? (
+              <a
+                href="#units"
+                className="inline-flex w-fit items-center gap-1.5 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+              >
+                Рассрочка от{' '}
+                <span className="tabular-nums">{formatPriceNumber(minMonthlyDirams)} TJS / мес</span>
+                <ArrowUpRight className="size-3.5" aria-hidden />
+              </a>
+            ) : null}
+          </AppContainer>
+        </section>
+      ) : null}
+
+      {/* ─── §C AVAILABLE APARTMENTS (the funnel, with room-type filter) ─
            Moved up from the previous position 7 — competitors all put
            apartments within the first scroll-and-a-half because that's
-           why buyers came to the page. */}
+           why buyers came to the page. Now grouped by room-type via
+           the RoomTypeFilter chip row (Cian-pattern). Chips render
+           only when inventory is varied (≥3 listings AND ≥2 distinct
+           room counts); single-room buildings keep the flat grid. */}
       <section id="units" className="scroll-mt-28 border-t border-stone-200 bg-stone-50 py-6">
         <AppContainer className="flex flex-col gap-5">
           <div className="flex items-end justify-between gap-3">
@@ -338,26 +436,15 @@ export default async function BuildingDetailPage({
             </AppCard>
           ) : (
             <>
-              {/* Show only the first APARTMENTS_PREVIEW_LIMIT cards
-                  inline. Full list lives on /kvartiry?building=<slug>
-                  with all the filters — competitors all do this so
-                  buyers don't have to scroll past 50+ apartments to
-                  reach the description / nearby / developer sections. */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
-                {listings.slice(0, APARTMENTS_PREVIEW_LIMIT).map((l) => (
-                  <ListingCard
-                    key={l.id}
-                    listing={l}
-                    building={building}
-                    developerVerified={developer.is_verified}
-                    districtMedianPerM2={median?.median ?? null}
-                    districtSampleSize={median?.sample ?? 0}
-                    currency={currency}
-                    rates={rates}
-                    hideBuildingName
-                  />
-                ))}
-              </div>
+              <RoomTypeFilter
+                listings={listings.slice(0, APARTMENTS_PREVIEW_LIMIT)}
+                building={building}
+                developer={developer}
+                districtMedianPerM2={median?.median ?? null}
+                districtSampleSize={median?.sample ?? 0}
+                currency={currency}
+                rates={rates}
+              />
               {listings.length > APARTMENTS_PREVIEW_LIMIT ? (
                 <Link
                   href={`/kvartiry?building=${building.slug}`}
@@ -372,6 +459,61 @@ export default async function BuildingDetailPage({
           )}
         </AppContainer>
       </section>
+
+      {/* ─── §D ХОД СТРОИТЕЛЬСТВА (inline progress preview) ──
+           Strongest trust signal for under-construction projects:
+           dated photos showing the building actually growing. Only
+           renders for under-construction / near-completion projects
+           that have at least one uploaded progress photo. Tap a thumb
+           or the "Все альбомы" link to drill into the full timeline
+           on /zhk/[slug]/progress. */}
+      {showProgressPreview && latestProgressMonth ? (
+        <section id="stroyka" className="scroll-mt-28 border-t border-stone-200 py-6">
+          <AppContainer className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-h2 font-semibold text-stone-900">Ход строительства</h2>
+                <p className="text-meta text-stone-500">
+                  Обновлено: {latestProgressMonth.label} · {progressTotalCount} фото
+                </p>
+              </div>
+              <Link
+                href={`/zhk/${building.slug}/progress`}
+                className="inline-flex items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+              >
+                Все альбомы
+                <ArrowUpRight className="size-3.5" aria-hidden />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
+              {latestProgressMonth.photos.slice(0, 4).map((p) => {
+                const url = supabasePublicUrl(p.storage_path);
+                return (
+                  <Link
+                    key={p.id}
+                    href={`/zhk/${building.slug}/progress`}
+                    className="group relative aspect-square overflow-hidden rounded-md bg-stone-100"
+                    aria-label="Открыть альбом стройки"
+                  >
+                    {url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={url}
+                        alt={`Стройка · ${latestProgressMonth.label}`}
+                        className="absolute inset-0 size-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center text-stone-400">
+                        <Camera className="size-6" aria-hidden />
+                      </div>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </AppContainer>
+        </section>
+      ) : null}
 
       {/* ─── 5. ABOUT / DESCRIPTION ──────────────────────────────── */}
       <section id="about" className="scroll-mt-28 py-6">
@@ -535,30 +677,36 @@ export default async function BuildingDetailPage({
         </AppContainer>
       </section>
 
-      {/* ─── 8. FINISHING LEGEND (footer) ────────────────────────── */}
-      {/* Extra bottom padding on mobile so the BuildingStickyContact
-          bar doesn't cover the legend's last row. The 80px clears the
-          ~64px sticky bar plus the safe-area inset on iOS notch
-          devices. Desktop drops back to its smaller padding. */}
-      <section className="bg-stone-50 py-6 pb-24 md:pb-7">
-        <AppContainer className="flex flex-col gap-3">
-          <h2 className="text-h3 font-semibold text-stone-900">Что значит отделка</h2>
-          <div className="flex flex-wrap gap-2">
-            <AppChip asStatic tone="finishing-no-finish">
-              {tFinishing('no_finish')}
-            </AppChip>
-            <AppChip asStatic tone="finishing-pre-finish">
-              {tFinishing('pre_finish')}
-            </AppChip>
-            <AppChip asStatic tone="finishing-full-finish">
-              {tFinishing('full_finish')}
-            </AppChip>
-            <AppChip asStatic tone="finishing-owner-renovated">
-              {tFinishing('owner_renovated')}
-            </AppChip>
-          </div>
-        </AppContainer>
-      </section>
+      {/* ─── §H ПОХОЖИЕ ЖК (escape hatch, conditional) ───────────
+           When the buyer doesn't pick this project, the next thing
+           they want is "what other projects are like this?" — Cian
+           and Rightmove both finish with this. Same-developer first,
+           same-district as fallback. Hides cleanly when none.
+           Extra bottom padding clears the BuildingStickyContact bar
+           on mobile (~64px sticky + iOS safe-area inset). */}
+      {similarBuildings.length > 0 ? (
+        <section className="border-t border-stone-200 bg-stone-50 py-6 pb-24 md:pb-7">
+          <AppContainer className="flex flex-col gap-5">
+            <h2 className="text-h2 font-semibold text-stone-900">Похожие ЖК</h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
+              {similarBuildings.map((b) => (
+                <BuildingCard
+                  key={b.id}
+                  building={b}
+                  developer={similarDevsMap.get(b.developer_id) ?? developer}
+                  district={district}
+                  currency={currency}
+                  rates={rates}
+                />
+              ))}
+            </div>
+          </AppContainer>
+        </section>
+      ) : (
+        // No similar projects to show — keep the bottom padding so the
+        // mobile sticky contact bar doesn't cover the developer card.
+        <div className="pb-24 md:pb-0" aria-hidden />
+      )}
 
       {/* Mobile sticky contact bar — see BuildingStickyContact for
           the layout rationale. Anchored at the bottom across every
@@ -569,6 +717,7 @@ export default async function BuildingDetailPage({
         buildingAddress={`${district.name.ru} · ${building.address.ru}`}
         whatsappLink={FOUNDER_CONTACTS.whatsappLink}
         telegramLink={FOUNDER_CONTACTS.telegramLink}
+        imoHref={buildContactLinks(FOUNDER_CONTACTS.phone).imo}
         phone={FOUNDER_CONTACTS.phone}
       />
     </>
