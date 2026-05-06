@@ -88,11 +88,18 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       {/* ─── HERO ─────────────────────────────────────────────────
           ≤5 visible elements: H1 + trust subhead + LocationSearch +
           search-help inline link + magic moment chip. Mobile first
-          viewport reads as: identity → trust → action → benefit. */}
-      <section className="border-b border-stone-200 bg-stone-50 py-6 md:py-8">
+          viewport reads as: identity → trust → action → benefit.
+          Faint warm gradient (terracotta-50 fading to stone-50) reads
+          as "warm publication paper" — adds brand atmosphere without
+          competing visually with content. */}
+      <section className="border-b border-stone-200 bg-gradient-to-b from-terracotta-50/40 via-stone-50 to-stone-50 py-6 md:py-8">
         <AppContainer className="flex flex-col gap-5">
           <div className="flex flex-col gap-2">
-            <h1 className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display">
+            {/* H1 in Lora serif — editorial-boutique voice. Tight
+                tracking + display size on desktop. Body, subhead, and
+                the rest of the page stay Inter sans for clarity and
+                contrast. Single typographic accent, not all-serif. */}
+            <h1 className="font-serif text-h1 font-semibold leading-[var(--leading-h1)] tracking-[-0.01em] text-stone-900 md:text-display">
               {t('heroTitle')}
             </h1>
             {/* Trust subhead — replaces the 3 USP cards. Same
@@ -110,11 +117,14 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               <p className="text-caption text-stone-500">
                 Введите район, ЖК, школу, мечеть или адрес — покажем новостройки рядом.
               </p>
+              {/* Sparkle icon micro-rotates on hover (~6deg) for a
+                  subtle tactile cue. motion-safe: respects
+                  prefers-reduced-motion. */}
               <Link
                 href="/pomoshch-vybora"
-                className="inline-flex items-center gap-1 text-caption font-medium text-terracotta-700 hover:text-terracotta-800"
+                className="group inline-flex items-center gap-1 text-caption font-medium text-terracotta-700 hover:text-terracotta-800"
               >
-                <Sparkles className="size-3.5" />
+                <Sparkles className="size-3.5 transition-transform duration-200 ease-out motion-safe:group-hover:rotate-[6deg]" />
                 Первый раз? Поможем подобрать за 2 минуты
               </Link>
             </div>
@@ -172,7 +182,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                    Emphasis here is positional (right under the
                    search) and typographic (bold tabular price), not
                    hue-driven. */
-                className="inline-flex w-fit items-center gap-3 rounded-md border border-stone-300 bg-white px-3 py-2 text-meta transition-colors hover:border-stone-400 hover:bg-stone-50"
+                className="inline-flex w-fit items-center gap-3 rounded-md border border-stone-300 bg-white px-3 py-2 text-meta shadow-[var(--shadow-sm)] transition-all duration-200 ease-out hover:border-stone-400 hover:bg-stone-50 hover:shadow-[var(--shadow-md)] motion-safe:hover:scale-[1.015]"
               >
                 <span className="flex flex-col items-start gap-0.5">
                   <span>
