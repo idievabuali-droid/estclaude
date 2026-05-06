@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation';
-import { MapPin, ArrowUpRight, BadgeCheck, Calendar } from 'lucide-react';
+import { MapPin, ArrowUpRight, BadgeCheck, Calendar, Layers, Users } from 'lucide-react';
 import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
-import { AppContainer, AppChip } from '@/components/primitives';
+import { AppContainer, AppChip, AppCard, AppCardContent } from '@/components/primitives';
 import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle, ShareButton, NearbyChips, PhotoGallery } from '@/components/blocks';
 import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
@@ -77,29 +77,33 @@ export async function generateMetadata({
 /**
  * Apartment detail page (/kvartira/[slug]).
  *
- * Section order follows the convergent pattern across Avito, Cian,
- * Krisha, Bayut, Zillow:
+ * Section order — each block answers ONE buying-decision question:
  *
- *   1. Hero (cover + rooms·m² overlay)
+ *   1. Hero gallery (visual fit)
  *   2. Breadcrumbs
- *   3. Title + price + posted-ago + contact bar (the "what is this and
- *      how do I reach the seller" zone — everything above the fold)
- *   4. Specs grid + finishing (the "stats" zone — Площадь, Этаж,
- *      Санузлов, Потолок, Балкон + finishing chip with 1-line note)
- *   5. Installment (if available) — placed adjacent to price because
- *      it modifies affordability
- *   6. Description — seller's free-text
- *   7. Building summary card — link to the parent /zhk page
- *   8. Compact nearby (4 POIs + "Все рядом" link to building's full POI list)
- *   9. Similar listings in the same building
+ *   3. §1 Заголовок — what + where + when (lean: H1, building, handover)
+ *   4. §2 Цена — how much (total + per-m² + foreign + magic-moment monthly)
+ *   5. §3 Контакт — how to reach the seller
+ *   6. §4 Об этой квартире — what's inside (finishing, bathroom layout,
+ *                                            orientation, view_notes)
+ *   7. §5 Планировка — apartment layout image (when set)
+ *   8. §6 Описание — seller's free text (when set)
+ *   9. §7 Рассрочка — financing (anchor target for §2 magic-moment link)
+ *  10. §8 О доме — building context + "all units in this building" CTA
+ *  11. §9 О застройщике — developer trust depth (only when populated)
+ *  12. §10 Что рядом — location proof
+ *  13. §11 Похожие — alternatives in the same building
+ *  14. §12 CallbackWidget — anonymous-friendly fallback (logged-out only)
+ *  15. §13 Meta — quiet posted-ago + view counter
  *
- * Removed from the previous structure:
- *   - Standalone "Отделка" section (folded into the specs zone)
- *   - Dead help button next to the finishing chip (had no behaviour)
- *   - Always-null fairness indicator conditional (the signal is
- *     globally disabled in V1, so the JSX block was dead code)
- *   - Full nearby POI list (replaced with a compact 4-chip preview;
- *     the building page is the source of truth for the full list)
+ * Mobile sticky contact bar is rendered by ContactBarWithModal in §3.
+ *
+ * Cuts preserved from prior iterations:
+ *   - No stage chip in the title — the handover line implies "ещё не сдан"
+ *   - No bathroom count — Tajik market doesn't shop on it (only the layout)
+ *   - No heavy 5-fact specs grid — §4 is a small pill row, not a grid
+ *   - No balcony / ceiling-height pills — not real shopper signals here
+ *   - No special-offer chip — no realistic V1 use case
  */
 export default async function ListingDetailPage({
   params,
@@ -121,11 +125,6 @@ export default async function ListingDetailPage({
   // Parallelise the rest. Was sequential before — the slowest single
   // call (getNearbyPOIs hits Overpass live, ~1-3s) blocked everything
   // after it, multiplying perceived latency on Tajik mobile networks.
-  // Promise.all collapses them to max(individual) instead of sum.
-  // - getCurrentUser: cookie + 1-2 DB lookups
-  // - getExchangeRates: cached 24h, only fired for diaspora
-  // - getNearbyPOIs: now properly cached (24h via unstable_cache)
-  // - getListingStats: events table aggregations
   const [visitor, rates, pois, stats] = await Promise.all([
     getCurrentUser(),
     isDiaspora ? getExchangeRates() : Promise.resolve(null),
@@ -139,10 +138,10 @@ export default async function ListingDetailPage({
     item: pois[cat][0] ?? null,
   })).filter((x) => x.item != null);
 
-  // Pull every photo for this listing so we can render the gallery
-  // beneath the hero. Ordered by display_order so the seller's chosen
-  // sequence (currently: cover first, then upload order) is preserved.
-  // Admin client because RLS on `photos` is locked to the uploader.
+  // Pull every photo for this listing so we can render the gallery.
+  // Same query also feeds the floor-plan lookup below — single
+  // round-trip. Admin client because RLS on `photos` is locked to
+  // the uploader.
   const photoSupabase = createAdminClient();
   const { data: photoRows } = await photoSupabase
     .from('photos')
@@ -153,14 +152,40 @@ export default async function ListingDetailPage({
     .map((p) => ({ id: p.id as string, url: supabasePublicUrl(p.storage_path as string) }))
     .filter((p): p is { id: string; url: string } => p.url != null);
 
+  // §5 Планировка: pick the photo whose id matches floor_plan_photo_id.
+  // Reuses the photoUrls list — no extra round-trip. Hides the section
+  // when the seller hasn't tagged a layout image.
+  const floorPlanUrl = listing.floor_plan_photo_id
+    ? (photoUrls.find((p) => p.id === listing.floor_plan_photo_id)?.url ?? null)
+    : null;
+
+  // §8 О доме: total active listings in this building drives the
+  // "Все квартиры в этом доме (N) →" CTA. The `similar` list is
+  // capped at 3 by getListing(), so we need a separate count query
+  // for the accurate total. `head: true` skips the row payload.
+  const { count: buildingUnitCount } = await photoSupabase
+    .from('listings')
+    .select('id', { count: 'exact', head: true })
+    .eq('building_id', listing.building_id)
+    .eq('status', 'active');
+
+  // §9 О застройщике renders only when the developer has trust depth
+  // (years on the market or a project count). Without those, the card
+  // would be an empty shell that adds visual noise without signal.
+  const showDeveloperCard =
+    developer.years_active != null || developer.projects_completed_count != null;
+
+  // §4 view_notes line — locale 'ru' for now (Tajik translations
+  // optional in the schema). Trim avoids rendering whitespace-only.
+  const viewNotesText = listing.view_notes?.ru?.trim() || null;
+
   return (
     <>
-      {/* ─── 1. HERO + PHOTO GALLERY ─────────────────────────────── */}
+      {/* ─── HERO + PHOTO GALLERY ───────────────────────────────── */}
       {/* Hero IS the gallery. Mobile: full-bleed scroll-snap carousel
           (swipe right/left between photos, tap any to fullscreen).
-          Desktop: hero photo + 4-thumb strip below. The title +
-          Save/Share actions overlay the hero on both. Replaces the
-          previous static grid that pushed the price below the fold. */}
+          Desktop: hero photo + 4-thumb strip below. The Save/Share
+          actions overlay the hero on both. */}
       {photoUrls.length > 0 ? (
         <div className="relative">
           <PhotoGallery
@@ -168,9 +193,6 @@ export default async function ListingDetailPage({
             alt={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} в ${building.name.ru}`}
             heroAspect="21/9"
           />
-          {/* Top-right actions: same Save + Share affordance as before,
-              now positioned over the gallery. pointer-events-auto so
-              taps on the buttons don't open the lightbox. */}
           <div className="pointer-events-none absolute right-3 top-3 z-20 flex items-center gap-2 md:right-5 md:top-5">
             <div className="pointer-events-auto">
               <ShareButton
@@ -183,17 +205,8 @@ export default async function ListingDetailPage({
               <SaveToggle type="listing" id={listing.id} />
             </div>
           </div>
-          {/* Title overlay removed — it duplicated the same rooms+m²
-              that now sits in the body H1 below the breadcrumb, AND
-              competed visually with the photo. Photos read cleanest
-              without any text overlay (Cian / Avito do this too); the
-              first body section under the breadcrumb is the right
-              place for the title. */}
         </div>
       ) : (
-        // No-photo fallback: source-coded coloured hero. Single photo
-        // listings still go through the gallery above (single slide,
-        // no counter, lightbox optional).
         <div
           className="relative aspect-[16/9] w-full bg-stone-100 md:aspect-[21/9]"
           style={{ backgroundColor: listing.cover_color }}
@@ -207,15 +220,10 @@ export default async function ListingDetailPage({
             />
             <SaveToggle type="listing" id={listing.id} />
           </div>
-          {/* No-photo hero — title now lives in the body section
-              below the breadcrumb, same as the with-photo path. The
-              coloured block + gradient still reads as "this is the
-              hero space" so the layout doesn't collapse to zero
-              height when no photos are uploaded. */}
         </div>
       )}
 
-      {/* ─── 2. BREADCRUMBS ─────────────────────────────────────── */}
+      {/* ─── BREADCRUMBS ────────────────────────────────────────── */}
       <nav aria-label="Хлебные крошки" className="border-b border-stone-200 bg-stone-50">
         <AppContainer>
           <ol className="flex items-center gap-1 overflow-x-auto py-2 text-caption text-stone-500 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -238,28 +246,17 @@ export default async function ListingDetailPage({
         </AppContainer>
       </nav>
 
-      {/* ─── 3. TITLE + PRICE + CONTACT (the "above the fold" zone) ─ */}
+      {/* ─── §1 ЗАГОЛОВОК (lean — what + where + when only) ─────── */}
+      {/* Title block carries only the orientation answers. Finishing,
+          bathroom layout, and meta (posted-ago, views) used to live
+          here too; they've moved to §4 and §13 so the title reads as
+          a single coherent "this is what apartment, in which building,
+          when ready" block. */}
       <section className="border-b border-stone-200 bg-white py-4">
         <AppContainer className="flex flex-col gap-3">
-          {/* Page H1 — moved here from the photo overlay. Carries the
-              three buyer-distinctive specs (rooms / m² / floor) so the
-              listing has a proper name before the price block. Without
-              this, removing the hero overlay left the page jumping
-              straight from breadcrumb to a building name + price with
-              no explicit title. */}
           <h1 className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display">
             {listing.rooms_count}-комн · {formatM2(listing.size_m2)} · {formatFloor(listing.floor_number, listing.total_floors)} эт
           </h1>
-
-          {/* Building name link → /zhk; small "На карте" pill → map;
-              "Проверенный" badge inline next to the building name when
-              the developer is verified. Stage chip and developer NAME
-              were dropped from this title block — buyers who want to
-              evaluate the developer or read about the build phase tap
-              the building name and land on /zhk where the full picture
-              lives. The apartment page only carries the answers a
-              buyer needs to decide whether to contact: building
-              orientation + when can I move in + price + condition. */}
           <div className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <Link
@@ -290,13 +287,6 @@ export default async function ListingDetailPage({
                 <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
               </Link>
             </div>
-            {/* When can I move in? — single answer line. Delivered
-                buildings get "Готов к заселению" (no quarter needed);
-                under-construction buildings get the handover quarter
-                directly. The stage chip ("Строится", "Котлован" etc)
-                was dropped — the quarter alone implies "ещё не сдан"
-                and the stage detail belongs on /zhk for buyers who
-                care about phase-by-phase progress. */}
             {building.status === 'delivered' ? (
               <span className="text-caption font-medium text-stone-900">
                 Готов к заселению
@@ -308,104 +298,153 @@ export default async function ListingDetailPage({
               </span>
             ) : null}
           </div>
+        </AppContainer>
+      </section>
 
-          {/* Price block. Each TJS amount is paired with its ≈
-              foreign equivalent INLINE on the same baseline — buyer
-              reads "180 000 TJS  ≈ 1 800 000 ₽" as one unit, no
-              ambiguity about which conversion goes with which price.
-              flex-wrap drops the conversion to the next line on
-              narrow viewports rather than overflow. Local buyers
-              (currency=TJS or no cookie) see only the TJS amounts,
-              no clutter. */}
-          <div className="flex flex-col gap-1">
-            <div className="flex flex-wrap items-baseline gap-x-3">
-              <span className="text-display font-semibold tabular-nums text-stone-900">
-                {formatPriceNumber(listing.price_total_dirams)} TJS
-              </span>
-              {isDiaspora && rates ? (
-                <PriceConversion
-                  priceDirams={listing.price_total_dirams}
-                  target={currency}
-                  rates={rates}
-                  variant="block"
-                />
-              ) : null}
-            </div>
-            <div className="flex flex-wrap items-baseline gap-x-2">
-              <span className="text-meta text-stone-500 tabular-nums">
-                {formatPriceNumber(listing.price_per_m2_dirams)} TJS / м²
-              </span>
-              {isDiaspora && rates ? (
-                <PriceConversion
-                  priceDirams={listing.price_per_m2_dirams}
-                  target={currency}
-                  rates={rates}
-                  perM2
-                />
-              ) : null}
-            </div>
-          </div>
-
-          {/* Finishing — small chip + 1-line caption. Used to live in
-              its own "stats" section below; promoting it here puts it
-              next to the price where buying-decision attributes
-              belong. Carrying the descriptor inline ("полная отделка
-              от застройщика, готова к заселению") means buyers don't
-              have to scroll past 5 redundant facts cards just to find
-              what condition the apartment is actually in.
-              Bathroom-layout (раздельный/совмещённый) reads on the
-              same line — it's a layout attribute, not a number; the
-              bathroom COUNT was dropped per the founder's call (Tajik
-              market doesn't shop by it; buyers who care about more
-              than one bathroom mention it in the description). */}
-          <div className="flex flex-col gap-1">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <AppChip asStatic tone={FINISHING_TONE[listing.finishing_type]}>
-                {tFinishing(listing.finishing_type)}
-              </AppChip>
-              <span className="text-caption text-stone-500">
-                {finishingDescription(listing.finishing_type)}
-              </span>
-            </div>
-            {listing.bathroom_separate != null ? (
-              <span className="text-caption text-stone-500">
-                Санузел {listing.bathroom_separate ? 'раздельный' : 'совмещённый'}
-              </span>
+      {/* ─── §2 ЦЕНА (with magic-moment monthly line) ──────────── */}
+      <section className="border-b border-stone-200 bg-white py-4">
+        <AppContainer className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-baseline gap-x-3">
+            <span className="text-display font-semibold tabular-nums text-stone-900">
+              {formatPriceNumber(listing.price_total_dirams)} TJS
+            </span>
+            {isDiaspora && rates ? (
+              <PriceConversion
+                priceDirams={listing.price_total_dirams}
+                target={currency}
+                rates={rates}
+                variant="block"
+              />
             ) : null}
           </div>
-
-          {/* Tertiary signal — small + muted so it doesn't compete
-              with price or building info above. Relative-only — the
-              absolute date repeated the same fact for 2-29-day-old
-              listings ("2 дня назад · 3 мая") and read as duplication. */}
-          <span className="text-caption text-stone-400">
-            Опубликовано {formatPostedAgo(listing.published_at)}
-          </span>
-
-          {/* Trust signals: view count + most-recent price change.
-              Renders nothing when both are absent so a brand-new
-              listing doesn't look stale. */}
-          <ListingTrustSignals stats={stats} />
-
-          {/* Contact bar: 4 channels + 1 intent CTA. Same client
-              component renders the desktop layout here AND the mobile
-              sticky bar at the bottom of the viewport. */}
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <span className="text-meta text-stone-500 tabular-nums">
+              {formatPriceNumber(listing.price_per_m2_dirams)} TJS / м²
+            </span>
+            {isDiaspora && rates ? (
+              <PriceConversion
+                priceDirams={listing.price_per_m2_dirams}
+                target={currency}
+                rates={rates}
+                perM2
+              />
+            ) : null}
+          </div>
+          {/* Magic moment: the affordability glance. Buyer's "can I
+              actually afford this monthly?" answered before they
+              scroll. Anchors to the full Рассрочка section below for
+              term details. Renders only when installment is offered. */}
+          {listing.installment_available && listing.installment_monthly_amount_dirams ? (
+            <a
+              href="#rassrochka"
+              className="inline-flex w-fit items-center gap-1.5 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+            >
+              <span>
+                Ежемесячно от{' '}
+                <span className="tabular-nums">
+                  {formatPriceNumber(listing.installment_monthly_amount_dirams)} TJS
+                </span>
+              </span>
+              {listing.installment_term_months ? (
+                <span className="text-stone-500"> · рассрочка {listing.installment_term_months} мес</span>
+              ) : null}
+              <ArrowUpRight className="size-3.5" aria-hidden />
+            </a>
+          ) : null}
+          {/* Contact cluster — desktop renders inline here (channels +
+              intent button); mobile renders nothing inline and pins
+              the same actions to a sticky bottom bar via the
+              component's own portal. Folded into the price section so
+              the contact buttons sit immediately next to the price on
+              desktop and we don't add an empty wrapper section on
+              mobile (the inline desktop layout uses `hidden md:flex`). */}
           <ContactBarWithModal
             listingTitle={`${listing.rooms_count}-комн в ${building.name.ru}`}
             sellerPhone={sellerPhone}
             isDiaspora={isDiaspora}
           />
-          {/* CallbackWidget moved BELOW the description (see end of
-              page) so it doesn't interrupt the price → specs flow.
-              A second contact prompt above the fold competes with
-              the primary ContactBarWithModal anyway. */}
         </AppContainer>
       </section>
 
+      {/* ─── §4 ОБ ЭТОЙ КВАРТИРЕ (pill row + view_notes line) ──── */}
+      {/* Per-apartment details that aren't in the title. Only finishing
+          + bathroom + orientation + view_notes — balcony, ceiling, and
+          bathroom-count are deliberately not surfaced (Tajik market
+          doesn't shop on them). Pills hide individually when their
+          source field is null. Finishing is NOT NULL in the schema, so
+          the section always renders with at least the finishing row. */}
+      <section className="border-t border-stone-200 py-6">
+        <AppContainer className="flex flex-col gap-3">
+          <h2 className="text-h2 font-semibold text-stone-900">Об этой квартире</h2>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+            <AppChip asStatic tone={FINISHING_TONE[listing.finishing_type]}>
+              {tFinishing(listing.finishing_type)}
+            </AppChip>
+            <span className="text-caption text-stone-500">
+              {finishingDescription(listing.finishing_type)}
+            </span>
+          </div>
+          {(listing.bathroom_separate != null || listing.orientation) ? (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+              {listing.bathroom_separate != null ? (
+                <AppChip asStatic tone="neutral">
+                  Санузел {listing.bathroom_separate ? 'раздельный' : 'совмещённый'}
+                </AppChip>
+              ) : null}
+              {listing.orientation ? (
+                <AppChip asStatic tone="neutral">
+                  Окна: {listing.orientation}
+                </AppChip>
+              ) : null}
+            </div>
+          ) : null}
+          {viewNotesText ? (
+            <p className="text-meta text-stone-700">{viewNotesText}</p>
+          ) : null}
+        </AppContainer>
+      </section>
 
-      {/* ─── 5. INSTALLMENT (only when offered) ─────────────────── */}
+      {/* ─── §5 ПЛАНИРОВКА (only when floor_plan_photo_id is set) ─ */}
+      {floorPlanUrl ? (
+        <section className="border-t border-stone-200 bg-stone-50 py-6">
+          <AppContainer className="flex flex-col gap-3">
+            <h2 className="text-h2 font-semibold text-stone-900">Планировка</h2>
+            {/* Tap opens the original photo in a new tab — full-size
+                viewing without an extra lightbox dependency. cursor-
+                zoom-in hints the affordance. */}
+            <a
+              href={floorPlanUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block overflow-hidden rounded-md bg-white"
+              title="Открыть планировку в полный размер"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={floorPlanUrl}
+                alt={`Планировка квартиры ${listing.rooms_count}-комн в ${building.name.ru}`}
+                className="block w-full cursor-zoom-in object-contain"
+              />
+            </a>
+          </AppContainer>
+        </section>
+      ) : null}
+
+      {/* ─── §6 ОПИСАНИЕ (only if seller wrote text) ────────────── */}
+      {listing.unit_description.ru?.trim() ? (
+        <section className="border-t border-stone-200 py-6">
+          <AppContainer className="flex flex-col gap-3">
+            <h2 className="text-h2 font-semibold text-stone-900">Описание</h2>
+            <p className="text-body text-stone-700">{listing.unit_description.ru}</p>
+          </AppContainer>
+        </section>
+      ) : null}
+
+      {/* ─── §7 РАССРОЧКА (anchor target for §2 magic-moment line) ─ */}
+      {/* scroll-mt-20 stops the heading from landing flush against the
+          top of the viewport when the magic-moment anchor jumps here. */}
       {listing.installment_available && listing.installment_monthly_amount_dirams ? (
-        <section className="border-t border-stone-200 bg-white py-6">
+        <section id="rassrochka" className="scroll-mt-20 border-t border-stone-200 bg-white py-6">
           <AppContainer className="flex flex-col gap-3">
             <h2 className="text-h2 font-semibold text-stone-900">Рассрочка от застройщика</h2>
             <InstallmentDisplay
@@ -423,44 +462,134 @@ export default async function ListingDetailPage({
         </section>
       ) : null}
 
-      {/* ─── 6. DESCRIPTION (seller's free-text) ────────────────── */}
-      {/* Hide the entire section when the seller didn't write
-          anything. An empty "Описание:" header followed by a blank
-          paragraph reads as a broken page; better to skip the section
-          entirely than render the heading with no content. */}
-      {listing.unit_description.ru?.trim() ? (
-        <section className="border-t border-stone-200 py-6">
+      {/* ─── §8 О ДОМЕ ──────────────────────────────────────────── */}
+      {/* Building context card. Visual identity (cover photo) + key
+          facts (handover, floors, total units) + a primary escape to
+          the full unit list scoped to this building. The CTA includes
+          the live count so the buyer knows whether it's worth tapping. */}
+      <section className="border-t border-stone-200 py-6">
+        <AppContainer className="flex flex-col gap-3">
+          <h2 className="text-h2 font-semibold text-stone-900">О доме</h2>
+          <AppCard>
+            <AppCardContent>
+              <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:gap-4">
+                <div
+                  className="relative aspect-[16/9] w-full overflow-hidden rounded-md bg-stone-100 md:aspect-[4/3] md:w-48 md:shrink-0"
+                  style={building.cover_photo_url ? undefined : { backgroundColor: building.cover_color }}
+                >
+                  {building.cover_photo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={building.cover_photo_url}
+                      alt={building.name.ru}
+                      className="absolute inset-0 size-full object-cover"
+                    />
+                  ) : null}
+                </div>
+                <div className="flex flex-col gap-2 md:flex-1">
+                  <Link
+                    href={`/zhk/${building.slug}`}
+                    className="text-h3 font-semibold text-stone-900 hover:text-terracotta-700"
+                  >
+                    {building.name.ru}
+                  </Link>
+                  <span className="text-meta text-stone-500">
+                    {district.name.ru} · {building.address.ru}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-stone-700">
+                    <span className="inline-flex items-center gap-1">
+                      <Calendar className="size-3.5 text-stone-500" aria-hidden />
+                      {building.status === 'delivered'
+                        ? 'Сдан'
+                        : `Сдача ${building.handover_estimated_quarter ?? '—'}`}
+                    </span>
+                    {building.total_floors > 0 ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Layers className="size-3.5 text-stone-500" aria-hidden />
+                        {building.total_floors} {pluralFloors(building.total_floors)}
+                      </span>
+                    ) : null}
+                    {building.total_units > 0 ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Users className="size-3.5 text-stone-500" aria-hidden />
+                        {building.total_units} {pluralApartments(building.total_units)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <Link
+                    href={`/kvartiry?building=${building.slug}`}
+                    className="mt-1 inline-flex w-fit items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+                  >
+                    Все квартиры в этом доме
+                    {buildingUnitCount != null ? ` (${buildingUnitCount})` : ''}
+                    <ArrowUpRight className="size-3.5" aria-hidden />
+                  </Link>
+                </div>
+              </div>
+            </AppCardContent>
+          </AppCard>
+        </AppContainer>
+      </section>
+
+      {/* ─── §9 О ЗАСТРОЙЩИКЕ (only if dev has trust depth) ────── */}
+      {/* A small card surfacing developer track record. /zhk has the
+          fuller version with project-status breakdown; this one is
+          intentionally lighter — apartment buyers want the summary
+          here, the depth on the building page. */}
+      {showDeveloperCard ? (
+        <section className="border-t border-stone-200 bg-stone-50 py-6">
           <AppContainer className="flex flex-col gap-3">
-            <h2 className="text-h2 font-semibold text-stone-900">Описание</h2>
-            <p className="text-body text-stone-700">{listing.unit_description.ru}</p>
+            <h2 className="text-h2 font-semibold text-stone-900">О застройщике</h2>
+            <AppCard>
+              <AppCardContent>
+                <div className="flex flex-col gap-3">
+                  <h3 className="inline-flex flex-wrap items-center gap-2 text-h3 font-semibold text-stone-900">
+                    {developer.display_name.ru}
+                    {developer.is_verified ? (
+                      <Link
+                        href="/tsentr-pomoshchi#verified-developer"
+                        className="inline-flex items-center gap-1 rounded-sm bg-amber-50 px-1.5 py-0.5 text-caption font-medium text-amber-800 hover:bg-amber-100"
+                        title="Что значит «Проверенный»?"
+                      >
+                        <BadgeCheck className="size-3" aria-hidden />
+                        Проверенный
+                      </Link>
+                    ) : null}
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-stone-700">
+                    {developer.years_active != null ? (
+                      <span className="tabular-nums">
+                        {developer.years_active} {pluralYears(developer.years_active)} на рынке
+                      </span>
+                    ) : null}
+                    {developer.years_active != null && developer.projects_completed_count != null ? (
+                      <span className="text-stone-400" aria-hidden>·</span>
+                    ) : null}
+                    {developer.projects_completed_count != null ? (
+                      <span className="tabular-nums">
+                        {developer.projects_completed_count} {pluralProjects(developer.projects_completed_count)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <Link
+                    href={`/novostroyki?developer=${developer.id}`}
+                    className="inline-flex w-fit items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+                  >
+                    Все проекты застройщика
+                    <ArrowUpRight className="size-3.5" aria-hidden />
+                  </Link>
+                </div>
+              </AppCardContent>
+            </AppCard>
           </AppContainer>
         </section>
       ) : null}
 
-      {/* Anonymous-friendly callback widget. Logged-in visitors already
-          have ContactBarWithModal as the primary surface and we'd
-          rather not double up; this widget exists so a random visitor
-          without a Telegram session can leave a phone for the founder
-          to follow up on WhatsApp. Lives BELOW the description so it
-          doesn't interrupt the price → specs flow above. */}
-      {!visitor ? (
-        <section className="border-t border-stone-200 py-6">
-          <AppContainer>
-            <CallbackWidget listingId={listing.id} />
-          </AppContainer>
-        </section>
-      ) : null}
-
-      {/* Building summary card removed — the title block at the top
-          already has the building name (clickable to /zhk), the "На
-          карте" pill, AND the developer name. A repeat card here was
-          duplicate visual real estate. */}
-
-      {/* ─── 7. COMPACT NEARBY (interactive chips + mini-map) ─────
-          Tapping a chip now drops an orange star on the map at that
-          POI's location and re-fits the camera. Tapping the same
-          chip again clears the highlight. Closes the "I see chips
-          but can't see WHERE" gap the user flagged on real iPhone. */}
+      {/* ─── §10 ЧТО РЯДОМ (compact 4-POI preview + mini-map) ──── */}
+      {/* Tapping a chip drops a star on the map at that POI's location
+          and re-fits the camera. NearbyChips renders its own h3 "Что
+          рядом" heading internally, so we don't add another h2 here —
+          would have duplicated the section title. */}
       {compactNearby.length > 0 ? (
         <section className="border-t border-stone-200 py-6">
           <AppContainer>
@@ -475,37 +604,20 @@ export default async function ListingDetailPage({
                 longitude: c.item!.lng,
                 distanceM: c.item!.distanceM,
               }))}
-              // "Все рядом" → focus map of this building. Buyer sees
-              // the building as the orange pin AND can tap a POI
-              // category chip on the map to drop pins for every nearby
-              // mosque / school / etc, then tap a pin for details.
-              // Was previously /zhk#nearby — sent the buyer back to a
-              // STATIC list on a different detail page, defeating the
-              // "show me where the things are" question.
               allNearbyHref={`/novostroyki?view=karta&focus=${building.slug}&from=kvartira&fromSlug=${listing.slug}`}
             />
           </AppContainer>
         </section>
       ) : null}
 
-      {/* ─── 9. SIMILAR IN THIS BUILDING ────────────────────────── */}
+      {/* ─── §11 ПОХОЖИЕ В ЭТОМ ЖК ──────────────────────────────── */}
+      {/* The "Все квартиры в ЖК →" header link is GONE — the same
+          escape lives in §8 above with the live count. Single source
+          of truth for that CTA. */}
       {similar.length > 0 ? (
-        <section className="border-t border-stone-200 bg-stone-50 py-6 pb-24 md:pb-7">
+        <section className="border-t border-stone-200 bg-stone-50 py-6">
           <AppContainer className="flex flex-col gap-5">
-            <div className="flex items-end justify-between gap-3">
-              <h2 className="text-h2 font-semibold text-stone-900">Похожие в этом ЖК</h2>
-              {/* Krisha pattern — when buyer is interested in this
-                  building, give them an instant escape to the full
-                  list with the building scope already applied. The
-                  building-scoped /kvartiry shows the count + filter
-                  chips so they can narrow further. */}
-              <Link
-                href={`/kvartiry?building=${building.slug}`}
-                className="shrink-0 text-meta font-medium text-terracotta-600 hover:text-terracotta-700"
-              >
-                Все квартиры в ЖК →
-              </Link>
-            </div>
+            <h2 className="text-h2 font-semibold text-stone-900">Похожие в этом ЖК</h2>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
               {similar.map((l) => (
                 <ListingCard
@@ -523,8 +635,34 @@ export default async function ListingDetailPage({
         </section>
       ) : null}
 
+      {/* ─── §12 CallbackWidget (anonymous-friendly fallback) ──── */}
+      {/* Logged-in visitors already have ContactBarWithModal as the
+          primary surface; this widget is for visitors without a
+          Telegram session who want to leave a phone for the founder. */}
+      {!visitor ? (
+        <section className="border-t border-stone-200 py-6">
+          <AppContainer>
+            <CallbackWidget listingId={listing.id} />
+          </AppContainer>
+        </section>
+      ) : null}
+
+      {/* ─── §13 META (quiet posted-ago + view counter) ─────────── */}
+      {/* Pulled out of the title block — these answer "how stale is
+          this?" not "what is this apartment". Bottom of the page is
+          the right place. pb-24 clears the mobile sticky contact
+          bar; desktop drops back to its smaller padding. */}
+      <section className="border-t border-stone-200 py-4 pb-24 md:pb-7">
+        <AppContainer className="flex flex-col gap-1">
+          <span className="text-caption text-stone-400">
+            Опубликовано {formatPostedAgo(listing.published_at)}
+          </span>
+          <ListingTrustSignals stats={stats} />
+        </AppContainer>
+      </section>
+
       {/* Mobile sticky contact bar is rendered by ContactBarWithModal
-          in section 3 — it floats fixed regardless of scroll position. */}
+          in §3 — it floats fixed regardless of scroll position. */}
     </>
   );
 }
@@ -542,4 +680,40 @@ function finishingDescription(t: string): string {
     default:
       return '';
   }
+}
+
+function pluralYears(n: number): string {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return 'лет';
+  if (last > 1 && last < 5) return 'года';
+  if (last === 1) return 'год';
+  return 'лет';
+}
+
+function pluralProjects(n: number): string {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return 'проектов';
+  if (last > 1 && last < 5) return 'проекта';
+  if (last === 1) return 'проект';
+  return 'проектов';
+}
+
+function pluralFloors(n: number): string {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return 'этажей';
+  if (last > 1 && last < 5) return 'этажа';
+  if (last === 1) return 'этаж';
+  return 'этажей';
+}
+
+function pluralApartments(n: number): string {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return 'квартир';
+  if (last > 1 && last < 5) return 'квартиры';
+  if (last === 1) return 'квартира';
+  return 'квартир';
 }

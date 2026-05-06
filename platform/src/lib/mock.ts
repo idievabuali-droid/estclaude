@@ -104,6 +104,18 @@ export type MockListing = {
    * (legacy listings + sellers who skip the field).
    */
   bathroom_separate: boolean | null;
+  /** Free-text orientation. Sellers fill with anything short like
+   *  "во двор", "на дорогу", "на юг" — not constrained to compass
+   *  directions. Surfaces as a pill in §4 Об этой квартире when set. */
+  orientation: string | null;
+  /** Bilingual free-text describing what windows look out on
+   *  ("окна на парк, тихая сторона"). Surfaces as a quiet line in
+   *  §4 when filled. */
+  view_notes: Bilingual | null;
+  /** FK to the photo (in `photos` table) that represents the
+   *  apartment's layout diagram. Drives the §5 Планировка section
+   *  on the detail page when set. */
+  floor_plan_photo_id: string | null;
   /** ISO timestamp of last edit — see MockBuilding.updated_at. */
   updated_at?: string | null;
 };
@@ -365,6 +377,9 @@ function mkListing(seed: {
     balcony: seed.balcony ?? null,
     ceiling_height_cm: seed.ceiling ?? null,
     bathroom_separate: null,
+    orientation: null,
+    view_notes: null,
+    floor_plan_photo_id: null,
   };
 }
 

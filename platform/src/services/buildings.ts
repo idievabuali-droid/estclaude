@@ -592,6 +592,9 @@ function mapListing(r: {
   balcony: boolean | null;
   ceiling_height_cm: number | null;
   bathroom_separate?: boolean | null;
+  orientation?: string | null;
+  view_notes?: { ru: string; tg?: string } | null;
+  floor_plan_photo_id?: string | null;
   updated_at?: string | null;
   cover_photo?: { storage_path: string } | { storage_path: string }[] | null;
 }): MockListing {
@@ -628,6 +631,9 @@ function mapListing(r: {
     balcony: r.balcony,
     ceiling_height_cm: r.ceiling_height_cm,
     bathroom_separate: r.bathroom_separate ?? null,
+    orientation: r.orientation ?? null,
+    view_notes: r.view_notes ?? null,
+    floor_plan_photo_id: r.floor_plan_photo_id ?? null,
     updated_at: r.updated_at ?? null,
   };
 }
