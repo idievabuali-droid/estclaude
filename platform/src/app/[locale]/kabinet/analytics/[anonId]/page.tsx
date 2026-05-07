@@ -197,6 +197,16 @@ export default async function VisitorPage({
             buildingNames={profileBuildingNames}
           />
 
+          {/* Journey: where they came from + first 5 unique paths. Lets
+              the operator see at a glance "they entered via /diaspora,
+              looked at buildings, then took the wizard" without scanning
+              the full event timeline at the bottom of the page. */}
+          <JourneyCard
+            firstReferrer={profile.firstReferrer}
+            firstLandingPath={profile.firstLandingPath}
+            journey={profile.journey}
+          />
+
           {/* Frictions — the actionable problem signals. Empty state
               hidden so the section disappears when there's nothing to
               show; the dashboard isn't a wall-of-empty-cards. */}
@@ -392,40 +402,95 @@ function BuyerProfileCard({
   listingLabels: Map<string, string>;
   buildingNames: Map<string, string>;
 }) {
+  // Quiz answers — strongest signal because the buyer literally told
+  // us. Use them for the headline summary when present, falling back
+  // to behavior-derived signals only when the quiz wasn't taken.
+  const qa = profile.quizAnswers;
   const lines: string[] = [];
-  if (profile.dominantRooms) {
-    lines.push(`${profile.dominantRooms}-комн`);
-  }
-  if (profile.priceBandTjs) {
-    const { min, max } = profile.priceBandTjs;
-    if (min != null && max != null) lines.push(`бюджет ${fmtTjs(min)}–${fmtTjs(max)} TJS`);
-    else if (max != null) lines.push(`до ${fmtTjs(max)} TJS`);
-    else if (min != null) lines.push(`от ${fmtTjs(min)} TJS`);
-  }
-  if (profile.districts.length > 0) {
-    // Render Russian names (e.g. "Гулистон") instead of slugs ("gulistan").
-    const named = profile.districts
-      .slice(0, 3)
-      .map((slug) => districtNames.get(slug) ?? slug);
-    lines.push(`районы: ${named.join(', ')}`);
-  }
-  if (profile.finishings.length > 0) {
-    const fin = profile.finishings.slice(0, 2).map((f) => FINISHING_LABEL[f] ?? f);
-    lines.push(`отделка: ${fin.join(', ')}`);
-  }
-  if (profile.stages.length > 0) {
-    const st = profile.stages.slice(0, 2).map((s) => STAGE_LABEL[s] ?? s);
-    lines.push(`стадия: ${st.join(', ')}`);
+  if (qa) {
+    if (qa.rooms.length > 0) {
+      const cleaned = qa.rooms.filter((r) => r !== 'any');
+      lines.push(cleaned.length > 0 ? `${cleaned.join(' или ')}-комн` : 'комнат: не важно');
+    }
+    if (qa.budgetMode === 'lump_sum' && qa.budgetTjs != null) {
+      lines.push(`до ${fmtTjs(qa.budgetTjs)} TJS наличными`);
+    } else if (qa.budgetMode === 'installment' && qa.maxMonthlyTjs != null) {
+      lines.push(`до ${fmtTjs(qa.maxMonthlyTjs)} TJS / мес в рассрочку`);
+    }
+    if (qa.districts.length > 0) {
+      const named = qa.districts.slice(0, 3).map((s) => districtNames.get(s) ?? s);
+      lines.push(`районы: ${named.join(', ')}`);
+    }
+    if (qa.finishings.length > 0) {
+      const cleaned = qa.finishings.filter((f) => f !== 'any');
+      if (cleaned.length > 0) {
+        lines.push(`отделка: ${cleaned.map((f) => FINISHING_LABEL[f] ?? f).join(', ')}`);
+      }
+    }
+    if (qa.timing) {
+      const TIMING_LABEL: Record<string, string> = {
+        now: 'въехать сейчас',
+        soon: 'въехать в 6 мес',
+        later: 'въехать в 1–2 года',
+        any: 'сроки не важны',
+      };
+      lines.push(TIMING_LABEL[qa.timing] ?? qa.timing);
+    }
+  } else {
+    // Fallback: derived from search/save behavior.
+    if (profile.dominantRooms) lines.push(`${profile.dominantRooms}-комн`);
+    if (profile.priceBandTjs) {
+      const { min, max } = profile.priceBandTjs;
+      if (min != null && max != null) lines.push(`бюджет ${fmtTjs(min)}–${fmtTjs(max)} TJS`);
+      else if (max != null) lines.push(`до ${fmtTjs(max)} TJS`);
+      else if (min != null) lines.push(`от ${fmtTjs(min)} TJS`);
+    }
+    if (profile.districts.length > 0) {
+      const named = profile.districts
+        .slice(0, 3)
+        .map((slug) => districtNames.get(slug) ?? slug);
+      lines.push(`районы: ${named.join(', ')}`);
+    }
+    if (profile.finishings.length > 0) {
+      const fin = profile.finishings.slice(0, 2).map((f) => FINISHING_LABEL[f] ?? f);
+      lines.push(`отделка: ${fin.join(', ')}`);
+    }
+    if (profile.stages.length > 0) {
+      const st = profile.stages.slice(0, 2).map((s) => STAGE_LABEL[s] ?? s);
+      lines.push(`стадия: ${st.join(', ')}`);
+    }
   }
   const summary = lines.length > 0
     ? lines.join(' · ')
     : 'Покупатель только смотрит — фильтры пока не использовал.';
+  const summarySource: 'quiz' | 'behavior' | 'none' = qa
+    ? 'quiz'
+    : lines.length > 0
+      ? 'behavior'
+      : 'none';
 
   return (
     <AppCard>
       <AppCardContent>
         <div className="flex flex-col gap-3">
-          <h2 className="text-h2 font-semibold text-stone-900">Что они ищут</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-h2 font-semibold text-stone-900">Что они ищут</h2>
+            {summarySource === 'quiz' ? (
+              <span
+                className="inline-flex items-center gap-1 rounded-sm bg-[color:var(--color-fairness-great)]/10 px-2 py-0.5 text-caption font-medium text-[color:var(--color-fairness-great)]"
+                title="Прошли мастер-подбора /pomoshch-vybora — это явные ответы покупателя, а не наша догадка по поведению"
+              >
+                ✓ Из мастер-подбора{qa && !qa.completed ? ' (не до конца)' : ''}
+              </span>
+            ) : summarySource === 'behavior' ? (
+              <span
+                className="inline-flex items-center gap-1 rounded-sm bg-stone-100 px-2 py-0.5 text-caption font-medium text-stone-600"
+                title="Выведено из поведения: фильтров, кликов, сохранений. Менее точно, чем явные ответы из мастер-подбора."
+              >
+                ~ По поведению
+              </span>
+            ) : null}
+          </div>
           <p className="text-body text-stone-800">{summary}</p>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <Stat label="Просмотров страниц" value={profile.pageViewCount} />
@@ -458,6 +523,93 @@ function BuyerProfileCard({
               </div>
             </div>
           ) : null}
+        </div>
+      </AppCardContent>
+    </AppCard>
+  );
+}
+
+/**
+ * Journey card — first-touch (referrer + landing) + first 5 unique
+ * paths in chronological order. Reads as: "Came in from <referrer>
+ * to <landing> · then walked: A → B → C". Empty state shows nothing
+ * (the section is hidden) — no point cluttering the page when the
+ * visitor has zero events.
+ */
+function JourneyCard({
+  firstReferrer,
+  firstLandingPath,
+  journey,
+}: {
+  firstReferrer: string | null;
+  firstLandingPath: string | null;
+  journey: string[];
+}) {
+  if (!firstLandingPath && journey.length === 0) return null;
+  const PATH_LABEL: Record<string, string> = {
+    '/': 'Главная',
+    '/novostroyki': 'Новостройки',
+    '/kvartiry': 'Квартиры',
+    '/zhk/*': 'Карточка ЖК',
+    '/kvartira/*': 'Карточка квартиры',
+    '/diaspora': 'Я за границей',
+    '/pomoshch-vybora': 'Мастер-подбор',
+    '/izbrannoe': 'Избранное',
+    '/tsentr-pomoshchi': 'Центр помощи',
+    '/voyti': 'Вход',
+    '/post': 'Разместить',
+  };
+  const labelFor = (p: string): string => PATH_LABEL[p] ?? p;
+  // Strip the bot's own protocol/host/query from the displayed referrer
+  // so it reads as "google.com" instead of "https://www.google.com/...".
+  const referrerHost = (() => {
+    if (!firstReferrer) return null;
+    try {
+      const u = new URL(firstReferrer);
+      return u.host.replace(/^www\./, '');
+    } catch {
+      return firstReferrer.slice(0, 40);
+    }
+  })();
+  return (
+    <AppCard>
+      <AppCardContent>
+        <div className="flex flex-col gap-3">
+          <h2 className="text-h2 font-semibold text-stone-900">Откуда и куда</h2>
+          <div className="flex flex-col gap-1.5 text-meta text-stone-700">
+            {firstLandingPath ? (
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-caption font-medium text-stone-500">Зашли:</span>
+                <span className="font-medium text-stone-900">
+                  {labelFor(firstLandingPath)}
+                </span>
+                {referrerHost ? (
+                  <span className="text-caption text-stone-500">
+                    из <span className="font-medium">{referrerHost}</span>
+                  </span>
+                ) : (
+                  <span className="text-caption text-stone-500">прямой заход</span>
+                )}
+              </div>
+            ) : null}
+            {journey.length > 0 ? (
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-caption font-medium text-stone-500">Путь:</span>
+                <span className="text-stone-900">
+                  {journey.map((p, i) => (
+                    <span key={`${p}-${i}`}>
+                      {i > 0 ? (
+                        <span className="mx-1.5 text-stone-400" aria-hidden>
+                          →
+                        </span>
+                      ) : null}
+                      {labelFor(p)}
+                    </span>
+                  ))}
+                </span>
+              </div>
+            ) : null}
+          </div>
         </div>
       </AppCardContent>
     </AppCard>

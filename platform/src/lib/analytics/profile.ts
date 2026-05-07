@@ -20,6 +20,7 @@ interface EventRow {
   event_type: string;
   properties: Record<string, unknown>;
   url: string | null;
+  referrer: string | null;
   occurred_at: string;
   user_id: string | null;
 }
@@ -51,6 +52,34 @@ interface ContactRequestRow {
   created_at: string;
 }
 
+/**
+ * Explicit answers from /pomoshch-vybora (the 2-min wizard). When the
+ * visitor takes the quiz, these are the strongest signal we have — the
+ * buyer literally tells us what they want. Each field is null if the
+ * visitor never reached that step. If the visitor re-took the quiz,
+ * we keep the LATEST answer per step.
+ */
+export interface QuizAnswers {
+  /** District slugs they picked on step 1. */
+  districts: string[];
+  /** Step 2: lump-sum vs installment-monthly mode. */
+  budgetMode: 'lump_sum' | 'installment' | null;
+  /** Step 2: total-price ceiling in TJS (when budgetMode='lump_sum'). */
+  budgetTjs: number | null;
+  /** Step 2: monthly-payment ceiling in TJS (when budgetMode='installment'). */
+  maxMonthlyTjs: number | null;
+  /** Step 3: rooms picked. */
+  rooms: string[];
+  /** Step 4: finishing types picked. */
+  finishings: string[];
+  /** Step 5: timing answer. 'now' / 'soon' / 'later' / 'any'. */
+  timing: string | null;
+  /** Did the visitor finish the wizard or drop mid-flow? */
+  completed: boolean;
+  /** ISO timestamp of the most recent quiz interaction. */
+  lastUpdatedAt: string | null;
+}
+
 export interface BuyerProfile {
   /** Most-asked-for room count (e.g. "2"). null if no preference visible. */
   dominantRooms: string | null;
@@ -75,6 +104,16 @@ export interface BuyerProfile {
   contactClickCount: number;
   /** Computed lead temperature — see WARM/HOT thresholds in deriveLeadTemp. */
   leadTemp: 'cold' | 'warm' | 'hot';
+  /** Explicit wizard answers — null if the visitor never started the quiz. */
+  quizAnswers: QuizAnswers | null;
+  /** First page they landed on (e.g. "/diaspora", "/zhk/vahdat-park"). */
+  firstLandingPath: string | null;
+  /** First external referrer (e.g. "https://t.me/some_channel", "https://google.com"). */
+  firstReferrer: string | null;
+  /** Up to first 5 distinct paths they visited, in time order. Tells the
+   *  founder the journey: "/diaspora → /novostroyki → /zhk/X → wizard →
+   *  /izbrannoe". */
+  journey: string[];
 }
 
 /**
@@ -113,7 +152,7 @@ export async function getVisitorBundle(anonId: string): Promise<VisitorBundle> {
 
   const eventsRes = await supabase
     .from('events')
-    .select('id, event_type, properties, url, occurred_at, user_id')
+    .select('id, event_type, properties, url, referrer, occurred_at, user_id')
     .eq('anon_id', anonId)
     .order('occurred_at', { ascending: false })
     .limit(500);
@@ -208,6 +247,31 @@ export function deriveBuyerProfile(bundle: VisitorBundle): BuyerProfile {
   const listingSlugCounts = new Map<string, number>();
   const buildingSlugCounts = new Map<string, number>();
 
+  // Quiz answers — start empty; populated as we walk the events. Each
+  // step's latest answer wins (handles re-takes).
+  let quizSawAnyEvent = false;
+  let quizCompleted = false;
+  let quizLastUpdatedAt: string | null = null;
+  const qa: QuizAnswers = {
+    districts: [],
+    budgetMode: null,
+    budgetTjs: null,
+    maxMonthlyTjs: null,
+    rooms: [],
+    finishings: [],
+    timing: null,
+    completed: false,
+    lastUpdatedAt: null,
+  };
+
+  // Journey — first-touch + first 5 distinct paths in chronological
+  // order. The events bundle is ordered DESC by occurred_at, so we
+  // walk it reversed for chronological traversal.
+  let firstLandingPath: string | null = null;
+  let firstReferrer: string | null = null;
+  const journeyPaths: string[] = [];
+  const journeyPathsSeen = new Set<string>();
+
   function incCsv(map: Map<string, number>, value: unknown) {
     if (typeof value !== 'string' || !value.trim()) return;
     for (const v of value.split(',').map((s) => s.trim()).filter(Boolean)) {
@@ -237,10 +301,31 @@ export function deriveBuyerProfile(bundle: VisitorBundle): BuyerProfile {
     if (hi != null) priceMax = priceMax == null ? hi : Math.min(priceMax, hi);
   }
 
-  for (const e of bundle.events) {
+  // Walk in chronological order so journey + first-touch are correct.
+  // bundle.events is DESC-ordered (newest first); reverse for the loop.
+  const eventsAsc = [...bundle.events].reverse();
+  for (const e of eventsAsc) {
     if (e.event_type === 'page_view') {
       pageViewCount++;
-      const path = (e.properties as { pathname?: string }).pathname ?? '';
+      const path = ((e.properties as { pathname?: string }).pathname ?? e.url ?? '').replace(/\?.*$/, '');
+      // First-touch: first page_view captures landing path + referrer.
+      if (firstLandingPath == null && path) {
+        firstLandingPath = stripLocale(path);
+        // Capture only EXTERNAL referrers (something not on our own
+        // origin); same-origin referrers are just nav noise.
+        const ref = e.referrer;
+        if (ref && !ref.includes('localhost') && !/жк\.tj|жк\.tj/.test(ref)) {
+          firstReferrer = ref;
+        }
+      }
+      // Journey: first 5 unique normalised paths, in arrival order.
+      if (path && journeyPaths.length < 5) {
+        const norm = normaliseJourneyPath(path);
+        if (!journeyPathsSeen.has(norm)) {
+          journeyPathsSeen.add(norm);
+          journeyPaths.push(norm);
+        }
+      }
       const m = path.match(/\/(kvartira|zhk)\/([^/?#]+)/);
       if (m) {
         const slug = m[2]!;
@@ -264,8 +349,43 @@ export function deriveBuyerProfile(bundle: VisitorBundle): BuyerProfile {
       if (slug) buildingSlugCounts.set(slug, (buildingSlugCounts.get(slug) ?? 0) + 1);
     } else if (e.event_type === 'contact_button_click') {
       contactClickCount++;
+    } else if (e.event_type === 'quiz_started' || e.event_type === 'quiz_step_answered' || e.event_type === 'quiz_completed' || e.event_type === 'quiz_abandoned') {
+      quizSawAnyEvent = true;
+      quizLastUpdatedAt = e.occurred_at;
+      if (e.event_type === 'quiz_completed') quizCompleted = true;
+      if (e.event_type === 'quiz_step_answered') {
+        const stepKey = (e.properties as { step_key?: string }).step_key;
+        const summary = (e.properties as { answer_summary?: Record<string, unknown> }).answer_summary;
+        if (summary && typeof summary === 'object') {
+          if (stepKey === 'districts' && Array.isArray((summary as { districts?: unknown }).districts)) {
+            qa.districts = ((summary as { districts: unknown[] }).districts).filter(
+              (v): v is string => typeof v === 'string',
+            );
+          } else if (stepKey === 'budget') {
+            const mode = (summary as { mode?: string }).mode;
+            if (mode === 'lump_sum' || mode === 'installment') qa.budgetMode = mode;
+            const b = numberOrNull((summary as { budget?: unknown }).budget);
+            if (b != null) qa.budgetTjs = b;
+            const mm = numberOrNull((summary as { max_monthly?: unknown }).max_monthly);
+            if (mm != null) qa.maxMonthlyTjs = mm;
+          } else if (stepKey === 'rooms' && Array.isArray((summary as { rooms?: unknown }).rooms)) {
+            qa.rooms = ((summary as { rooms: unknown[] }).rooms).filter(
+              (v): v is string => typeof v === 'string',
+            );
+          } else if (stepKey === 'finishing' && Array.isArray((summary as { finishing?: unknown }).finishing)) {
+            qa.finishings = ((summary as { finishing: unknown[] }).finishing).filter(
+              (v): v is string => typeof v === 'string',
+            );
+          } else if (stepKey === 'timing') {
+            const t = (summary as { timing?: string | null }).timing;
+            if (typeof t === 'string') qa.timing = t;
+          }
+        }
+      }
     }
   }
+  qa.completed = quizCompleted;
+  qa.lastUpdatedAt = quizLastUpdatedAt;
   for (const s of bundle.savedSearches) {
     ingestFilters(s.filters);
   }
@@ -292,7 +412,27 @@ export function deriveBuyerProfile(bundle: VisitorBundle): BuyerProfile {
       pageViewCount,
       contactClickCount,
     }),
+    quizAnswers: quizSawAnyEvent ? qa : null,
+    firstLandingPath,
+    firstReferrer,
+    journey: journeyPaths,
   };
+}
+
+/** Strip the locale prefix ("/ru/...") so journey paths read as
+ *  "/zhk/vahdat-park" instead of "/ru/zhk/vahdat-park". */
+function stripLocale(path: string): string {
+  return path.replace(/^\/[a-z]{2}(?=\/|$)/, '') || '/';
+}
+
+/** Collapse dynamic slugs to their parent path so the journey shows
+ *  "viewed a /zhk page" rather than five copies of distinct slugs.
+ *  /zhk/vahdat-park → /zhk/*; /kvartira/444401 → /kvartira/*. */
+function normaliseJourneyPath(path: string): string {
+  const stripped = stripLocale(path);
+  if (/^\/zhk\/[^/]+/.test(stripped)) return '/zhk/*';
+  if (/^\/kvartira\/[^/]+/.test(stripped)) return '/kvartira/*';
+  return stripped;
 }
 
 /**
