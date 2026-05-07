@@ -40,3 +40,9 @@ export { IllustrationSupermarket } from './IllustrationSupermarket';
 export { IllustrationTransit } from './IllustrationTransit';
 export { IllustrationPark } from './IllustrationPark';
 export { IllustrationPharmacy } from './IllustrationPharmacy';
+
+// /post seller-pitch illustrations — the three-step process
+// (написать → ответить на вопросы → опубликовано).
+export { IllustrationChatBubble } from './IllustrationChatBubble';
+export { IllustrationClipboard } from './IllustrationClipboard';
+export { IllustrationHouseSparkle } from './IllustrationHouseSparkle';

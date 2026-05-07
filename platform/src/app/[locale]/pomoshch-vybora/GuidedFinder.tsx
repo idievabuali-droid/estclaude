@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { ChevronLeft, MapPin, Coins, Bed, Brush, Calendar } from 'lucide-react';
-import { X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
-import { AppButton, AppCard, AppCardContent } from '@/components/primitives';
+import { AppButton } from '@/components/primitives';
 import { LocationSearch } from '@/components/blocks';
 import { mockDistricts } from '@/lib/mock';
 import { cn } from '@/lib/utils';
@@ -48,12 +47,38 @@ type PickedAnchor =
   | { kind: 'building'; slug: string; label: string }
   | { kind: 'developer'; id: string; label: string };
 
+/** Each step now carries a subhead alongside the title — the wizard's
+ *  Typeform/Cal.com feel comes from one decision at a time presented
+ *  with a clear question (display serif H1) AND a one-line context
+ *  subhead beneath it (muted body). The icon-circle that used to lead
+ *  each step has been dropped — it competed with the question's
+ *  visual weight and added no information the title didn't carry. */
 const STEPS = [
-  { key: 'districts' as const, title: 'Какие районы вам подходят?', Icon: MapPin },
-  { key: 'budget' as const, title: 'Какой бюджет вы рассматриваете?', Icon: Coins },
-  { key: 'rooms' as const, title: 'Сколько комнат нужно?', Icon: Bed },
-  { key: 'finishing' as const, title: 'Какая отделка вам подходит?', Icon: Brush },
-  { key: 'timing' as const, title: 'Когда хотите въехать?', Icon: Calendar },
+  {
+    key: 'districts' as const,
+    title: 'Какие районы вам подходят?',
+    subhead: 'Знаете конкретное место — школу, ЖК, район? Введите название.',
+  },
+  {
+    key: 'budget' as const,
+    title: 'Какой бюджет вы рассматриваете?',
+    subhead: 'Цена сразу или ежемесячный платёж — ответьте, как вам удобнее.',
+  },
+  {
+    key: 'rooms' as const,
+    title: 'Сколько комнат нужно?',
+    subhead: 'Можно выбрать несколько — например, 2 или 3 комнаты.',
+  },
+  {
+    key: 'finishing' as const,
+    title: 'Какая отделка вам подходит?',
+    subhead: 'Готовое жильё или место под ваш ремонт.',
+  },
+  {
+    key: 'timing' as const,
+    title: 'Когда хотите въехать?',
+    subhead: 'От готовых квартир до проектов на котловане.',
+  },
 ];
 
 // Budget ceiling presets — start from 250 000 so Faridun's 200k
@@ -221,50 +246,78 @@ export function GuidedFinder() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* Step counter + progress */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          {stepIdx > 0 ? (
-            <button
-              type="button"
-              onClick={() => setStepIdx((i) => i - 1)}
-              className="inline-flex items-center gap-1 text-meta font-medium text-stone-700 hover:text-terracotta-600"
+    <div className="flex flex-col gap-8 md:gap-10">
+      {/* ─── PROGRESS NODES ──────────────────────────────────────
+          5 connected circles per the senior-design prescription:
+          completed = filled green with checkmark, current = filled
+          terracotta with center dot, future = outlined grey with
+          step number. Bar segments between nodes match the same
+          three-state colour rule.
+          Replaces the prior single-line bar (one colour, no nodes)
+          which gave no signal about how far along the buyer was. */}
+      <ol className="flex items-center px-4 md:px-0">
+        {STEPS.map((_, i) => {
+          const done = i < stepIdx;
+          const active = i === stepIdx;
+          const nodeClass = done
+            ? 'bg-[color:var(--color-fairness-great)] text-white'
+            : active
+              ? 'bg-terracotta-600 text-white'
+              : 'border border-stone-300 bg-white text-stone-400';
+          const isLastNode = i === STEPS.length - 1;
+          // Bar AFTER this node, green if buyer is past this node.
+          const barClass = i < stepIdx
+            ? 'bg-[color:var(--color-fairness-great)]'
+            : 'bg-stone-200';
+          return (
+            <li
+              key={i}
+              className={cn('flex items-center', isLastNode ? '' : 'flex-1')}
             >
-              <ChevronLeft className="size-4" /> Назад
-            </button>
-          ) : (
-            <span />
-          )}
-          <span className="text-caption tabular-nums text-stone-500">
+              <div
+                className={cn(
+                  'relative flex size-7 shrink-0 items-center justify-center rounded-full transition-colors',
+                  nodeClass,
+                )}
+                aria-hidden
+              >
+                {done ? (
+                  <Check className="size-3.5" />
+                ) : active ? (
+                  <span className="size-1.5 rounded-full bg-white" />
+                ) : (
+                  <span className="text-caption font-semibold tabular-nums">
+                    {i + 1}
+                  </span>
+                )}
+              </div>
+              {!isLastNode ? (
+                <div aria-hidden className={cn('h-0.5 flex-1', barClass)} />
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+
+      {/* ─── QUESTION ───────────────────────────────────────────── */}
+      <div className="flex flex-col gap-6 px-4 md:px-0">
+        <div className="flex flex-col gap-3">
+          <span className="text-caption font-medium uppercase tracking-widest text-stone-500 tabular-nums">
             Вопрос {stepIdx + 1} из {STEPS.length}
           </span>
+          <h1
+            className="text-[28px] font-semibold leading-[1.15] text-stone-900 md:text-display"
+            style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+          >
+            {step.title}
+          </h1>
+          <p className="text-meta text-stone-600 md:text-body">{step.subhead}</p>
         </div>
-        <div className="flex h-1 w-full overflow-hidden rounded-full bg-stone-200">
-          {STEPS.map((_, i) => (
-            <div
-              key={i}
-              className={cn(
-                'h-full flex-1',
-                i <= stepIdx ? 'bg-terracotta-600' : 'bg-transparent',
-                i > 0 ? 'ml-0.5' : '',
-              )}
-            />
-          ))}
-        </div>
-      </div>
 
-      <AppCard>
-        <AppCardContent>
-          <div className="flex flex-col gap-5">
-            <div className="flex items-start gap-3">
-              <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-terracotta-100 text-terracotta-700">
-                <step.Icon className="size-5" />
-              </span>
-              <h1 className="text-h2 font-semibold text-stone-900">{step.title}</h1>
-            </div>
-
-            {step.key === 'districts' ? (
+        {/* Step content — preserved logic, just the wrapper shell
+            (icon-circle + h2) was stripped above. */}
+        <div className="flex flex-col gap-5">
+          {step.key === 'districts' ? (
               <div className="flex flex-col gap-4">
                 {/* LocationSearch as the richer location input —
                     leverages the multi-source search. `onPick` keeps
@@ -391,24 +444,52 @@ export function GuidedFinder() {
               />
             ) : null}
           </div>
-        </AppCardContent>
-      </AppCard>
 
-      <div className="flex flex-col gap-2">
-        <AppButton variant="primary" size="lg" disabled={!canAdvance} onClick={next}>
-          {isLast ? 'Показать подходящие варианты' : 'Далее'}
-        </AppButton>
-        {step.key === 'districts' ? (
-          <button
-            type="button"
-            onClick={() => setStepIdx((i) => i + 1)}
-            className="text-meta font-medium text-stone-500 hover:text-terracotta-600"
-          >
-            Пропустить — все районы
-          </button>
-        ) : null}
+          {/* ─── BOTTOM ACTIONS ──────────────────────────────────
+              Two buttons in a row per the prescription: outlined
+              "Назад" left, terracotta-filled "Далее" right. On the
+              first step "Назад" is hidden so "Далее" takes the full
+              width as a single decisive primary. On step 1 only,
+              the small "Пропустить — все районы" text-link sits
+              below as a quiet escape. */}
+          <div className="flex flex-col gap-3 pt-2">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-stretch">
+              {stepIdx > 0 ? (
+                <AppButton
+                  variant="secondary"
+                  size="lg"
+                  onClick={() => setStepIdx((i) => i - 1)}
+                  className="sm:flex-1"
+                >
+                  Назад
+                </AppButton>
+              ) : null}
+              <AppButton
+                variant="primary"
+                size="lg"
+                disabled={!canAdvance}
+                onClick={next}
+                // Terracotta override — wizard primary keeps the
+                // brand-warm color (deliberate exception to the
+                // platform's stone-900 default, same as /voyti's
+                // Telegram primary). The wizard is a brand moment.
+                className="bg-terracotta-600 hover:bg-terracotta-700 active:bg-terracotta-800 sm:flex-[2]"
+              >
+                {isLast ? 'Показать подходящие варианты' : 'Далее'}
+              </AppButton>
+            </div>
+            {step.key === 'districts' ? (
+              <button
+                type="button"
+                onClick={() => setStepIdx((i) => i + 1)}
+                className="self-center text-meta font-medium text-stone-500 hover:text-terracotta-700 hover:underline"
+              >
+                Пропустить — все районы
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
-    </div>
   );
 }
 
