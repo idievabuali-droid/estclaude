@@ -18,7 +18,10 @@ export interface MessagingPopoverButtonProps {
    *     Used when an even-higher-intent CTA (e.g. "Запросить визит") is
    *     the primary on the same page and Сообщения should read as a
    *     peer to "Позвонить" rather than competing with the primary.
-   *   primary-mobile: mobile sticky-bar primary slot (labeled, flex-1)
+   *   primary-mobile: mobile sticky-bar primary slot (labeled,
+   *     content-sized so a price-anchored bar can render
+   *     [price | button] without the button stretching across the
+   *     full row).
    *   icon-stack: mobile sticky-bar icon-with-label slot (compact) */
   variant: 'primary-lg' | 'secondary-lg' | 'primary-mobile' | 'icon-stack';
   /** Override the trigger label. Default "Сообщения". /zhk uses
@@ -86,7 +89,7 @@ export function MessagingPopoverButton({
     }
     if (variant === 'primary-mobile') {
       return (
-        <AppButton variant="primary" size="md" className="w-full" onClick={() => setOpen((v) => !v)}>
+        <AppButton variant="primary" size="md" onClick={() => setOpen((v) => !v)}>
           <TriggerIcon className="size-4" /> {triggerLabel}
         </AppButton>
       );
@@ -112,7 +115,7 @@ export function MessagingPopoverButton({
       : 'top-full mt-2';
 
   return (
-    <div ref={wrapRef} className={cn('relative inline-flex', variant === 'primary-mobile' ? 'flex-1 min-w-0' : '', className)}>
+    <div ref={wrapRef} className={cn('relative inline-flex', className)}>
       {trigger}
       {open ? (
         <div
