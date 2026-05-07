@@ -8,8 +8,14 @@ import { buildQuery, csvSet, type FilterParams } from './filter-state';
 export interface MultiSelectOption {
   value: string;
   label: string;
-  /** Optional emoji prefix — used by the "Что рядом" category. */
+  /** Optional emoji prefix — legacy "Что рядом" usage. New code
+   *  should pass `Icon` instead so the visual vocabulary stays in
+   *  the monoline illustration system. */
   emoji?: string;
+  /** Optional monoline illustration component for this option. When
+   *  set, replaces emoji. Sized at size-5 inside the chip — small
+   *  enough not to crowd the label. */
+  Icon?: React.ComponentType<{ className?: string }>;
 }
 
 export interface MultiSelectChipProps {
@@ -124,7 +130,14 @@ export function MultiSelectChip({
                   : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-100')
               }
             >
-              {opt.emoji ? (
+              {opt.Icon ? (
+                <opt.Icon
+                  className={
+                    'size-5 ' +
+                    (active ? 'text-terracotta-700' : 'text-stone-500')
+                  }
+                />
+              ) : opt.emoji ? (
                 <span className="mr-1" aria-hidden>
                   {opt.emoji}
                 </span>

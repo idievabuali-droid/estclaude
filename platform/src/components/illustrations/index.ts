@@ -27,3 +27,16 @@ export { IllustrationVideoCall } from './IllustrationVideoCall';
 export { IllustrationDocuments } from './IllustrationDocuments';
 export { IllustrationWorldClock } from './IllustrationWorldClock';
 export { IllustrationHouseHeart } from './IllustrationHouseHeart';
+
+// POI illustrations — used in "Что рядом" filter row + nearby-POI
+// card grids. Replace the previous emoji pictograms (🕌 🏫 🏥 etc.)
+// with a unified monoline set so the brand vocabulary stays
+// consistent across the platform.
+export { IllustrationMosque } from './IllustrationMosque';
+export { IllustrationSchool } from './IllustrationSchool';
+export { IllustrationKindergarten } from './IllustrationKindergarten';
+export { IllustrationHospital } from './IllustrationHospital';
+export { IllustrationSupermarket } from './IllustrationSupermarket';
+export { IllustrationTransit } from './IllustrationTransit';
+export { IllustrationPark } from './IllustrationPark';
+export { IllustrationPharmacy } from './IllustrationPharmacy';

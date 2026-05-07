@@ -76,3 +76,4 @@ export type { MessagingPopoverButtonProps } from './MessagingPopoverButton';
 export { RoomTypeFilter } from './RoomTypeFilter';
 export type { RoomTypeFilterProps } from './RoomTypeFilter';
 export { HomeSubscribeButton } from './HomeSubscribeButton';
+export { FilterGroup } from './FilterGroup';

@@ -15,6 +15,7 @@ import { PriceChip } from './PriceChip';
 import { SizeChip } from './SizeChip';
 import { MultiSelectChip } from './MultiSelectChip';
 import { MonthlyChip } from './MonthlyChip';
+import { KvartiryFilterRail } from './FilterRail';
 
 // Source filter (developer/owner/intermediary) hidden in V1 — every
 // listing currently comes from the founder, so the filter has nothing
@@ -137,11 +138,12 @@ export default async function KvartiryPage({
           filtered URL. Skips bare /kvartiry visits (page_view covers
           those). */}
       <SearchTracker page="kvartiry" filters={sp} resultCount={filtered.length} />
+
+      {/* ─── PAGE HEADER ────────────────────────────────────────
+          Breadcrumb (when scoped) + serif H1 + LocationSearch full-
+          width above the two-column body. */}
       <section className="border-b border-stone-200 bg-white">
-        <AppContainer className="flex flex-col gap-4 py-5">
-          {/* Breadcrumb back to the building detail page — only shown
-              when the page is scoped to a single building. Lets buyers
-              return to the project context after browsing apartments. */}
+        <AppContainer className="flex flex-col gap-4 py-6 md:py-8">
           {scopedBuilding ? (
             <Link
               href={`/zhk/${scopedBuilding.slug}`}
@@ -154,7 +156,7 @@ export default async function KvartiryPage({
 
           <div className="flex flex-col gap-1">
             <h1
-              className="text-h1 font-semibold text-stone-900"
+              className="text-h1 font-semibold text-stone-900 md:text-display"
               style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
             >
               {scopedBuilding
@@ -163,18 +165,8 @@ export default async function KvartiryPage({
                   ? `Рядом с «${sp.near_label}»`
                   : t('apartments')}
             </h1>
-            <p className="text-meta text-stone-500 tabular-nums">
-              {filtered.length}{' '}
-              {pluralRu(filtered.length, ['объявление', 'объявления', 'объявлений'])}
-              {sp.near_label && nearRadius
-                ? ` · в радиусе ${(nearRadius / 1000).toFixed(1)} км`
-                : ''}
-            </p>
           </div>
 
-          {/* LocationSearch — same pattern as /novostroyki. Hidden when
-              the page is scoped to a building (the buyer is already
-              inside that project's units, location filter is moot). */}
           {!scopedBuilding ? (
             <div className="flex flex-col gap-2">
               <LocationSearch
@@ -193,105 +185,114 @@ export default async function KvartiryPage({
               ) : null}
             </div>
           ) : null}
+        </AppContainer>
+      </section>
 
-          {/* Cian-style category chip bar. One chip per filter category
-              (Комнат / Цена / Отделка); each chip shows its current
-              value summary inline and opens a bottom sheet with the
-              options + an Apply button. Building scope is preserved
-              across applies because each chip rebuilds the URL with
-              the full param set (see PriceChip / MultiSelectChip).
+      {/* ─── BODY: filter rail + content ─────────────────────────
+          Desktop two-column per the senior-design prescription:
+          260px filter rail on the left (with installment-emphasized
+          treatment), content (above-grid header + grid) on the
+          right. Mobile collapses to chip bar above grid. */}
+      <AppContainer>
+        <div className="flex flex-col gap-6 py-6 md:flex-row md:gap-7 md:py-8">
+          <div className="md:sticky md:top-20 md:self-start">
+            <KvartiryFilterRail current={sp} basePath={resetHref} />
+          </div>
 
-              Source filter hidden in V1 — every listing currently
-              comes from the founder so the filter has nothing to
-              filter. Returns when real seller diversity exists. */}
-          <div className="-mx-4 md:-mx-5 lg:-mx-6">
-            <div className="flex items-center gap-2 overflow-x-auto px-4 py-1 md:px-5 lg:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <MultiSelectChip
-                label="Комнат"
-                paramKey="rooms"
-                options={ROOM_FILTERS.map((r) => ({ value: r, label: r }))}
-                current={sp}
-              />
-              <PriceChip current={sp} />
-              <MonthlyChip current={sp} />
-              <SizeChip current={sp} />
-              <MultiSelectChip
-                label="Отделка"
-                paramKey="finishing"
-                options={FINISHING_FILTERS}
-                current={sp}
-              />
+          <div className="flex min-w-0 flex-1 flex-col gap-5">
+            {/* MOBILE chip bar — preserved for <md. */}
+            <div className="-mx-4 md:hidden">
+              <div className="flex items-center gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <MultiSelectChip
+                  label="Комнат"
+                  paramKey="rooms"
+                  options={ROOM_FILTERS.map((r) => ({ value: r, label: r }))}
+                  current={sp}
+                />
+                <PriceChip current={sp} />
+                <MonthlyChip current={sp} />
+                <SizeChip current={sp} />
+                <MultiSelectChip
+                  label="Отделка"
+                  paramKey="finishing"
+                  options={FINISHING_FILTERS}
+                  current={sp}
+                />
+              </div>
+            </div>
+
+            {/* ABOVE-GRID HEADER — count + sort. */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 pb-4">
+              <p className="text-body text-stone-700 tabular-nums">
+                <span className="font-semibold text-stone-900">{filtered.length}</span>{' '}
+                {pluralRu(filtered.length, ['объявление', 'объявления', 'объявлений'])}
+                {sp.near_label && nearRadius
+                  ? ` · в радиусе ${(nearRadius / 1000).toFixed(1)} км`
+                  : ''}
+              </p>
               <SortChip pagePath="/kvartiry" current={sp} />
             </div>
-          </div>
-        </AppContainer>
-      </section>
 
-      <section className="py-6">
-        <AppContainer className="flex flex-col gap-5">
-          {/* Single consolidated subscribe panel. When wizard=1 it
-              ALSO renders the result-count + filter summary headline
-              (so the buyer sees one panel, not two stacked ones).
-              Earlier we had a separate WizardResultBanner above this
-              prompt — buyers reported it as "two places say subscribe
-              to this", confusing. Now it's one card with one CTA. */}
-          {(sp.wizard ||
-            countActiveFiltersK(sp) >= 2 ||
-            filtered.length === 0) &&
-          hasActiveFiltersK(sp) &&
-          !scopedBuilding ? (
-            <SaveSearchPrompt
-              page="kvartiry"
-              filters={sp}
-              noResults={filtered.length === 0}
-              resultCount={sp.wizard ? filtered.length : undefined}
-              filterSummary={
-                sp.wizard ? displayNameFromFilters('kvartiry', sp) : undefined
-              }
-            />
-          ) : null}
-          {filtered.length <= 1 && countActiveFiltersK(sp) >= 2 ? (
-            <FilterRelaxSuggestion
-              pagePath="/kvartiry"
-              currentParams={sp}
-              resultCount={filtered.length}
-              relaxOptions={await buildRelaxOptionsKvartiryWithCounts(sp, scopedBuilding?.id)}
-            />
-          ) : null}
-          {filtered.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 rounded-md border border-stone-200 bg-white p-7 text-center">
-              <p className="text-h3 font-semibold text-stone-900">Ничего не найдено</p>
-              <p className="text-meta text-stone-500">
-                Попробуйте изменить фильтры или сбросить их.
-              </p>
-              <Link href={resetHref}>
-                <AppButton variant="secondary">Сбросить фильтры</AppButton>
-              </Link>
+            <div className="flex flex-col gap-5">
+              {(sp.wizard ||
+                countActiveFiltersK(sp) >= 2 ||
+                filtered.length === 0) &&
+              hasActiveFiltersK(sp) &&
+              !scopedBuilding ? (
+                <SaveSearchPrompt
+                  page="kvartiry"
+                  filters={sp}
+                  noResults={filtered.length === 0}
+                  resultCount={sp.wizard ? filtered.length : undefined}
+                  filterSummary={
+                    sp.wizard ? displayNameFromFilters('kvartiry', sp) : undefined
+                  }
+                />
+              ) : null}
+              {filtered.length <= 1 && countActiveFiltersK(sp) >= 2 ? (
+                <FilterRelaxSuggestion
+                  pagePath="/kvartiry"
+                  currentParams={sp}
+                  resultCount={filtered.length}
+                  relaxOptions={await buildRelaxOptionsKvartiryWithCounts(sp, scopedBuilding?.id)}
+                />
+              ) : null}
+              {filtered.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 rounded-md border border-stone-200 bg-white p-7 text-center">
+                  <p className="text-h3 font-semibold text-stone-900">Ничего не найдено</p>
+                  <p className="text-meta text-stone-500">
+                    Попробуйте изменить фильтры или сбросить их.
+                  </p>
+                  <Link href={resetHref}>
+                    <AppButton variant="secondary">Сбросить фильтры</AppButton>
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+                  {filtered.map((l) => {
+                    const building = buildingMap.get(l.building_id);
+                    if (!building) return null;
+                    const dev = developerMap.get(building.developer_id);
+                    const benchmark = benchmarkMap.get(building.district_id);
+                    return (
+                      <ListingCard
+                        key={l.id}
+                        listing={l}
+                        building={building}
+                        developerVerified={dev?.is_verified ?? false}
+                        currency={currency}
+                        rates={rates}
+                        districtMedianPerM2={benchmark ? Number(benchmark.median_per_m2_dirams) : null}
+                        districtSampleSize={benchmark?.sample_size ?? 0}
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
-              {filtered.map((l) => {
-                const building = buildingMap.get(l.building_id);
-                if (!building) return null;
-                const dev = developerMap.get(building.developer_id);
-                const benchmark = benchmarkMap.get(building.district_id);
-                return (
-                  <ListingCard
-                    key={l.id}
-                    listing={l}
-                    building={building}
-                    developerVerified={dev?.is_verified ?? false}
-                    currency={currency}
-                    rates={rates}
-                    districtMedianPerM2={benchmark ? Number(benchmark.median_per_m2_dirams) : null}
-                    districtSampleSize={benchmark?.sample_size ?? 0}
-                  />
-                );
-              })}
-            </div>
-          )}
-        </AppContainer>
-      </section>
+          </div>
+        </div>
+      </AppContainer>
     </>
   );
 }

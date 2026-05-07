@@ -2,33 +2,35 @@
 
 import { useState } from 'react';
 import { Link } from '@/i18n/navigation';
+import { ArrowUpRight } from 'lucide-react';
 import {
-  ArrowUpRight,
-  Landmark,
-  School,
-  Baby,
-  Hospital,
-  ShoppingBag,
-  Bus,
-  Trees,
-  Pill,
-  type LucideIcon,
-} from 'lucide-react';
+  IllustrationMosque,
+  IllustrationSchool,
+  IllustrationKindergarten,
+  IllustrationHospital,
+  IllustrationSupermarket,
+  IllustrationTransit,
+  IllustrationPark,
+  IllustrationPharmacy,
+} from '@/components/illustrations';
 import { MiniMap, type MiniMapHighlight } from './MiniMap';
 import { POI_LABELS, type PoiCategory } from '@/services/poi';
 
-/** Same Lucide mapping as NearbyPois — keep in sync if categories
- *  evolve. Lucide doesn't ship a Mosque glyph; Landmark is the
- *  closest neutral building-with-spire icon. */
-const POI_ICONS: Record<PoiCategory, LucideIcon> = {
-  mosque: Landmark,
-  school: School,
-  kindergarten: Baby,
-  hospital: Hospital,
-  supermarket: ShoppingBag,
-  transit: Bus,
-  park: Trees,
-  pharmacy: Pill,
+/** Custom monoline POI illustration set — replaces the previous Lucide
+ *  mapping. Lucide didn't ship a real mosque glyph (we used Landmark
+ *  as a neutral building-with-spire fallback) and the rest of the
+ *  Lucide POI icons read as generic; switching to the bespoke set
+ *  keeps the brand visual vocabulary consistent across the platform.
+ *  Same shape contract: <Icon className="size-4" /> renders correctly. */
+const POI_ICONS: Record<PoiCategory, React.ComponentType<{ className?: string }>> = {
+  mosque: IllustrationMosque,
+  school: IllustrationSchool,
+  kindergarten: IllustrationKindergarten,
+  hospital: IllustrationHospital,
+  supermarket: IllustrationSupermarket,
+  transit: IllustrationTransit,
+  park: IllustrationPark,
+  pharmacy: IllustrationPharmacy,
 };
 
 export interface NearbyChipsItem {

@@ -17,6 +17,17 @@ import type { PoiCategory } from '@/services/poi';
 import { buildQuery, type FilterParams } from './filter-state';
 import { PriceChip } from './PriceChip';
 import { MultiSelectChip } from './MultiSelectChip';
+import { NovostroykiFilterRail } from './FilterRail';
+import {
+  IllustrationMosque,
+  IllustrationSchool,
+  IllustrationKindergarten,
+  IllustrationHospital,
+  IllustrationSupermarket,
+  IllustrationTransit,
+  IllustrationPark,
+  IllustrationPharmacy,
+} from '@/components/illustrations';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { getExchangeRates } from '@/services/currency';
 
@@ -46,17 +57,25 @@ const AMENITIES_FILTERS: Array<{ value: string; label: string }> = [
   { value: 'commercial-floor', label: 'Коммерческий этаж' },
 ];
 
-/** "Что рядом" filters — POI categories within 1km walking distance.
- *  Mosque first per Tajik market relevance. */
-const NEARBY_FILTERS: Array<{ value: PoiCategory; label: string; emoji: string }> = [
-  { value: 'mosque', label: 'Мечеть', emoji: '🕌' },
-  { value: 'school', label: 'Школа', emoji: '🏫' },
-  { value: 'kindergarten', label: 'Детский сад', emoji: '👶' },
-  { value: 'supermarket', label: 'Магазин', emoji: '🛒' },
-  { value: 'hospital', label: 'Поликлиника', emoji: '🏥' },
-  { value: 'pharmacy', label: 'Аптека', emoji: '💊' },
-  { value: 'transit', label: 'Транспорт', emoji: '🚌' },
-  { value: 'park', label: 'Парк', emoji: '🌳' },
+/** "Что рядом" mobile chip filters — POI categories within 1km walking
+ *  distance. Mosque first per Tajik market relevance. Each entry pairs
+ *  the POI value with a monoline illustration (replaces the previous
+ *  emoji glyphs that read as inconsistent against the rest of the
+ *  brand vocabulary). The illustration is also used by the
+ *  NovostroykiFilterRail's "Что рядом" group. */
+const NEARBY_FILTERS: Array<{
+  value: PoiCategory;
+  label: string;
+  Icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { value: 'mosque', label: 'Мечеть', Icon: IllustrationMosque },
+  { value: 'school', label: 'Школа', Icon: IllustrationSchool },
+  { value: 'kindergarten', label: 'Детский сад', Icon: IllustrationKindergarten },
+  { value: 'supermarket', label: 'Магазин', Icon: IllustrationSupermarket },
+  { value: 'hospital', label: 'Поликлиника', Icon: IllustrationHospital },
+  { value: 'pharmacy', label: 'Аптека', Icon: IllustrationPharmacy },
+  { value: 'transit', label: 'Транспорт', Icon: IllustrationTransit },
+  { value: 'park', label: 'Парк', Icon: IllustrationPark },
 ];
 
 export default async function NovostroykiPage({
@@ -190,76 +209,28 @@ export default async function NovostroykiPage({
 
   return (
     <>
-      {/* Fire search_run / search_no_results events for analytics. The
-          tracker dedupes via JSON of (filters + count) so React strict
-          mode doesn't double-fire, and skips when no filters are set
-          (a bare /novostroyki visit is a page_view, not a search). */}
+      {/* Fire search_run / search_no_results events for analytics. */}
       <SearchTracker page="novostroyki" filters={sp} resultCount={filtered.length} />
+
+      {/* ─── PAGE HEADER ────────────────────────────────────────
+          H1 + LocationSearch full-width above the two-column body.
+          Mirrors the editorial-luxury voice from the rest of the
+          platform: serif H1 in display size on a generous header
+          band before the dense filter+grid body. */}
       <section className="border-b border-stone-200 bg-white">
-        <AppContainer className="flex flex-col gap-4 py-5">
-          <div className="flex items-end justify-between gap-3">
-            <div className="flex min-w-0 flex-col gap-1">
-              <h1
-                className="text-h1 font-semibold text-stone-900"
-                style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
-              >
-                {scopedDeveloper
-                  ? `Проекты от ${scopedDeveloper.display_name.ru}`
-                  : sp.near_label
-                    ? `Рядом с «${sp.near_label}»`
-                    : t('buildings')}
-              </h1>
-              <p className="text-meta text-stone-500 tabular-nums">
-                {filtered.length} {filtered.length === 1 ? 'проект' : 'проектов'}
-                {sp.near_label && nearRadius
-                  ? ` · в радиусе ${(nearRadius / 1000).toFixed(1)} км`
-                  : ''}
-                {/* Price range hint sets expectation BEFORE he scrolls.
-                    Krisha pattern: "от X до Y" in the result-count line. */}
-                {priceRangeText(filtered) ? ` · ${priceRangeText(filtered)}` : ''}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {isMap ? (
-                <Link
-                  href={`/novostroyki${buildQuery({ ...sp, view: undefined })}`}
-                  className="inline-flex h-9 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-meta font-medium text-stone-900 hover:bg-stone-100"
-                >
-                  <List className="size-4" /> Список
-                </Link>
-              ) : (
-                <Link
-                  href={`/novostroyki${buildQuery({ ...sp, view: 'karta' })}`}
-                  className="inline-flex h-9 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-meta font-medium text-stone-900 hover:bg-stone-100"
-                >
-                  <MapIcon className="size-4" /> Карта
-                </Link>
-              )}
-            </div>
+        <AppContainer className="flex flex-col gap-4 py-6 md:py-8">
+          <div className="flex flex-col gap-1">
+            <h1
+              className="text-h1 font-semibold text-stone-900 md:text-display"
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+            >
+              {scopedDeveloper
+                ? `Проекты от ${scopedDeveloper.display_name.ru}`
+                : sp.near_label
+                  ? `Рядом с «${sp.near_label}»`
+                  : t('buildings')}
+            </h1>
           </div>
-
-          {/* Cian-style horizontal filter bar. Single scrollable row with
-              all filters as toggleable chips — no sheet, no "Фильтры"
-              button, no vertical sections. Inline labels mark each
-              group (Стадия / Сдача / Удобства / Что рядом) so buyers
-              can scan groups while scrolling.
-
-              Negative horizontal margins + matching inner padding let
-              the bar bleed to the screen edge so chips can scroll
-              flush with the viewport — important on mobile where the
-              scroll affordance is the chip cut off at the right.
-
-              РАЙОН filter is hidden in V1 — Vahdat is small enough
-              that splitting 6 buildings across 5 microdistricts makes
-              each district filter narrow the result to 1-2 projects,
-              which feels broken. District info still shows on every
-              building card (address chip), so buyers can see where
-              each project is without needing the filter. */}
-          {/* LocationSearch — same affordance as the home hero. When a
-              POI is already selected the input is pre-populated with the
-              label so the visitor sees what they searched for, and a
-              one-tap "× убрать место" link strips the radius filter
-              without touching the rest of the URL. */}
           <div className="flex flex-col gap-2">
             <LocationSearch
               destinationPath="/novostroyki"
@@ -282,126 +253,167 @@ export default async function NovostroykiPage({
               </Link>
             ) : null}
           </div>
-
-          {/* Cian-style category chip bar. One chip per filter category
-              (Цена / Стадия / Сдача / Удобства / Что рядом). Each chip
-              shows its current value summary inline and opens a bottom
-              sheet with the full set of options + an Apply button. The
-              bar scrolls horizontally on narrow viewports — chips are
-              shrink-0 so they keep their natural width. */}
-          {/* Chip order: high-decision filters first so the truncation
-              edge of the horizontal scroll doesn't hide the chip a
-              first-time buyer reaches for. Цена + Что рядом are
-              decisive; Стадия/Сдача/Удобства are refinements. */}
-          <div className="-mx-4 md:-mx-5 lg:-mx-6">
-            <div className="flex items-center gap-2 overflow-x-auto px-4 py-1 md:px-5 lg:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <PriceChip current={sp} />
-              <MultiSelectChip
-                label="Что рядом"
-                paramKey="nearby"
-                options={NEARBY_FILTERS}
-                current={sp}
-              />
-              <MultiSelectChip
-                label="Стадия"
-                paramKey="status"
-                options={STATUS_FILTERS}
-                current={sp}
-              />
-              <MultiSelectChip
-                label="Сдача"
-                paramKey="handover"
-                options={HANDOVER_FILTERS}
-                current={sp}
-              />
-              <MultiSelectChip
-                label="Удобства"
-                paramKey="amenities"
-                options={AMENITIES_FILTERS}
-                current={sp}
-              />
-              <SortChip pagePath="/novostroyki" current={sp} />
-            </div>
-          </div>
         </AppContainer>
       </section>
 
-      {isMap && (
-        <MapView
-          buildings={filtered}
-          nearPoi={
-            nearLat != null && nearLng != null && sp.near_label && nearRadius
-              ? { lat: nearLat, lng: nearLng, label: sp.near_label, radiusM: nearRadius }
-              : null
-          }
-        />
-      )}
-      {!isMap && (
-        <section className="py-6">
-          <AppContainer className="flex flex-col gap-5">
-            {/* Single consolidated subscribe panel. Wizard mode
-                (?wizard=1) drops the count + filter summary into the
-                same card as the subscribe buttons — buyers reported
-                the previous stacked-banner layout as "two places say
-                subscribe to this", confusing. */}
-            {(sp.wizard ||
-              countActiveFilters(sp) >= 2 ||
-              filtered.length === 0) &&
-            hasActiveFilters(sp) ? (
-              <SaveSearchPrompt
-                page="novostroyki"
-                filters={sp}
-                noResults={filtered.length === 0}
-                resultCount={sp.wizard ? filtered.length : undefined}
-                filterSummary={
-                  sp.wizard ? displayNameFromFilters('novostroyki', sp) : undefined
-                }
-              />
-            ) : null}
-            {/* Filter-relax: when results are tight (0 or 1) and the
-                visitor has 2+ filters active, surface 1-tap relax
-                buttons. Faster than scrolling back to the chip bar
-                and toggling a filter off manually. */}
-            {filtered.length <= 1 && countActiveFilters(sp) >= 2 ? (
-              <FilterRelaxSuggestion
-                pagePath="/novostroyki"
-                currentParams={sp}
-                resultCount={filtered.length}
-                relaxOptions={await buildRelaxOptionsNovostroykiWithCounts(sp)}
-              />
-            ) : null}
-            {filtered.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 rounded-md border border-stone-200 bg-white p-7 text-center">
-                <p className="text-h3 font-semibold text-stone-900">Ничего не найдено</p>
-                <p className="text-meta text-stone-500">
-                  Попробуйте изменить фильтры или сбросить их.
-                </p>
-                <Link href="/novostroyki">
-                  <AppButton variant="secondary">Сбросить фильтры</AppButton>
+      {/* ─── BODY: filter rail + content ─────────────────────────
+          Desktop two-column per the senior-design prescription:
+          260px filter rail on the left, content (above-grid header
+          + grid OR map) on the right. Mobile collapses to a single
+          column with the existing chip bar pattern at the top of
+          the content area. */}
+      <AppContainer>
+        <div className="flex flex-col gap-6 py-6 md:flex-row md:gap-7 md:py-8">
+          {/* DESKTOP RAIL — hidden <md, shows the new eyebrow-grouped
+              filter UI. Sticky so it follows the buyer down the
+              grid rather than scrolling off-screen. */}
+          <div className="md:sticky md:top-20 md:self-start">
+            <NovostroykiFilterRail current={sp} />
+          </div>
+
+          <div className="flex min-w-0 flex-1 flex-col gap-5">
+            {/* MOBILE chip bar — preserved for <md. The new desktop
+                rail covers md+. The "Фильтры" full-screen sheet
+                pattern (also in the prescription) is deferred to a
+                follow-up polish pass. */}
+            <div className="-mx-4 md:hidden">
+              <div className="flex items-center gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <PriceChip current={sp} />
+                <MultiSelectChip
+                  label="Что рядом"
+                  paramKey="nearby"
+                  options={NEARBY_FILTERS}
+                  current={sp}
+                />
+                <MultiSelectChip
+                  label="Стадия"
+                  paramKey="status"
+                  options={STATUS_FILTERS}
+                  current={sp}
+                />
+                <MultiSelectChip
+                  label="Сдача"
+                  paramKey="handover"
+                  options={HANDOVER_FILTERS}
+                  current={sp}
+                />
+                <MultiSelectChip
+                  label="Удобства"
+                  paramKey="amenities"
+                  options={AMENITIES_FILTERS}
+                  current={sp}
+                />
+              </div>
+            </div>
+
+            {/* ABOVE-GRID HEADER — single line "X проектов в Вахдате"
+                + sort dropdown + Карта/Список tab toggle. Per the
+                prescription this row sits above the grid and gives
+                the buyer scan-context (count + range) before they
+                read individual cards. */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 pb-4">
+              <p className="text-body text-stone-700 tabular-nums">
+                <span className="font-semibold text-stone-900">{filtered.length}</span>{' '}
+                {filtered.length === 1 ? 'проект' : 'проектов'} в Вахдате
+                {sp.near_label && nearRadius
+                  ? ` · в радиусе ${(nearRadius / 1000).toFixed(1)} км`
+                  : ''}
+                {priceRangeText(filtered) ? ` · ${priceRangeText(filtered)}` : ''}
+              </p>
+              <div className="flex items-center gap-2">
+                <SortChip pagePath="/novostroyki" current={sp} />
+                {/* Карта/Список tab toggle — single button that
+                    flips view-mode. Per the prescription this sits
+                    above the grid as the user's primary view choice. */}
+                <Link
+                  href={`/novostroyki${buildQuery({
+                    ...sp,
+                    view: isMap ? undefined : 'karta',
+                  })}`}
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-meta font-medium text-stone-900 hover:bg-stone-100"
+                >
+                  {isMap ? (
+                    <>
+                      <List className="size-4" /> Список
+                    </>
+                  ) : (
+                    <>
+                      <MapIcon className="size-4" /> Карта
+                    </>
+                  )}
                 </Link>
               </div>
+            </div>
+
+            {isMap ? (
+              <div className="-mx-4 md:mx-0">
+                <MapView
+                  buildings={filtered}
+                  nearPoi={
+                    nearLat != null && nearLng != null && sp.near_label && nearRadius
+                      ? { lat: nearLat, lng: nearLng, label: sp.near_label, radiusM: nearRadius }
+                      : null
+                  }
+                />
+              </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
-                {cards.map(({ b, dev, dist, units, unitsTotal }) => {
-                  if (!dev || !dist) return null;
-                  return (
-                    <BuildingCard
-                      key={b.id}
-                      building={b}
-                      developer={dev}
-                      district={dist}
-                      matchingUnits={units}
-                      activeListingsCount={unitsTotal}
-                      currency={currency}
-                      rates={rates}
-                    />
-                  );
-                })}
+              <div className="flex flex-col gap-5">
+                {(sp.wizard ||
+                  countActiveFilters(sp) >= 2 ||
+                  filtered.length === 0) &&
+                hasActiveFilters(sp) ? (
+                  <SaveSearchPrompt
+                    page="novostroyki"
+                    filters={sp}
+                    noResults={filtered.length === 0}
+                    resultCount={sp.wizard ? filtered.length : undefined}
+                    filterSummary={
+                      sp.wizard ? displayNameFromFilters('novostroyki', sp) : undefined
+                    }
+                  />
+                ) : null}
+                {filtered.length <= 1 && countActiveFilters(sp) >= 2 ? (
+                  <FilterRelaxSuggestion
+                    pagePath="/novostroyki"
+                    currentParams={sp}
+                    resultCount={filtered.length}
+                    relaxOptions={await buildRelaxOptionsNovostroykiWithCounts(sp)}
+                  />
+                ) : null}
+                {filtered.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 rounded-md border border-stone-200 bg-white p-7 text-center">
+                    <p className="text-h3 font-semibold text-stone-900">Ничего не найдено</p>
+                    <p className="text-meta text-stone-500">
+                      Попробуйте изменить фильтры или сбросить их.
+                    </p>
+                    <Link href="/novostroyki">
+                      <AppButton variant="secondary">Сбросить фильтры</AppButton>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+                    {cards.map(({ b, dev, dist, units, unitsTotal }) => {
+                      if (!dev || !dist) return null;
+                      return (
+                        <BuildingCard
+                          key={b.id}
+                          building={b}
+                          developer={dev}
+                          district={dist}
+                          matchingUnits={units}
+                          activeListingsCount={unitsTotal}
+                          currency={currency}
+                          rates={rates}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
-          </AppContainer>
-        </section>
-      )}
+          </div>
+        </div>
+      </AppContainer>
     </>
   );
 }
