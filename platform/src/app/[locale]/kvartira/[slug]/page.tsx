@@ -401,11 +401,25 @@ export default async function ListingDetailPage({
               {finishingDescription(listing.finishing_type)}
             </span>
           </div>
-          {(listing.bathroom_separate != null || listing.orientation) ? (
+          {(listing.bathroom_separate != null ||
+            listing.has_technical_passport != null ||
+            listing.orientation) ? (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
               {listing.bathroom_separate != null ? (
                 <AppChip asStatic tone="neutral">
                   Санузел {listing.bathroom_separate ? 'раздельный' : 'совмещённый'}
+                </AppChip>
+              ) : null}
+              {/* Tech-passport — green-toned when present (positive
+                  trust signal), neutral when absent (factual). Hidden
+                  entirely when the seller didn't say. */}
+              {listing.has_technical_passport === true ? (
+                <AppChip asStatic tone="positive">
+                  Техпаспорт есть
+                </AppChip>
+              ) : listing.has_technical_passport === false ? (
+                <AppChip asStatic tone="neutral">
+                  Техпаспорт — выдадут при сдаче
                 </AppChip>
               ) : null}
               {listing.orientation ? (

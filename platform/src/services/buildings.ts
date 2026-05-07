@@ -592,6 +592,7 @@ function mapListing(r: {
   balcony: boolean | null;
   ceiling_height_cm: number | null;
   bathroom_separate?: boolean | null;
+  has_technical_passport?: boolean | null;
   orientation?: string | null;
   view_notes?: { ru: string; tg?: string } | null;
   floor_plan_photo_id?: string | null;
@@ -631,6 +632,7 @@ function mapListing(r: {
     balcony: r.balcony,
     ceiling_height_cm: r.ceiling_height_cm,
     bathroom_separate: r.bathroom_separate ?? null,
+    has_technical_passport: r.has_technical_passport ?? null,
     orientation: r.orientation ?? null,
     view_notes: r.view_notes ?? null,
     floor_plan_photo_id: r.floor_plan_photo_id ?? null,

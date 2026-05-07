@@ -47,6 +47,9 @@ interface ApartmentInput {
    * have one bathroom, so capturing the type is enough.
    */
   bathroom_separate?: boolean;
+  /** True/false/undefined → есть/нет/не указано. Schema column is
+   *  nullable per migration 0018 — undefined skips the column. */
+  has_technical_passport?: boolean;
   description?: string;
   installment?: {
     monthly_tjs: number;
@@ -263,6 +266,7 @@ export async function POST(req: NextRequest) {
         priceTotalDirams: BigInt(Math.round(apt.price_tjs)) * TJS_TO_DIRAMS,
         finishingType: apt.finishing_type,
         bathroomSeparate: apt.bathroom_separate,
+        hasTechnicalPassport: apt.has_technical_passport,
         description: apt.description,
         installment: apt.installment
           ? {

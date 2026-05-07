@@ -40,7 +40,7 @@ export default async function EditListingPage({
   const { data: listing } = await supabase
     .from('listings')
     .select(
-      'id, slug, building_id, seller_user_id, status, rooms_count, size_m2, floor_number, price_total_dirams, finishing_type, bathroom_separate, unit_description, installment_available, installment_monthly_amount_dirams, installment_first_payment_percent, installment_term_months',
+      'id, slug, building_id, seller_user_id, status, rooms_count, size_m2, floor_number, price_total_dirams, finishing_type, bathroom_separate, has_technical_passport, unit_description, installment_available, installment_monthly_amount_dirams, installment_first_payment_percent, installment_term_months',
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -91,6 +91,7 @@ export default async function EditListingPage({
     finishing_type: listing.finishing_type as
       | 'no_finish' | 'pre_finish' | 'full_finish' | 'owner_renovated',
     bathroom_separate: listing.bathroom_separate as boolean | null,
+    has_technical_passport: (listing.has_technical_passport as boolean | null) ?? null,
     description: ((listing.unit_description as { ru: string } | null) ?? null)?.ru ?? '',
     installment_enabled: !!listing.installment_available,
     installment_monthly_tjs: installmentMonthlyTjs,

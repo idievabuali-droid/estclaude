@@ -18,6 +18,12 @@ const chipVariants = cva(
     variants: {
       tone: {
         neutral: 'bg-stone-100 text-stone-700',
+        // Positive trust signal (CLAUDE.md: green is reserved for
+        // fairness/trust). Used for "Техпаспорт есть" and any future
+        // confirmed-document affordances. NOT for status changes —
+        // those use AppBadge tier-3.
+        positive:
+          'bg-[color:var(--color-fairness-great)]/10 text-[color:var(--color-fairness-great)]',
         terracotta:
           'bg-terracotta-100 text-terracotta-800 [&_svg]:text-terracotta-700',
         'source-developer':

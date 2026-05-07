@@ -29,6 +29,7 @@ export interface EditApartmentInitial {
   price_tjs: number;
   finishing_type: 'no_finish' | 'pre_finish' | 'full_finish' | 'owner_renovated';
   bathroom_separate: boolean | null;
+  has_technical_passport: boolean | null;
   description: string;
   installment_enabled: boolean;
   installment_monthly_tjs: number | null;
@@ -95,6 +96,13 @@ export function EditApartmentForm({
         ? 'separate'
         : 'combined',
   );
+  const [techPassport, setTechPassport] = useState<'' | 'yes' | 'no'>(
+    initial.has_technical_passport === null
+      ? ''
+      : initial.has_technical_passport
+        ? 'yes'
+        : 'no',
+  );
   const [description, setDescription] = useState(initial.description);
   const [installmentEnabled, setInstallmentEnabled] = useState(
     initial.installment_enabled,
@@ -124,6 +132,8 @@ export function EditApartmentForm({
       finishing_type: finishing,
       bathroom_separate:
         bathroom === 'separate' ? true : bathroom === 'combined' ? false : null,
+      has_technical_passport:
+        techPassport === 'yes' ? true : techPassport === 'no' ? false : null,
       description: description.trim() || null,
       installment: installmentEnabled
         ? {
@@ -219,6 +229,24 @@ export function EditApartmentForm({
                   { value: 'combined', label: 'Совмещённый' },
                   { value: 'separate', label: 'Раздельный' },
                 ]}
+              />
+            </div>
+
+            {/* Документы — техпаспорт. Mirrors PostFlow so create + edit
+                show the same field. */}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <AppSelect
+                label="Техпаспорт"
+                value={techPassport}
+                onChange={(e) =>
+                  setTechPassport(e.target.value as '' | 'yes' | 'no')
+                }
+                placeholder="—"
+                options={[
+                  { value: 'yes', label: 'Есть' },
+                  { value: 'no', label: 'Нет / выдадут при сдаче' },
+                ]}
+                helperText="Покупатели чаще всего спрашивают именно про это."
               />
             </div>
 

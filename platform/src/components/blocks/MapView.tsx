@@ -52,6 +52,74 @@ const NEAR_RADIUS_LINE_LAYER = 'near-poi-radius-line';
  * — buyers don't need geodesic precision, they need "is this in the
  * neighbourhood".
  */
+/**
+ * Group buildings whose coordinates round to the same ~30m grid cell
+ * and fan each group out on a small circle so their price pills don't
+ * stack visually.
+ *
+ * The bug this fixes: two ЖК entered with identical (or near-identical)
+ * lat/lng — common when a complex has multiple posted entrances or when
+ * the founder picks the centroid for both — render their pins exactly
+ * on top of each other, so only the last-painted "от X TJS/м²" label
+ * is readable. The browser screenshot showed two labels mushed
+ * together near the Vahdat-park-area pin.
+ *
+ * Approach: deterministic grid bucketing (so the same set of buildings
+ * always produces the same arrangement on rerender), then a circular
+ * fan around the bucket's centroid. We do NOT use marker-clustering
+ * libraries — total Vahdat building count is small (<50) and clusters
+ * would hide the per-building price information that makes the map
+ * useful for shopping.
+ *
+ * Returned position is the RENDER position only — bounds-fitting and
+ * deep-link camera flights use the building's real lat/lng so the
+ * camera frames the genuine location.
+ */
+function spreadOverlappingMarkers<
+  T extends { latitude: number; longitude: number },
+>(buildings: T[]): Map<T, { lat: number; lng: number }> {
+  // ~30m at TJ latitude. Small enough not to merge genuinely-distinct
+  // buildings on the same street, large enough to catch coordinate-
+  // rounding collisions (sellers commonly drop the pin on the same
+  // map dot for adjacent towers).
+  const STEP = 0.0003;
+  // Fan radius — ~55m. At map zoom 13–15 (typical /novostroyki
+  // browse view) that's 30–80px, enough to give each pill its own
+  // tap target without the cluster reading as separate addresses.
+  const FAN_R = 0.0005;
+
+  const groups = new Map<string, T[]>();
+  for (const b of buildings) {
+    const key =
+      `${Math.round(b.latitude / STEP) * STEP}|` +
+      `${Math.round(b.longitude / STEP) * STEP}`;
+    const arr = groups.get(key) ?? [];
+    arr.push(b);
+    groups.set(key, arr);
+  }
+
+  const out = new Map<T, { lat: number; lng: number }>();
+  for (const arr of groups.values()) {
+    if (arr.length === 1) {
+      out.set(arr[0]!, { lat: arr[0]!.latitude, lng: arr[0]!.longitude });
+      continue;
+    }
+    const cx = arr.reduce((s, b) => s + b.longitude, 0) / arr.length;
+    const cy = arr.reduce((s, b) => s + b.latitude, 0) / arr.length;
+    arr.forEach((b, i) => {
+      // Offset by -π/2 so the first member sits at 12 o'clock (top of
+      // the circle) — feels more deliberate than dropping the first
+      // pill east of centre.
+      const angle = (2 * Math.PI * i) / arr.length - Math.PI / 2;
+      out.set(b, {
+        lat: cy + FAN_R * Math.sin(angle),
+        lng: cx + FAN_R * Math.cos(angle),
+      });
+    });
+  }
+  return out;
+}
+
 function radiusPolygon(lat: number, lng: number, radiusM: number): GeoJSON.Feature {
   const R = 6371000;
   const points: Array<[number, number]> = [];
@@ -471,7 +539,16 @@ export function MapView({
       bounds.extend([nearPoi.lng - dLng, nearPoi.lat - dLat]);
       bounds.extend([nearPoi.lng + dLng, nearPoi.lat + dLat]);
     }
+    // Pre-compute a per-marker render position so groups of buildings
+    // at near-identical coordinates fan out on a small circle instead
+    // of stacking their pills on top of each other (visible bug on the
+    // home map: two "от X TJS/м²" labels rendering as one mush). The
+    // bounds.extend() and clicked-marker centering still use the REAL
+    // coordinates so the camera math doesn't drift.
+    const renderCoords = spreadOverlappingMarkers(buildings);
+
     for (const b of buildings) {
+      const renderAt = renderCoords.get(b) ?? { lat: b.latitude, lng: b.longitude };
       const root = document.createElement('div');
       root.className = PIN_WRAPPER_CLASS;
       root.setAttribute('role', 'button');
@@ -485,7 +562,7 @@ export function MapView({
       // above the popup so they read as separate elements.
       const centerOnMarker = () => {
         if (!map) return;
-        const target = map.project([b.longitude, b.latitude]);
+        const target = map.project([renderAt.lng, renderAt.lat]);
         // Offset by ~30% of the map height upward so the pin appears
         // above the popup card (the popup occupies ~bottom 25%).
         const offsetY = map.getCanvas().height * 0.18;
@@ -519,10 +596,12 @@ export function MapView({
       root.appendChild(tip);
 
       const marker = new maplibregl.Marker({ element: root, anchor: 'bottom' })
-        .setLngLat([b.longitude, b.latitude])
+        .setLngLat([renderAt.lng, renderAt.lat])
         .addTo(map);
       markersRef.current.push(marker);
       markerElementsRef.current.set(b.slug, { root, pill, tip });
+      // Use REAL coords for bounds so the camera frames the actual
+      // location, not the visual fan-out offset.
       bounds.extend([b.longitude, b.latitude]);
     }
 

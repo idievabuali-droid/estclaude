@@ -86,6 +86,12 @@ interface ApartmentDraft {
    * bathroom, so just capturing the type covers most cases.
    */
   bathroom_separate: '' | 'combined' | 'separate';
+  /**
+   * Tech passport (техпаспорт) — '' means seller didn't say.
+   * Yes/no resolves to a boolean server-side; '' resolves to null
+   * (column is nullable per migration 0018).
+   */
+  has_technical_passport: '' | 'yes' | 'no';
   /** Photos already uploaded to Storage by /api/storage/upload but
    *  not yet attached to a listing — submission attaches them. */
   photos: PendingPhoto[];
@@ -137,6 +143,7 @@ function makeApartmentDraft(overrides: Partial<ApartmentDraft> = {}): ApartmentD
     price_tjs: '',
     finishing_type: '',
     bathroom_separate: '',
+    has_technical_passport: '',
     photos: [],
     installmentEnabled: false,
     ...overrides,
@@ -488,6 +495,14 @@ export function PostFlow({
           a.bathroom_separate === 'separate'
             ? true
             : a.bathroom_separate === 'combined'
+              ? false
+              : undefined,
+        // Tech-passport mirrors bathroom_separate: '' → undefined (null
+        // in DB), 'yes' → true, 'no' → false.
+        has_technical_passport:
+          a.has_technical_passport === 'yes'
+            ? true
+            : a.has_technical_passport === 'no'
               ? false
               : undefined,
         description: a.description?.trim() || undefined,
@@ -1287,6 +1302,29 @@ function ApartmentEditor({
                 { value: 'combined', label: 'Совмещённый' },
                 { value: 'separate', label: 'Раздельный' },
               ]}
+            />
+          </div>
+
+          {/* Документы — техпаспорт. Buyers ask "есть техпаспорт?"
+              before everything else for resale; surfacing it on the
+              listing card removes a back-and-forth WhatsApp round.
+              Optional: blank = не указано (для котлована/новостроек,
+              где документ ещё не выдан). */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <AppSelect
+              label="Техпаспорт"
+              value={apartment.has_technical_passport}
+              onChange={(e) =>
+                onChange({
+                  has_technical_passport: e.target.value as ApartmentDraft['has_technical_passport'],
+                })
+              }
+              placeholder="—"
+              options={[
+                { value: 'yes', label: 'Есть' },
+                { value: 'no', label: 'Нет / выдадут при сдаче' },
+              ]}
+              helperText="Покупатели чаще всего спрашивают именно про это."
             />
           </div>
 

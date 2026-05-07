@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { ImagePlus, X, Star, Loader2 } from 'lucide-react';
+import { ImagePlus, X, Star, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from '@/components/primitives/AppToast';
 
 /** Per-file metadata kept in the form's local state. Mirrors the
@@ -122,13 +122,50 @@ export function PhotoPicker({
     onChange(next);
   }
 
+  /**
+   * Sets the cover AND moves the chosen photo to position 0. The
+   * server's `attachPhotos` writes `display_order` from the array
+   * index, and the in-card carousel renders cover first → so a
+   * cover-only flag without reordering would leave the second photo
+   * still appearing right after the cover in the carousel ordering.
+   * Reordering on cover-set keeps the seller's intent consistent
+   * across all three surfaces (form thumbnail row, listing card,
+   * detail page).
+   */
   function setCover(storagePath: string) {
-    onChange(
-      photos.map((p) => ({
-        ...p,
-        is_cover: p.storage_path === storagePath,
-      })),
-    );
+    const target = photos.find((p) => p.storage_path === storagePath);
+    if (!target) return;
+    const others = photos.filter((p) => p.storage_path !== storagePath);
+    onChange([
+      { ...target, is_cover: true },
+      ...others.map((p) => ({ ...p, is_cover: false })),
+    ]);
+  }
+
+  /** Reorder helper — moves the photo at `index` by `delta` positions
+   *  (negative = earlier / left, positive = later / right). Clamps at
+   *  the array bounds. Used by the per-thumbnail ◀ ▶ buttons so the
+   *  seller can fine-tune order without dragging (touch-friendly). */
+  function move(index: number, delta: number) {
+    const target = index + delta;
+    if (target < 0 || target >= photos.length) return;
+    const next = [...photos];
+    const [moved] = next.splice(index, 1);
+    next.splice(target, 0, moved!);
+    // Reordering away from position 0 should NOT silently lose the
+    // cover. If the user moved photo[0] off the front, promote the new
+    // photo[0] to cover — matches the buyer's expectation that "first
+    // photo = cover". They can still manually re-pick the cover via
+    // the star button.
+    if (!next.some((p) => p.is_cover)) {
+      next[0]!.is_cover = true;
+    } else if (target === 0 && delta < 0) {
+      // Just-moved photo is now first → it becomes cover.
+      next.forEach((p, i) => {
+        p.is_cover = i === 0;
+      });
+    }
+    onChange(next);
   }
 
   return (
@@ -147,10 +184,10 @@ export function PhotoPicker({
       />
 
       <div className="grid grid-cols-3 gap-2 md:grid-cols-4">
-        {photos.map((p) => (
+        {photos.map((p, idx) => (
           <div
             key={p.storage_path}
-            className="group relative aspect-square overflow-hidden rounded-md border border-stone-200 bg-stone-100"
+            className="relative aspect-square overflow-hidden rounded-md border border-stone-200 bg-stone-100"
           >
             {/* Plain <img> not next/image — these are runtime-uploaded
                 photos served directly from Supabase Storage; the
@@ -167,20 +204,51 @@ export function PhotoPicker({
                 <Star className="size-3" /> Обложка
               </span>
             ) : (
+              // Always visible (was hidden+group-hover, which made it
+              // unreachable on touch devices — the only place sellers
+              // actually post from). 28px hit target keeps it tappable
+              // without dominating the thumbnail.
               <button
                 type="button"
                 onClick={() => setCover(p.storage_path)}
                 aria-label="Сделать обложкой"
-                className="absolute left-1 top-1 hidden size-6 items-center justify-center rounded-sm bg-white/80 text-stone-700 hover:bg-white hover:text-terracotta-600 group-hover:inline-flex"
+                className="absolute left-1 top-1 inline-flex size-7 items-center justify-center rounded-sm bg-white/85 text-stone-700 shadow-sm hover:bg-white hover:text-terracotta-600 active:bg-stone-100"
               >
                 <Star className="size-3.5" />
               </button>
             )}
+
+            {/* ◀ ▶ reorder controls — bottom-row, touch-friendly. Up
+                arrow disabled at index 0; down arrow disabled at the
+                end. Reordering away from index 0 auto-promotes the new
+                first photo to cover (see move()), so sellers don't end
+                up with a phantom cover offscreen. */}
+            <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => move(idx, -1)}
+                disabled={idx === 0}
+                aria-label="Сдвинуть влево"
+                className="inline-flex size-7 items-center justify-center rounded-sm bg-white/85 text-stone-700 shadow-sm hover:bg-white hover:text-terracotta-600 active:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/85"
+              >
+                <ChevronLeft className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => move(idx, 1)}
+                disabled={idx === photos.length - 1}
+                aria-label="Сдвинуть вправо"
+                className="inline-flex size-7 items-center justify-center rounded-sm bg-white/85 text-stone-700 shadow-sm hover:bg-white hover:text-terracotta-600 active:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/85"
+              >
+                <ChevronRight className="size-3.5" />
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={() => remove(p.storage_path)}
               aria-label="Удалить фото"
-              className="absolute right-1 top-1 inline-flex size-6 items-center justify-center rounded-sm bg-white/80 text-stone-700 hover:bg-white hover:text-rose-600"
+              className="absolute right-1 top-1 inline-flex size-7 items-center justify-center rounded-sm bg-white/85 text-stone-700 shadow-sm hover:bg-white hover:text-rose-600 active:bg-stone-100"
             >
               <X className="size-3.5" />
             </button>
@@ -210,7 +278,8 @@ export function PhotoPicker({
       </div>
 
       <span className="text-caption text-stone-500">
-        Максимум {max} фото · до 10 МБ каждое · jpg, png, webp · первое — обложка
+        Максимум {max} фото · до 10 МБ каждое · jpg, png, webp · ⭐ — обложка ·
+        ◀ ▶ — порядок
       </span>
     </div>
   );

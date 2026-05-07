@@ -328,6 +328,11 @@ export interface CreateListingInput {
    * Undefined = seller didn't specify.
    */
   bathroomSeparate?: boolean;
+  /**
+   * Tech-passport (техпаспорт) presence. True/false/undefined map
+   * to есть/нет/не указано — column is nullable (migration 0018).
+   */
+  hasTechnicalPassport?: boolean;
   /** Russian description. */
   description?: string;
   installment?: {
@@ -410,6 +415,7 @@ export async function createListing(
         : null,
       installment_term_months: installmentEnabled ? input.installment!.termMonths : null,
       bathroom_separate: input.bathroomSeparate ?? null,
+      has_technical_passport: input.hasTechnicalPassport ?? null,
       unit_description: input.description
         ? { ru: input.description, tg: input.description }
         : null,
@@ -508,6 +514,7 @@ export interface UpdateListingInput {
   priceTotalDirams?: bigint;
   finishingType?: FinishingType;
   bathroomSeparate?: boolean | null;
+  hasTechnicalPassport?: boolean | null;
   description?: string | null;
   installment?: {
     monthlyDirams: bigint;
@@ -572,6 +579,9 @@ export async function updateListing(
   if (input.finishingType != null) patch.finishing_type = input.finishingType;
   if (input.bathroomSeparate !== undefined) {
     patch.bathroom_separate = input.bathroomSeparate;
+  }
+  if (input.hasTechnicalPassport !== undefined) {
+    patch.has_technical_passport = input.hasTechnicalPassport;
   }
   if (input.description !== undefined) {
     patch.unit_description = input.description

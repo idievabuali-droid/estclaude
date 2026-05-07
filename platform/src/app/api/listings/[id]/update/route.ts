@@ -26,6 +26,7 @@ interface UpdateBody {
   price_tjs?: number;
   finishing_type?: FinishingType;
   bathroom_separate?: boolean | null;
+  has_technical_passport?: boolean | null;
   description?: string | null;
   installment?: {
     monthly_tjs: number;
@@ -81,6 +82,7 @@ export async function POST(
             : undefined,
         finishingType: body.finishing_type,
         bathroomSeparate: body.bathroom_separate,
+        hasTechnicalPassport: body.has_technical_passport,
         description: body.description,
         installment:
           body.installment === undefined

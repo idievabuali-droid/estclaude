@@ -104,6 +104,13 @@ export type MockListing = {
    * (legacy listings + sellers who skip the field).
    */
   bathroom_separate: boolean | null;
+  /**
+   * Whether the apartment has a registered technical passport
+   * (cadastre document). True = есть, false = нет, null = не указано.
+   * Buyers commonly open a contact thread with "есть техпаспорт?" so
+   * pre-disclosing this on the card is a real friction-saver.
+   */
+  has_technical_passport: boolean | null;
   /** Free-text orientation. Sellers fill with anything short like
    *  "во двор", "на дорогу", "на юг" — not constrained to compass
    *  directions. Surfaces as a pill in §4 Об этой квартире when set. */
@@ -377,6 +384,7 @@ function mkListing(seed: {
     balcony: seed.balcony ?? null,
     ceiling_height_cm: seed.ceiling ?? null,
     bathroom_separate: null,
+    has_technical_passport: null,
     orientation: null,
     view_notes: null,
     floor_plan_photo_id: null,
