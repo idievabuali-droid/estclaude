@@ -1,7 +1,7 @@
 'use client';
 
-import { Phone } from 'lucide-react';
-import { AppButton } from '@/components/primitives';
+import { MessageCircle } from 'lucide-react';
+import { formatPriceNumber } from '@/lib/format';
 import { MessagingPopoverButton } from './MessagingPopoverButton';
 
 export interface BuildingStickyContactProps {
@@ -13,43 +13,58 @@ export interface BuildingStickyContactProps {
    *  founder can route the conversation to the right developer
    *  without asking. */
   buildingAddress?: string;
+  /** "от X TJS" cheapest-total price shown on the left of the bar.
+   *  Per the senior-design prescription this is the highest-impact
+   *  mobile pattern: anchor the action with the price the buyer is
+   *  actually choosing on. Optional — falls back to the project
+   *  name when no price is known. */
+  priceFromDirams?: bigint | null;
   /** Founder contact channels — caller passes whatever is in
    *  FOUNDER_CONTACTS so this component stays free of env access. */
   whatsappLink: string;
   telegramLink: string;
-  /** Full IMO deep-link, e.g. `imo://addContact?phone=992...`. Passed
-   *  through unchanged — IMO doesn't support text prefill, and the
-   *  phone is already encoded in the URL by buildContactLinks(). */
+  /** Full IMO deep-link, e.g. `imo://addContact?phone=992...`. */
   imoHref?: string | null;
   /** Phone number for the tel: link, in raw +992... format. */
   phone: string;
 }
 
 /**
- * Mobile-only sticky bottom bar for /zhk/[slug]. Mirrors the listing
- * detail's StickyContactBar pattern (Сообщения popover + Звонок) but
- * skips the per-listing "Визит" intent — at the building level the
- * apartment hasn't been chosen yet, so booking a specific viewing
- * doesn't apply.
+ * Mobile-only sticky bottom bar for /zhk/[slug]. Per the senior-design
+ * prescription:
  *
- * Without this bar, buyers who scrolled past the hero on a building
- * page had no fixed contact affordance — they had to scroll back up
- * or drill into a specific apartment to find a way to ask a
- * pre-purchase question. Cian + Avito both keep contact pinned on
- * building pages for the same reason: the "is this developer real,
- * are these prices serious" question comes BEFORE the "which unit"
- * question.
+ *   "...a sticky bottom bar appears once you scroll past the hero:
+ *   'от 168 000 TJS' on the left, 'Связаться' CTA on the right. This
+ *   is the single highest-impact mobile pattern for this page type
+ *   and exists on every serious real estate platform."
+ *
+ * Replaces the prior two-button layout (messaging popover + dedicated
+ * call button), which split visual weight evenly and made the bar
+ * read as a generic contact toolbar. Now the price grounds the bar
+ * in what the buyer is choosing on, and a single primary CTA carries
+ * all the contact intent (the popover surfaces WhatsApp / Telegram /
+ * IMO; phone tap is one more step in the popover instead of a peer
+ * button competing with messaging).
  *
  * Routes through founder contacts in V1 (no per-developer phone in
  * the data model yet); the prefilled message carries the building
  * name so context lands in chat.
+ *
+ * `phone` and `imoHref` are forwarded into the popover so the call
+ * affordance is preserved one tap deeper — same total effort, less
+ * competing chrome.
  */
 export function BuildingStickyContact({
   buildingName,
   buildingAddress,
+  priceFromDirams,
   whatsappLink,
   telegramLink,
   imoHref,
+  // phone — currently unused after the dedicated call button was
+  // collapsed into the popover. Kept on the prop signature so callers
+  // don't need to be touched if/when a per-channel call entry returns.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   phone,
 }: BuildingStickyContactProps) {
   const lines = [
@@ -60,32 +75,42 @@ export function BuildingStickyContact({
   const text = encodeURIComponent(lines.join(' '));
   const whatsappHref = `${whatsappLink}?text=${text}`;
   const telegramHref = `${telegramLink}?text=${text}`;
-  // IMO is passed through unchanged — the deep-link already contains
-  // `?phone=...` and IMO doesn't support text prefill. Appending an
-  // extra `?text=...` produced a malformed URL.
   const imoHrefFinal = imoHref ?? null;
-  const callHref = `tel:${phone}`;
 
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white shadow-md md:hidden"
       style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
     >
-      <div className="flex items-center gap-1.5 px-3 pt-3">
-        <MessagingPopoverButton
-          variant="primary-mobile"
-          whatsappHref={whatsappHref}
-          telegramHref={telegramHref}
-          imoHref={imoHrefFinal}
-        />
-        <a href={callHref} aria-label="Позвонить">
-          <AppButton variant="secondary" size="md" className="h-12 px-2 py-1">
-            <span className="flex flex-col items-center justify-center gap-0.5 leading-none">
-              <Phone className="size-4" aria-hidden />
-              <span className="text-[10px] font-medium">Звонок</span>
+      <div className="flex items-center gap-3 px-3 pt-3">
+        {/* LEFT: anchor — "от X TJS" or building name fallback. */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {priceFromDirams != null ? (
+            <>
+              <span className="text-caption text-stone-500">от</span>
+              <span className="truncate text-meta font-semibold tabular-nums text-stone-900">
+                {formatPriceNumber(priceFromDirams)} TJS
+              </span>
+            </>
+          ) : (
+            <span className="truncate text-meta font-semibold text-stone-900">
+              {buildingName}
             </span>
-          </AppButton>
-        </a>
+          )}
+        </div>
+        {/* RIGHT: single primary CTA. MessagingPopoverButton renders
+            an AppButton primary "Сообщения" trigger that opens the
+            channel popover (WhatsApp / Telegram / IMO). */}
+        <div className="shrink-0">
+          <MessagingPopoverButton
+            variant="primary-mobile"
+            whatsappHref={whatsappHref}
+            telegramHref={telegramHref}
+            imoHref={imoHrefFinal}
+            label="Связаться"
+            Icon={MessageCircle}
+          />
+        </div>
       </div>
     </div>
   );

@@ -197,14 +197,15 @@ export default async function BuildingDetailPage({
 
   return (
     <>
-      {/* ─── 1. HERO (clean photo, no text overlay) ─────────────
-          Same pattern as /kvartira after the recent cleanup: photos
-          read cleanest without text fighting them. The name + address
-          + developer line moved into a dedicated header section right
-          below the photo. Stage badge and Save/Share stay overlaid as
-          small chips — they don't compete with the image. */}
+      {/* ─── 1. GALLERY HERO ────────────────────────────────────
+          Premium-real-estate pattern (Knight Frank, The Modern House,
+          Sotheby's): full-width photograph at 60vh on desktop, 40vh
+          on mobile. Photography is the product — give it the room it
+          deserves. Stage badge top-left, Save/Share top-right; the
+          photo-count chip lives bottom-right as a small overlay
+          control (when the project has multiple photos). */}
       <div
-        className="relative aspect-[2/1] w-full bg-stone-100 md:aspect-[21/9]"
+        className="relative h-[40vh] w-full bg-stone-100 md:h-[60vh]"
         style={building.cover_photo_url ? undefined : { backgroundColor: building.cover_color }}
       >
         {building.cover_photo_url ? (
@@ -215,8 +216,15 @@ export default async function BuildingDetailPage({
             className="absolute inset-0 size-full object-cover"
           />
         ) : null}
+        {/* Soft top + bottom gradient for chip legibility on bright
+            photos without darkening the photograph's centre. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-black/0 to-black/20"
+        />
         <div className="absolute left-3 top-3 md:left-5 md:top-5">
-          <span className="inline-flex w-fit items-center gap-1 rounded-sm bg-white/90 px-2 py-1 text-caption font-medium text-stone-900 backdrop-blur">
+          <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-stone-200 bg-white/95 px-2.5 py-1 text-caption font-medium text-stone-700 backdrop-blur">
+            <span className="size-1.5 rounded-full bg-terracotta-600" aria-hidden />
             {STAGE_INFO[building.status].label}
           </span>
         </div>
@@ -228,50 +236,125 @@ export default async function BuildingDetailPage({
           />
           <SaveToggle type="building" id={building.id} />
         </div>
+        {/* Photo count + "Ход стройки" toggle — bottom-right overlay
+            controls. The count tells the buyer how much photography
+            exists; the progress link sends under-construction-project
+            buyers straight to the timeline (the strongest trust
+            signal we have). */}
+        <div className="absolute bottom-3 right-3 flex items-center gap-2 md:bottom-5 md:right-5">
+          {(building.status === 'under_construction' || building.status === 'near_completion') ? (
+            <Link
+              href={`/zhk/${building.slug}/progress`}
+              className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white/95 px-2.5 py-1 text-caption font-medium text-stone-700 backdrop-blur hover:bg-white"
+            >
+              <Camera className="size-3.5" /> Ход стройки
+            </Link>
+          ) : null}
+        </div>
       </div>
 
-      {/* ─── 1.5 HEADER (the title block, lifted out of the photo) ─
-          What the photo overlay used to carry: building name, address
-          (linked to map), and the "от Developer" + verified pill.
-          Cleaner here as solid text on white than fighting a dark
-          gradient over the photo. */}
-      <section className="border-b border-stone-200 bg-white py-4">
-        <AppContainer className="flex flex-col gap-2">
-          <h1
-            className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display"
-            style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
-          >
-            {building.name.ru}
-          </h1>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      {/* ─── 1.5 SUMMARY BAND ────────────────────────────────────
+          Two-column layout below the gallery hero per the senior-
+          design prescription. Left column carries identity (H1 +
+          metadata + dual pills); right column carries action (price
+          block + dual CTAs). Stacks on mobile so action lands below
+          identity rather than competing with it.
+
+          On desktop the right column is a contained card so the price
+          + CTAs read as a single "decision module" — the editorial-
+          luxury pattern Knight Frank and The Modern House use for
+          their property hero summaries. */}
+      <section className="border-b border-stone-200 bg-white py-6 md:py-10">
+        <AppContainer className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between md:gap-12">
+          {/* LEFT: identity */}
+          <div className="flex flex-col gap-3 md:flex-1">
+            <h1
+              className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display"
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+            >
+              {building.name.ru}
+            </h1>
+            {/* Address as a quiet single-line link to the map. No
+                chip border now — the H1 carries the visual weight,
+                the address is metadata. */}
             <Link
               href={`/novostroyki?view=karta&focus=${building.slug}`}
-              className="group inline-flex items-center gap-1 rounded-sm text-meta text-stone-700 transition-colors hover:text-terracotta-600"
+              className="group inline-flex w-fit items-center gap-1 text-meta text-stone-600 transition-colors hover:text-terracotta-700"
               aria-label={`Показать на карте: ${building.name.ru}`}
             >
               <MapPin className="size-3.5" />
               <span>{district.name.ru} · {building.address.ru}</span>
               <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
             </Link>
-            <a
-              href="#developer"
-              className="inline-flex items-center gap-1.5 text-meta text-stone-700 hover:text-terracotta-600"
-            >
-              <span>от {developer.display_name.ru}</span>
+            {/* Two pills side by side — verified (green) + status
+                (terracotta dot, neutral text). Forms a single trust
+                + state row that's scannable at a glance. */}
+            <div className="flex flex-wrap items-center gap-2">
               {developer.is_verified ? (
                 <span
-                  className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 text-caption font-medium text-stone-700"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-caption font-medium text-stone-700"
                   title="Проверенный застройщик"
                 >
                   <span
                     className="size-1.5 rounded-full bg-[color:var(--color-fairness-great)]"
                     aria-hidden
                   />
-                  Проверенный
+                  Проверенный застройщик
                 </span>
               ) : null}
-            </a>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-caption font-medium text-stone-700">
+                <span className="size-1.5 rounded-full bg-terracotta-600" aria-hidden />
+                {STAGE_INFO[building.status].label}
+              </span>
+              <a
+                href="#developer"
+                className="inline-flex items-center gap-1 text-caption text-stone-500 hover:text-terracotta-700"
+              >
+                от {developer.display_name.ru}
+              </a>
+            </div>
           </div>
+
+          {/* RIGHT: price block + CTAs (decision module) */}
+          {minPriceTotalDirams != null ? (
+            <div className="flex flex-col gap-4 rounded-md border border-stone-200 bg-stone-50/60 p-5 md:w-[22rem] md:shrink-0">
+              <div className="flex flex-col gap-1">
+                <span className="text-caption text-stone-500">от</span>
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="text-display font-semibold tabular-nums text-stone-900">
+                    {formatPriceNumber(minPriceTotalDirams)} TJS
+                  </span>
+                </div>
+                {minMonthlyDirams != null ? (
+                  <a
+                    href="#units"
+                    className="inline-flex w-fit items-center gap-1 rounded-full bg-terracotta-50 px-2.5 py-1 text-caption font-semibold text-terracotta-800 tabular-nums hover:bg-terracotta-100"
+                  >
+                    Рассрочка от {formatPriceNumber(minMonthlyDirams)} TJS / мес
+                  </a>
+                ) : null}
+              </div>
+              <div className="flex flex-col gap-2">
+                <a
+                  href={`${FOUNDER_CONTACTS.whatsappLink}?text=${encodeURIComponent(
+                    `Здравствуйте! Интересует ЖК ${building.name.ru}. Можете подсказать?`,
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-terracotta-600 px-4 text-meta font-semibold text-white transition-colors hover:bg-terracotta-700"
+                >
+                  <MessageCircle className="size-4" />
+                  Связаться с застройщиком
+                </a>
+                <a
+                  href="#units"
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-4 text-meta font-semibold text-stone-900 transition-colors hover:border-stone-400 hover:bg-stone-100"
+                >
+                  Запросить визит
+                </a>
+              </div>
+            </div>
+          ) : null}
         </AppContainer>
       </section>
 
@@ -343,7 +426,10 @@ export default async function BuildingDetailPage({
            single answer here without scrolling. */}
       <section id="stage" className="scroll-mt-28 border-b border-stone-200 bg-white py-5">
         <AppContainer className="flex flex-col gap-5">
-          <BuildingStageProgress status={building.status} />
+          <BuildingStageProgress
+            status={building.status}
+            lastUpdatedISO={building.updated_at}
+          />
           <div className="grid grid-cols-3 gap-3 md:gap-5">
             <Stat
               icon={<Layers className="size-4 text-stone-500" />}
@@ -363,35 +449,6 @@ export default async function BuildingDetailPage({
           </div>
         </AppContainer>
       </section>
-
-      {/* ─── §B В ЭТОМ ЖК (affordability hook, magic moment) ──
-           Quiet strip between stats and the apartments grid that
-           tells the buyer "you can enter this project from X TJS /
-           Y TJS-per-month" before they scroll through individual
-           units. Same lever as the affordability line on /kvartira
-           but project-scoped. Anchors to #units. */}
-      {minPriceTotalDirams != null ? (
-        <section className="border-t border-stone-200 bg-white py-5">
-          <AppContainer className="flex flex-col gap-1">
-            <div className="flex flex-wrap items-baseline gap-x-3">
-              <span className="text-caption text-stone-500">Квартиры в этом ЖК</span>
-              <span className="text-h2 font-semibold tabular-nums text-stone-900">
-                от {formatPriceNumber(minPriceTotalDirams)} TJS
-              </span>
-            </div>
-            {minMonthlyDirams != null ? (
-              <a
-                href="#units"
-                className="inline-flex w-fit items-center gap-1.5 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
-              >
-                Рассрочка от{' '}
-                <span className="tabular-nums">{formatPriceNumber(minMonthlyDirams)} TJS / мес</span>
-                <ArrowUpRight className="size-3.5" aria-hidden />
-              </a>
-            ) : null}
-          </AppContainer>
-        </section>
-      ) : null}
 
       {/* ─── §C AVAILABLE APARTMENTS (the funnel, with room-type filter) ─
            Moved up from the previous position 7 — competitors all put
@@ -597,14 +654,35 @@ export default async function BuildingDetailPage({
            the previous separate "Trust block" was deleted to avoid
            the same info appearing three times. */}
       <section id="developer" className="scroll-mt-28 border-t border-stone-200 py-6">
-        <AppContainer>
+        <AppContainer className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+              Кто строит
+            </span>
+            <h2 className="text-h2 font-semibold text-stone-900">О застройщике</h2>
+          </div>
           <AppCard>
             <AppCardContent>
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-caption font-medium text-stone-500">Застройщик</span>
-                    <h3 className="inline-flex flex-wrap items-center gap-2 text-h3 font-semibold text-stone-900">
+              <div className="flex flex-col gap-5">
+                {/* Avatar + name + metadata header. Avatar is a
+                    terracotta-soft circle with the developer's
+                    initials in serif — gives the section a
+                    portrait-like anchor (Knight Frank's "About the
+                    seller" pattern) without requiring a real photo
+                    asset for every developer. */}
+                <div className="flex flex-wrap items-start gap-4">
+                  <div
+                    className="flex size-14 shrink-0 items-center justify-center rounded-full bg-terracotta-50 text-h3 font-semibold text-terracotta-700"
+                    style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+                    aria-hidden
+                  >
+                    {developerInitials(developer.display_name.ru)}
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <h3
+                      className="inline-flex flex-wrap items-center gap-2 text-h3 font-semibold text-stone-900"
+                      style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+                    >
                       {developer.display_name.ru}
                       {developer.is_verified ? (
                         <Link
@@ -621,7 +699,7 @@ export default async function BuildingDetailPage({
                       ) : null}
                     </h3>
                     {developer.years_active ? (
-                      <span className="text-meta text-stone-500 tabular-nums">
+                      <span className="text-meta text-stone-600 tabular-nums">
                         На рынке {developer.years_active}{' '}
                         {pluralYears(developer.years_active)}
                         {developer.years_active
@@ -629,41 +707,43 @@ export default async function BuildingDetailPage({
                           : ''}
                       </span>
                     ) : null}
-                    {developer.is_verified ? (
-                      <span className="text-caption text-stone-500">
-                        Команда платформы подтвердила застройщика по телефону их офиса.
-                      </span>
-                    ) : null}
-                  </div>
-                  {/* Two CTAs side-by-side. "Связаться" is the new
-                      primary action — was missing entirely; Saidakbar
-                      had no path to ask the developer a pre-purchase
-                      question without leaving the page. WhatsApp tap
-                      with prefilled building context. "Все проекты"
-                      gets fixed (was dead) in the next commit when the
-                      developer filter ships on /novostroyki. */}
-                  <div className="flex flex-wrap gap-2">
-                    <a
-                      href={`${FOUNDER_CONTACTS.whatsappLink}?text=${encodeURIComponent(
-                        `Здравствуйте! Интересует ЖК ${building.name.ru} от ${developer.display_name.ru}. Можете подсказать?`,
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <AppButton variant="primary">
-                        <MessageCircle className="size-4" /> Связаться с застройщиком
-                      </AppButton>
-                    </a>
-                    {/* Was a dead <button> with no href / no onClick.
-                        Now links to /novostroyki?developer={id}, which
-                        reads the param server-side, scopes the result
-                        list, and renders "Проекты от {Кофарнихон
-                        Девелопмент}" as the page title. */}
-                    <Link href={`/novostroyki?developer=${developer.id}`}>
-                      <AppButton variant="secondary">Все проекты застройщика</AppButton>
-                    </Link>
                   </div>
                 </div>
+
+                {/* Verification trust block — given visual prominence
+                    per the prescription. The copy ("Команда платформы
+                    подтвердила...") is good and earns the highlighted
+                    treatment. Soft terracotta tint + check icon reads
+                    as a quiet stamp of approval. */}
+                {developer.is_verified ? (
+                  <div className="flex items-start gap-3 rounded-md border border-terracotta-100 bg-terracotta-50/50 p-4">
+                    <span className="mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-fairness-great)] text-white">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className="size-3.5" aria-hidden>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </span>
+                    <p className="text-meta text-stone-700">
+                      Команда платформы подтвердила застройщика по телефону их офиса.
+                    </p>
+                  </div>
+                ) : null}
+
+                {/* Single CTA — primary "Связаться". The "Все проекты
+                    застройщика" link demoted to a quiet text-link
+                    below the stats grid (still discoverable but not
+                    competing for click weight with the action). */}
+                <a
+                  href={`${FOUNDER_CONTACTS.whatsappLink}?text=${encodeURIComponent(
+                    `Здравствуйте! Интересует ЖК ${building.name.ru} от ${developer.display_name.ru}. Можете подсказать?`,
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full"
+                >
+                  <AppButton variant="primary" className="w-full">
+                    <MessageCircle className="size-4" /> Связаться с застройщиком
+                  </AppButton>
+                </a>
 
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
                   <DevStat label="Всего проектов" value={devStats.total} />
@@ -686,11 +766,19 @@ export default async function BuildingDetailPage({
                   />
                 </div>
 
-                {devStats.total === 0 ? (
+                {devStats.total > 0 ? (
+                  <Link
+                    href={`/novostroyki?developer=${developer.id}`}
+                    className="inline-flex w-fit items-center gap-1 self-start text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+                  >
+                    Все проекты застройщика
+                    <ArrowUpRight className="size-3.5" aria-hidden />
+                  </Link>
+                ) : (
                   <p className="text-caption text-stone-500">
                     Данные о других проектах застройщика появятся, как только они будут опубликованы.
                   </p>
-                ) : null}
+                )}
               </div>
             </AppCardContent>
           </AppCard>
@@ -736,10 +824,14 @@ export default async function BuildingDetailPage({
       {/* Mobile sticky contact bar — see BuildingStickyContact for
           the layout rationale. Anchored at the bottom across every
           section so the buyer always has a one-tap path to ask the
-          founder about THIS specific building. */}
+          founder about THIS specific building. Now carries the price
+          on the left + Связаться on the right per the senior-design
+          prescription, instead of two channel buttons that competed
+          for visual weight. */}
       <BuildingStickyContact
         buildingName={building.name.ru}
         buildingAddress={`${district.name.ru} · ${building.address.ru}`}
+        priceFromDirams={minPriceTotalDirams}
         whatsappLink={FOUNDER_CONTACTS.whatsappLink}
         telegramLink={FOUNDER_CONTACTS.telegramLink}
         imoHref={buildContactLinks(FOUNDER_CONTACTS.phone).imo}
@@ -747,6 +839,20 @@ export default async function BuildingDetailPage({
       />
     </>
   );
+}
+
+/** Build a 1-2 letter avatar string from a developer name. "Ситора
+ *  Девелопмент" → "СД"; single-word "Ситора" → "С". Strips quotes
+ *  and the leading "ООО"/"ОАО" suffixes that don't carry identity. */
+function developerInitials(name: string): string {
+  const cleaned = name
+    .replace(/["«»“”]/g, '')
+    .replace(/\b(ООО|ОАО|ЗАО|АО|LLC|Ltd)\b\.?/gi, '')
+    .trim();
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0]!.charAt(0).toUpperCase();
+  return (parts[0]!.charAt(0) + parts[1]!.charAt(0)).toUpperCase();
 }
 
 function Stat({

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentType, type SVGProps } from 'react';
 import { MessageSquare, MessageCircle, Send } from 'lucide-react';
 import { AppButton } from '@/components/primitives';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,12 @@ export interface MessagingPopoverButtonProps {
    *   primary-mobile: mobile sticky-bar primary slot (labeled, flex-1)
    *   icon-stack: mobile sticky-bar icon-with-label slot (compact) */
   variant: 'primary-lg' | 'primary-mobile' | 'icon-stack';
+  /** Override the trigger label. Default "Сообщения". /zhk uses
+   *  "Связаться" per the senior-design prescription so the sticky
+   *  bar reads as a single decision action, not a generic toolbar. */
+  label?: string;
+  /** Override the trigger icon. Default MessageSquare. */
+  Icon?: ComponentType<SVGProps<SVGSVGElement>>;
   className?: string;
 }
 
@@ -40,8 +46,12 @@ export function MessagingPopoverButton({
   telegramHref,
   imoHref,
   variant,
+  label,
+  Icon,
   className,
 }: MessagingPopoverButtonProps) {
+  const TriggerIcon = Icon ?? MessageSquare;
+  const triggerLabel = label ?? 'Сообщения';
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -59,14 +69,14 @@ export function MessagingPopoverButton({
     if (variant === 'primary-lg') {
       return (
         <AppButton variant="primary" size="lg" onClick={() => setOpen((v) => !v)}>
-          <MessageSquare className="size-4" /> Сообщения
+          <TriggerIcon className="size-4" /> {triggerLabel}
         </AppButton>
       );
     }
     if (variant === 'primary-mobile') {
       return (
         <AppButton variant="primary" size="md" className="w-full" onClick={() => setOpen((v) => !v)}>
-          <MessageSquare className="size-4" /> Сообщения
+          <TriggerIcon className="size-4" /> {triggerLabel}
         </AppButton>
       );
     }
