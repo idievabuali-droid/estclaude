@@ -26,7 +26,10 @@ export async function SiteHeader() {
               Tightened tracking + slight size bump reads as quiet
               sophistication; combined with the warm terracotta brand
               colour, it's the brand-identity moment of the chrome. */}
-          <span className="font-serif text-h3 tracking-[-0.01em]">ЖК.tj</span>
+          <span
+            className="text-h3 tracking-[-0.01em]"
+            style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+          >ЖК.tj</span>
         </Link>
 
         <nav className="hidden items-center gap-5 text-meta font-medium text-stone-700 md:flex">

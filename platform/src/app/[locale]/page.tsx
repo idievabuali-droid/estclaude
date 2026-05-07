@@ -1,4 +1,4 @@
-import { Sparkles, ArrowUpRight } from 'lucide-react';
+import { Sparkles, ArrowUpRight, ShieldCheck, Image as ImageIcon, Clock, Globe2 } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { AppContainer } from '@/components/primitives';
 import { BuildingCard, LocationSearch, HomeSubscribeButton } from '@/components/blocks';
@@ -10,34 +10,35 @@ import {
   getListingsForBuildingId,
 } from '@/services/buildings';
 import { listListings } from '@/services/listings';
-import { formatPriceNumber } from '@/lib/format';
 
 /**
- * Home page (V1, first-5-seconds redesign).
+ * Home page (V1, mockup-aligned redesign).
  *
- * Mobile-first, ≤5 visible elements above the fold. Buyer is in
- * 5-second-judgment mode: identity → trust → action → benefit, in
- * that order. Every surface earns its place against "what does this
- * solve at this exact moment in their journey?" — anything that
- * forces a decision before the buyer has decided to engage is cut.
+ * Section order (top to bottom):
+ *   1. Hero — pill + serif H1 with italic accent + subhead +
+ *      search-with-button + "или подобрать" sparkle link + nav strip
+ *   2. Trust block — "Почему ЖК.tj" eyebrow + H2 statement + 3 icon
+ *      cards (verified visits / real photos / 2-min match)
+ *   3. Featured ЖК — 3 BuildingCards (curated by featured_rank)
+ *   4. Retention — one-tap Vahdat-wide Telegram subscribe
+ *   5. Diaspora dark band — service framing for overseas buyers
  *
- * Section order:
- *   1. Hero — H1 + 1-line trust subhead + LocationSearch + magic
- *      moment affordability chip
- *   2. Featured ЖК — 3 BuildingCards (curated by featured_rank)
- *   3. §R Retention — one-tap Vahdat-wide Telegram subscribe
- *   4. Footer-band — quiet seller CTA, de-emphasised
+ * Editorial-luxury typography pattern: Lora serif (regular + italic)
+ * for H1 + the accent clause "проверенные вручную"; Inter sans for
+ * body, subheads, button labels, captions. Single-accent terracotta
+ * brand color, used sparingly. Stone for everything else.
  *
- * Cut from prior version (deliberate, see plan file):
- *   - 3 USP cards (verified devs / construction photos / diaspora) —
- *     folded into a single subhead line under H1.
- *   - 3 direction chips (новостройки / квартиры / диаспора) —
- *     redundant with the site header nav.
- *   - Recent listings (3 cards) — overlapped Featured at our V1
- *     inventory scale; Featured wins on quality. Re-add post-launch
- *     when the freshness signal carries real activity.
- *   - "Хотите разместить?" banner from middle position — moved to a
- *     quiet footer-band line so it doesn't compete with buyer funnel.
+ * Cuts from prior version:
+ *   - 3 USP cards in hero zone — replaced by the dedicated Trust
+ *     block section (correct placement, breathable, single-job head).
+ *   - Magic moment affordability chip — Featured cards already carry
+ *     price info. Hero stays focused on identity + trust + action.
+ *   - Footer-band seller CTA — sellers reach /post via SiteHeader's
+ *     "Разместить" + footer column. Replaced by the Diaspora band.
+ *
+ * Honest copy discipline: pill says "Каждый ЖК посетили лично"
+ * (no fabricated count), diaspora subline says "Готовы помочь" (no
+ * false "помогли 80+ семьям" claim — pre-launch state).
  */
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -45,8 +46,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const t = await getTranslations('Homepage');
   const tNav = await getTranslations('Nav');
 
-  // Featured buildings — top 3 marked is_featured, with their
-  // developer + district + first 2 unit previews each.
+  // Featured buildings — top 3 marked is_featured.
   const featured = await listFeaturedBuildings(3);
   const featuredWithRefs = await Promise.all(
     featured.map(async (b) => {
@@ -59,161 +59,154 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     }),
   );
 
-  // Magic moment data — cheapest active listing in the city + the
-  // cheapest installment monthly across listings. listListings({})
-  // already enforces ACTIVE_CITY + status='active' server-side; we
-  // reduce client-side here. Negligible compute at V1 inventory.
+  // Listings count drives the retention strip's loaded vs empty copy.
   const allListings = await listListings({});
-  const minTotalDirams =
-    allListings.length > 0
-      ? allListings.reduce(
-          (min, l) => (l.price_total_dirams < min ? l.price_total_dirams : min),
-          allListings[0]!.price_total_dirams,
-        )
-      : null;
-  const monthlyVals = allListings
-    .filter((l) => l.installment_available && l.installment_monthly_amount_dirams != null)
-    .map((l) => l.installment_monthly_amount_dirams as bigint);
-  const minMonthlyDirams =
-    monthlyVals.length > 0 ? monthlyVals.reduce((a, b) => (a < b ? a : b)) : null;
-  // Chip is INFORMATIONAL — text describes the city's price floor.
-  // Tap → /kvartiry (no filter applied). Earlier version pre-filtered
-  // by `?maxMonthly={cheapest}` which trapped mid-budget buyers in
-  // a tier narrower than their actual interest. Filter dropped on
-  // purpose; buyers refine on /kvartiry themselves.
-  const chipHref = '/kvartiry';
+  const hasListings = allListings.length > 0;
 
   return (
     <>
       {/* ─── HERO ─────────────────────────────────────────────────
-          ≤5 visible elements: H1 + trust subhead + LocationSearch +
-          search-help inline link + magic moment chip. Mobile first
-          viewport reads as: identity → trust → action → benefit.
-          Faint warm gradient (terracotta-50 fading to stone-50) reads
-          as "warm publication paper" — adds brand atmosphere without
-          competing visually with content. */}
-      <section className="border-b border-stone-200 bg-gradient-to-b from-terracotta-50/40 via-stone-50 to-stone-50 py-6 md:py-8">
-        <AppContainer className="flex flex-col gap-5">
-          <div className="flex flex-col gap-2">
-            {/* H1 in Lora serif — editorial-boutique voice. Tight
-                tracking + display size on desktop. Body, subhead, and
-                the rest of the page stay Inter sans for clarity and
-                contrast. Single typographic accent, not all-serif. */}
-            <h1 className="font-serif text-h1 font-semibold leading-[var(--leading-h1)] tracking-[-0.01em] text-stone-900 md:text-display">
-              {t('heroTitle')}
-            </h1>
-            {/* Trust subhead — replaces the 3 USP cards. Same
-                content (verified developers / real construction
-                photos / diaspora support) compressed to one line so
-                the buyer reads identity + trust in 3 seconds without
-                scanning three card layouts. */}
-            <p className="text-meta text-stone-700 md:text-body">
-              Только проверенные застройщики. Реальные фото со стройки. Команда вычитывает каждое объявление.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 max-w-2xl">
-            <LocationSearch destinationPath="/novostroyki" variant="hero" />
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <p className="text-caption text-stone-500">
-                Введите район, ЖК, школу, мечеть или адрес — покажем новостройки рядом.
-              </p>
-              {/* Sparkle icon micro-rotates on hover (~6deg) for a
-                  subtle tactile cue. motion-safe: respects
-                  prefers-reduced-motion. */}
-              <Link
-                href="/pomoshch-vybora"
-                className="group inline-flex items-center gap-1 text-caption font-medium text-terracotta-700 hover:text-terracotta-800"
-              >
-                <Sparkles className="size-3.5 transition-transform duration-200 ease-out motion-safe:group-hover:rotate-[6deg]" />
-                Первый раз? Поможем подобрать за 2 минуты
-              </Link>
+          Mockup-aligned: pill / H1 with italic serif accent / subhead /
+          search + "Найти" button / "или подобрать" sparkle / nav strip.
+          Faint warm gradient (terracotta-50/40 → stone-50) reads as
+          warm publication paper — atmosphere without competing visually. */}
+      <section className="border-b border-stone-200 bg-gradient-to-b from-terracotta-50/40 via-stone-50 to-stone-50 py-10 md:py-16">
+        <AppContainer className="flex flex-col items-center gap-5 text-center md:gap-6">
+          {/* Trust pill — green dot + uppercase tracking-wider claim.
+              Honest copy: no fabricated count. */}
+          <span className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-1 text-caption font-medium uppercase tracking-wider text-stone-700">
+            <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
+            Каждый ЖК посетили лично
+          </span>
+
+          {/* H1 with italic serif accent — editorial-luxury pattern.
+              Whole H1 in Lora serif for cohesion; accent clause picks
+              up italic + terracotta. Inline fontFamily because
+              Tailwind v4's default --font-serif overrides our @theme
+              custom one — bypassing via direct var reference is the
+              reliable path. */}
+          <h1
+            className="text-h1 font-semibold leading-[var(--leading-h1)] tracking-[-0.01em] text-stone-900 md:text-display"
+            style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+          >
+            {t('heroTitle')}{' '}
+            <em className="italic text-terracotta-700">{t('heroTitleAccent')}</em>
+          </h1>
+
+          {/* Subhead — Inter sans for clarity. Replaces the prior
+              3-claim trust line (now folded into the dedicated trust
+              block section below). */}
+          <p className="max-w-xl text-meta text-stone-700 md:text-body">
+            Реальные фото со стройки, а не рендеры. Помогаем выбрать за 2 минуты.
+          </p>
+
+          {/* Search row — input + button. Mobile: stacked, button
+              full-width below. Desktop: button inline at right edge.
+              Button is a Link to /novostroyki (LocationSearch's
+              destination) so even with empty input the CTA browses
+              all projects. The search input itself still submits via
+              its own behaviour on Enter or result selection. */}
+          <div className="flex w-full max-w-2xl flex-col gap-2 md:flex-row md:items-stretch">
+            <div className="flex-1">
+              <LocationSearch destinationPath="/novostroyki" variant="hero" />
             </div>
-            {/* Quiet navigation strip — recovers the 1-tap path to
-                /kvartiry (Faridun: unit-shopping intent), /diaspora
-                (Saidakbar: remote-buying intent), and the "browse
-                without typing" path to /novostroyki. Visually
-                subordinate text-links replace the previous 3 styled
-                chip-buttons that crowded the hero. Functional access
-                preserved without the visual noise. */}
-            {/* Nav-strip links: stone-700 at rest, terracotta only on
-                hover. Engagement-triggered colour, not at-rest
-                decoration — the eye should land on the search bar +
-                magic moment chip first, not on every link competing
-                for attention. */}
-            <p className="text-caption text-stone-500">
-              <span className="text-stone-400">или:</span>{' '}
-              <Link
-                href="/kvartiry"
-                className="font-medium text-stone-700 hover:text-terracotta-700 hover:underline"
-              >
-                Все квартиры
-              </Link>
-              <span className="text-stone-400" aria-hidden> · </span>
-              <Link
-                href="/novostroyki"
-                className="font-medium text-stone-700 hover:text-terracotta-700 hover:underline"
-              >
-                Все новостройки
-              </Link>
-              <span className="text-stone-400" aria-hidden> · </span>
-              <Link
-                href="/diaspora"
-                className="font-medium text-stone-700 hover:text-terracotta-700 hover:underline"
-              >
-                {tNav('diaspora')}
-              </Link>
-            </p>
-            {/* Magic moment — affordability chip. "Is this site in my
-                budget?" answered in 5 seconds. Tappable: lands Faridun
-                on /kvartiry?maxMonthly=Y filtered results in one tap.
-                For Madina it's a calm trust signal (not out of reach).
-                Hides if 0 listings; monthly half hides if no
-                installment exists. Same lever + visual styling as
-                /kvartira §2 and /zhk §B. */}
-            {minTotalDirams != null ? (
-              <Link
-                href={chipHref}
-                /* Stone-only chip with terracotta arrow as the single
-                   brand moment. Earlier green attempt added a third
-                   hue and read as "two random greens picked from
-                   nowhere"; the role-coding logic was over-applied
-                   versus the senior premium-brand rule (Linear /
-                   Compass / Sonder all run a 1-accent palette).
-                   Emphasis here is positional (right under the
-                   search) and typographic (bold tabular price), not
-                   hue-driven. */
-                className="inline-flex w-fit items-center gap-3 rounded-md border border-stone-300 bg-white px-3 py-2 text-meta shadow-[var(--shadow-sm)] transition-all duration-200 ease-out hover:border-stone-400 hover:bg-stone-50 hover:shadow-[var(--shadow-md)] motion-safe:hover:scale-[1.015]"
-              >
-                <span className="flex flex-col items-start gap-0.5">
-                  <span>
-                    <span className="text-stone-500">От </span>
-                    <span className="font-semibold tabular-nums text-stone-900">
-                      {formatPriceNumber(minTotalDirams)} TJS
-                    </span>
-                  </span>
-                  {minMonthlyDirams != null ? (
-                    <span className="text-stone-700">
-                      Рассрочка от{' '}
-                      <span className="tabular-nums">{formatPriceNumber(minMonthlyDirams)} TJS / мес</span>
-                    </span>
-                  ) : null}
-                </span>
-                <ArrowUpRight className="size-3.5 shrink-0 text-terracotta-700" aria-hidden />
-              </Link>
-            ) : null}
+            <Link
+              href="/novostroyki"
+              className="inline-flex h-12 shrink-0 items-center justify-center rounded-md bg-stone-900 px-6 text-meta font-semibold text-white transition-colors hover:bg-stone-800"
+            >
+              Найти
+            </Link>
+          </div>
+
+          {/* "Или подобрать за 2 минуты" — quiet sparkle link to the
+              guided picker. Sparkle micro-rotates on hover (motion-safe). */}
+          <Link
+            href="/pomoshch-vybora"
+            className="group inline-flex items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+          >
+            <Sparkles className="size-3.5 transition-transform duration-200 ease-out motion-safe:group-hover:rotate-[6deg]" />
+            или подобрать за 2 минуты
+          </Link>
+
+          {/* Quiet nav strip — preserves 1-tap mobile access to
+              /kvartiry, /novostroyki, /diaspora. Mobile bottom nav
+              doesn't yet carry these (separate pass), so we keep this
+              row for navigation coverage. Stone-700 default, terracotta
+              on hover. */}
+          <p className="text-caption text-stone-500">
+            <span className="text-stone-400">или:</span>{' '}
+            <Link
+              href="/kvartiry"
+              className="font-medium text-stone-700 hover:text-terracotta-700 hover:underline"
+            >
+              Все квартиры
+            </Link>
+            <span className="text-stone-400" aria-hidden> · </span>
+            <Link
+              href="/novostroyki"
+              className="font-medium text-stone-700 hover:text-terracotta-700 hover:underline"
+            >
+              Все новостройки
+            </Link>
+            <span className="text-stone-400" aria-hidden> · </span>
+            <Link
+              href="/diaspora"
+              className="font-medium text-stone-700 hover:text-terracotta-700 hover:underline"
+            >
+              {tNav('diaspora')}
+            </Link>
+          </p>
+        </AppContainer>
+      </section>
+
+      {/* ─── TRUST BLOCK — "Почему ЖК.tj" ─────────────────────────
+          First-class section between hero and Featured. Eyebrow label
+          + H2 statement + 3 icon cards. Replaces the prior in-hero
+          USP cards — better placement, single-job heading, breathable. */}
+      <section className="border-b border-stone-200 bg-white py-10 md:py-14">
+        <AppContainer className="flex flex-col gap-6 md:gap-8">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+              Почему ЖК.tj
+            </span>
+            <h2
+              className="text-h2 font-semibold leading-[var(--leading-h2)] text-stone-900 md:text-h1"
+              style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+            >
+              Покупка — это серьёзно. Мы относимся так же.
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-5">
+            <TrustCard
+              Icon={ShieldCheck}
+              title="Каждый ЖК посетили"
+              body="Команда выезжает на стройку лично."
+            />
+            <TrustCard
+              Icon={ImageIcon}
+              title="Реальные фото, не рендеры"
+              body="Обновляем еженедельно."
+            />
+            <TrustCard
+              Icon={Clock}
+              title="Подбор за 2 минуты"
+              body="Покажем подходящие именно вам."
+            />
           </div>
         </AppContainer>
       </section>
 
       {/* ─── FEATURED ЖК ──────────────────────────────────────────
-          Curated by founder via `featured_rank`. Trust by quality.
-          At V1 scale (3 cards) this is the only listings showcase
-          on home — Recent listings cut (overlapped at our scale). */}
+          Curated by founder via featured_rank. Card redesign per
+          mockup deferred — shared BuildingCard touches /izbrannoe +
+          /novostroyki and warrants a separate variant pass. */}
       {featuredWithRefs.length > 0 ? (
-        <section className="py-7">
+        <section className="py-10 md:py-14">
           <AppContainer className="flex flex-col gap-5">
             <div className="flex items-end justify-between gap-3">
-              <h2 className="text-h2 font-semibold text-stone-900">Рекомендуемые проекты</h2>
+              <h2 className="text-h2 font-semibold text-stone-900 md:text-h1">
+                Рекомендуемые проекты
+              </h2>
               <Link
                 href="/novostroyki"
                 className="shrink-0 text-meta font-medium text-stone-700 hover:text-terracotta-700"
@@ -240,22 +233,19 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </section>
       ) : null}
 
-      {/* ─── §R RETENTION ────────────────────────────────────────
-          One-tap Telegram subscribe to all new Vahdat listings.
-          Always renders — empty inventory is exactly when subscribing
-          carries the most value (capture intent now, deliver later
-          when listings exist). Reuses the saved-search → Telegram
-          pipeline; displayNameFromFilters({}) returns "Сохранённый
-          поиск" as a sensible empty-filter dashboard label. */}
+      {/* ─── RETENTION ────────────────────────────────────────────
+          One-tap Telegram subscribe. Always renders — empty inventory
+          is exactly when subscribing carries the most value. Copy
+          adapts based on listings count. */}
       <section className="border-t border-stone-200 bg-stone-50 py-7">
         <AppContainer>
           <div className="flex flex-col items-start gap-3 rounded-md border border-stone-200 bg-white p-5 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-col gap-1">
               <h2 className="text-h3 font-semibold text-stone-900">
-                {allListings.length > 0 ? 'Не нашли подходящую?' : 'Узнаете первыми'}
+                {hasListings ? 'Не нашли подходящую?' : 'Узнаете первыми'}
               </h2>
               <p className="text-meta text-stone-700">
-                {allListings.length > 0
+                {hasListings
                   ? 'Получайте новые квартиры в Вахдате в Telegram. Без спама — только новые объявления.'
                   : 'Объявления появляются регулярно. Подпишитесь и узнаете первыми, когда появится подходящее.'}
               </p>
@@ -265,27 +255,62 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </AppContainer>
       </section>
 
-      {/* ─── FOOTER-BAND SELLER CTA ──────────────────────────────
-          Moved here from a prominent middle-of-page banner. Sellers
-          landing on home still find /post; buyers stop seeing a
-          competing CTA in their decision zone. Quiet 1-line strip,
-          terracotta link styling — recoverable, not banner-loud. */}
-      <section className="border-t border-stone-200 py-5">
-        <AppContainer>
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <p className="text-meta text-stone-600">
-              Хотите разместить квартиру в Вахдате?
+      {/* ─── DIASPORA DARK BAND ──────────────────────────────────
+          Premium-dark section before footer. Eyebrow + Globe icon +
+          headline + honest service-framing subline + outline CTA.
+          Replaces the prior footer-band seller CTA — sellers reach
+          /post via SiteHeader's "Разместить" + footer column. */}
+      <section className="bg-stone-900 py-10 md:py-14">
+        <AppContainer className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between md:gap-12">
+          <div className="flex max-w-2xl flex-col gap-3">
+            <div className="flex items-center gap-2 text-caption font-medium uppercase tracking-widest text-stone-400">
+              <Globe2 className="size-4 text-terracotta-400" aria-hidden />
+              Покупаете из-за границы?
+            </div>
+            <h2 className="text-h2 font-semibold leading-[var(--leading-h2)] text-white md:text-h1">
+              Видеотуры, проверка документов, звонки в вашем часовом поясе.
+            </h2>
+            <p className="text-meta text-stone-300">
+              Готовы помочь покупателям из ОАЭ, России, Турции.
             </p>
-            <Link
-              href="/post"
-              className="inline-flex items-center gap-1 text-meta font-medium text-stone-700 hover:text-terracotta-700"
-            >
-              Свяжитесь с нами
-              <ArrowUpRight className="size-3.5" aria-hidden />
-            </Link>
           </div>
+          <Link
+            href="/diaspora"
+            className="inline-flex h-11 shrink-0 items-center gap-2 rounded-md border border-white px-5 text-meta font-semibold text-white transition-colors hover:bg-white hover:text-stone-900"
+          >
+            Узнать как
+            <ArrowUpRight className="size-3.5" aria-hidden />
+          </Link>
         </AppContainer>
       </section>
     </>
+  );
+}
+
+/**
+ * Trust block card — icon in a tinted square + title + body. Three
+ * of these in a row on desktop, stacked on mobile. Reuses the
+ * terracotta-50 + terracotta-700 icon-tile pattern that pairs with
+ * the warm hero gradient above.
+ */
+function TrustCard({
+  Icon,
+  title,
+  body,
+}: {
+  Icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-stone-200 bg-white p-5">
+      <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-terracotta-50 text-terracotta-700">
+        <Icon className="size-5" aria-hidden />
+      </span>
+      <div className="flex flex-col gap-1">
+        <p className="text-meta font-semibold text-stone-900">{title}</p>
+        <p className="text-caption text-stone-600">{body}</p>
+      </div>
+    </div>
   );
 }

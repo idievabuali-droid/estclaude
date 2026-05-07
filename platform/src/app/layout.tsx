@@ -17,6 +17,7 @@ const inter = Inter({
 const lora = Lora({
   subsets: ['latin', 'cyrillic'],
   weight: ['600'],
+  style: ['normal', 'italic'],
   display: 'swap',
   variable: '--font-lora',
 });
