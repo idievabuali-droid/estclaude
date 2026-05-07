@@ -54,14 +54,14 @@ export async function SiteHeader() {
           {user ? (
             <Link
               href="/kabinet"
-              className="inline-flex h-9 items-center rounded-md bg-terracotta-600 px-4 text-meta font-semibold text-white hover:bg-terracotta-700"
+              className="inline-flex h-9 items-center rounded-md bg-stone-900 px-4 text-meta font-semibold text-white hover:bg-stone-800"
             >
               Кабинет
             </Link>
           ) : (
             <Link
               href="/voyti"
-              className="inline-flex h-9 items-center rounded-md bg-terracotta-600 px-4 text-meta font-semibold text-white hover:bg-terracotta-700"
+              className="inline-flex h-9 items-center rounded-md bg-stone-900 px-4 text-meta font-semibold text-white hover:bg-stone-800"
             >
               {t('login')}
             </Link>

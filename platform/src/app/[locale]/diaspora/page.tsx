@@ -136,7 +136,7 @@ export default async function DiasporaPage({
               href={whatsappHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-terracotta-600 px-6 text-meta font-semibold text-white transition-colors hover:bg-terracotta-700"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-stone-900 px-6 text-meta font-semibold text-white transition-colors hover:bg-stone-800"
             >
               <MessageCircle className="size-4" aria-hidden />
               Запросить видеообзор
