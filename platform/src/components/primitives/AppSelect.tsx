@@ -18,7 +18,20 @@ export interface AppSelectProps extends SelectHTMLAttributes<HTMLSelectElement> 
  * select on mobile is genuinely good (full-screen wheel, accessible).
  */
 export const AppSelect = forwardRef<HTMLSelectElement, AppSelectProps>(
-  ({ className, label, helperText, errorText, options, placeholder, id, ...rest }, ref) => {
+  (
+    {
+      className,
+      label,
+      helperText,
+      errorText,
+      options,
+      placeholder,
+      id,
+      required,
+      ...rest
+    },
+    ref,
+  ) => {
     const generatedId = useId();
     const selectId = id ?? generatedId;
     const hasError = Boolean(errorText);
@@ -28,6 +41,11 @@ export const AppSelect = forwardRef<HTMLSelectElement, AppSelectProps>(
         {label ? (
           <label htmlFor={selectId} className="text-meta font-medium text-stone-700">
             {label}
+            {required ? (
+              <span className="ml-0.5 text-semantic-error" aria-hidden>
+                *
+              </span>
+            ) : null}
           </label>
         ) : null}
         <div
@@ -40,6 +58,7 @@ export const AppSelect = forwardRef<HTMLSelectElement, AppSelectProps>(
           <select
             ref={ref}
             id={selectId}
+            required={required}
             className={cn(
               'h-full w-full appearance-none bg-transparent pr-6 text-body text-stone-900 outline-none',
               className,

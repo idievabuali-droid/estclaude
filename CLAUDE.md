@@ -19,7 +19,7 @@ You are working on a trust-first, mobile-first new-build apartment platform. The
 The original specs target Dushanbe + Vahdat with 14 pages, full verification flow, multi-source listings, etc. **V1 is much narrower.** Locked decisions:
 
 - **One city: Vahdat.** The `ACTIVE_CITY = 'vahdat'` constant in `services/buildings.ts` is the master switch. Every public query filters on it.
-- **Founder-only publishing.** Only the user (admin role in `user_roles`) creates listings via `/post` PostFlow. Everyone else lands on a `ContactCard` with WhatsApp/Telegram/Phone — they message the founder, who posts on their behalf. Founder contacts live in `src/lib/founder-contacts.ts`.
+- **Seller self-serve with founder moderation.** Any phone-verified user (Telegram bot login captures the phone) can post via `/post` PostFlow. Non-founder submissions enter `status='pending_review'` + `is_published=false` and surface in the founder's moderation queue at `/kabinet` (ModerationList). Founder reviews each listing, calls/visits the seller using the captured phone, then approves via `/api/listings/moderate` — approval flips status to `'active'`, auto-publishes the parent building, and triggers saved-search match-on-publish. Founder posts (admin/staff in `user_roles`) go live immediately. Founder contacts in `src/lib/founder-contacts.ts` are still used for buyer-side WhatsApp/Telegram entry points (`/pomoshch-vybora`, etc).
 - **Telegram bot auth, not SMS.** `@zhk_tj_bot` handles `/start <token>` for login + `/start subscribe_<token>` for saved-search subscribe. Twilio/Vonage references in specs are deferred.
 - **No paid features. No verification UI flows. No Tier 2/3 self-service.** Founder manually verifies developers (when needed) by flipping `developers.verified_at` directly in Supabase Studio.
 - **Compare hidden behind `FEATURES.compare = false`.** The code is shipped but the UI is gated.
@@ -34,7 +34,7 @@ When the user asks for something, **do not re-add cut features as "while we're h
 
 - **Migration application.** Each new migration file in `platform/supabase/migrations/` is applied by the user in the Supabase SQL editor. Don't try to run them via the script unless asked.
 - **Developer verification.** No admin UI. Founder edits `developers.status` + `verified_at` directly.
-- **Listing posting for non-founder leads.** ContactCard surfaces WhatsApp/Telegram/Phone. Founder talks to the seller and posts via `/post` themselves. By design.
+- **Listing verification.** Founder calls (or visits, when needed) the seller using the phone captured at Telegram login before approving a `pending_review` listing. The moderation queue surfaces the phone next to each row. By design — automated verification is V2.
 - **WhatsApp callback follow-up.** When a saved-search match arrives via the WhatsApp fallback, the founder gets a Telegram nudge with the buyer's phone and messages them manually. By design.
 - **Building cover photos for legacy buildings.** No backfill — only photos uploaded via the post/edit flow appear; older mock buildings stay on the colored placeholder.
 

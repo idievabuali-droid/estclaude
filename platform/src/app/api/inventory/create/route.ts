@@ -29,7 +29,9 @@ import { createBuilding } from '@/services/buildings';
 import { createListing } from '@/services/listings';
 import { attachAndSetCover, type PendingPhoto } from '@/services/photos';
 import { notifyMatchingListing } from '@/lib/saved-searches/match';
-import type { BuildingStatus, FinishingType } from '@/types/domain';
+import { notifyPendingListing } from '@/lib/analytics/founder-notify';
+import { createAdminClient } from '@/lib/supabase/admin';
+import type { BuildingStatus, FinishingType, SourceType } from '@/types/domain';
 
 interface ApartmentInput {
   rooms_count: number;
@@ -86,6 +88,50 @@ interface CreateInventoryBody {
 
 const TJS_TO_DIRAMS = 100n;
 
+/**
+ * Translate the most-likely Postgres constraint / Supabase errors into
+ * Russian copy the seller can act on. Falls back to the raw message so
+ * we never hide a debug-useful detail.
+ *
+ * The list is intentionally narrow — every entry corresponds to a
+ * named DB constraint or a known Supabase failure mode that a real
+ * seller might hit. Adding "best effort fallback" translations beyond
+ * this would risk masking new bugs we should fix at the source.
+ */
+function humaniseListingError(raw: string): string {
+  // listings_owner_renovated_only_resale (migration 0003): the founder
+  // accidentally picked "Отремонтировано владельцем" while we still
+  // mark the listing as a developer source. Now defended client-side
+  // by resolveSourceType, but kept here in case a future code path
+  // bypasses it.
+  if (raw.includes('listings_owner_renovated_only_resale')) {
+    return 'Отделка «Отремонтировано владельцем» доступна только для частных продавцов — выберите другой вариант или войдите как обычный пользователь.';
+  }
+  // listings_size_positive / _price_positive / _rooms_min — basic
+  // sanity checks. The form prevents these but a copy-paste API call
+  // could still hit them.
+  if (raw.includes('listings_size_positive')) {
+    return 'Площадь должна быть больше нуля.';
+  }
+  if (raw.includes('listings_price_positive')) {
+    return 'Цена должна быть больше нуля.';
+  }
+  if (raw.includes('listings_rooms_min')) {
+    return 'Минимум 1 комната.';
+  }
+  // listings_slug_unique — extremely rare after the slug-collision
+  // retry loop, but not impossible.
+  if (raw.includes('listings_slug_unique')) {
+    return 'Похожее объявление уже существует — измените площадь или этаж и попробуйте ещё раз.';
+  }
+  // Foreign-key violations on building_id / seller_user_id are usually
+  // a bug, not a seller mistake. Surface a cleaner string anyway.
+  if (raw.includes('listings_building_id_fkey')) {
+    return 'ЖК не найден. Обновите страницу и выберите ЖК заново.';
+  }
+  return raw;
+}
+
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
@@ -107,9 +153,21 @@ export async function POST(req: NextRequest) {
 
   const founder = await isFounder(user.id);
   const initialStatus = founder ? 'active' : 'pending_review';
-  // Founder posts on behalf of developers → 'developer' source.
-  // Other phone-verified users → 'owner' (they're posting their own).
-  const sourceType = founder ? 'developer' : 'owner';
+  // Source-type derivation:
+  //  - Non-founder always = 'owner' (they're posting their own apartment).
+  //  - Founder defaults to 'developer' (they post on behalf of a builder).
+  //  - But: the schema enforces a CHECK constraint
+  //      `listings_owner_renovated_only_resale`:
+  //        finishing_type='owner_renovated' ⇒ source_type ∈ {owner, intermediary}
+  //    So if the apartment is "Отремонтировано владельцем" we force
+  //    'owner' regardless of who's typing — by definition that's a
+  //    private-owner listing, even when the founder is data-entering it.
+  //  We resolve sourceType per-apartment rather than once-per-request
+  //  because a single submission can mix new-build (developer) and
+  //  resale (owner) units (rare today, but the constraint is per-row).
+  const baseSourceType: 'developer' | 'owner' = founder ? 'developer' : 'owner';
+  const resolveSourceType = (finishing: FinishingType): SourceType =>
+    finishing === 'owner_renovated' ? 'owner' : baseSourceType;
 
   // Resolve building — either create new or use existing id.
   let buildingId: string;
@@ -197,7 +255,7 @@ export async function POST(req: NextRequest) {
       const c = await createListing({
         buildingId,
         sellerUserId: user.id,
-        sourceType,
+        sourceType: resolveSourceType(apt.finishing_type),
         roomsCount: apt.rooms_count,
         sizeM2: apt.size_m2,
         floorNumber: apt.floor_number,
@@ -231,8 +289,28 @@ export async function POST(req: NextRequest) {
         }
       }
     } catch (err) {
-      console.error(`createListing #${i} failed:`, err);
-      failed.push({ index: i, error: String(err) });
+      // Verbose server log so dev / Vercel logs surface the actual
+      // Supabase error (PG code, hint, details) — `String(err)` on a
+      // Postgrest error reads as "[object Object]" which is useless
+      // when debugging from the client side.
+      const detail =
+        err && typeof err === 'object'
+          ? JSON.stringify({
+              message: (err as { message?: unknown }).message,
+              code: (err as { code?: unknown }).code,
+              details: (err as { details?: unknown }).details,
+              hint: (err as { hint?: unknown }).hint,
+            })
+          : String(err);
+      console.error(`createListing #${i} failed:`, detail, err);
+      // Translate the most-likely Supabase/Postgres error reasons into
+      // friendlier Russian; fall back to the raw message otherwise. The
+      // raw message stays in the dev log above for engineering debug.
+      const errMsg =
+        err && typeof err === 'object' ? (err as { message?: string }).message : null;
+      const raw = typeof errMsg === 'string' && errMsg.length > 0 ? errMsg : String(err);
+      const clientMsg = humaniseListingError(raw);
+      failed.push({ index: i, error: clientMsg });
     }
   }
 
@@ -249,6 +327,34 @@ export async function POST(req: NextRequest) {
         ),
       ),
     );
+  }
+
+  // Founder notification — when a non-founder submits, we ping the
+  // founder on Telegram so they can call the seller and review the
+  // listing without polling /kabinet. Best-effort: never blocks the
+  // API response.
+  if (!founder && created.length > 0) {
+    void (async () => {
+      try {
+        // Resolve building name (jsonb {ru, tg}) for the alert message.
+        const supabase = createAdminClient();
+        const { data: bld } = await supabase
+          .from('buildings')
+          .select('name')
+          .eq('id', buildingId)
+          .maybeSingle();
+        const buildingName =
+          (bld?.name as { ru?: string } | undefined)?.ru ?? 'ЖК';
+        await notifyPendingListing({
+          buildingName,
+          apartmentCount: created.length,
+          sellerPhone: user.phone,
+          origin: req.nextUrl.origin,
+        });
+      } catch (err) {
+        console.error('notifyPendingListing failed:', err);
+      }
+    })();
   }
 
   return NextResponse.json({

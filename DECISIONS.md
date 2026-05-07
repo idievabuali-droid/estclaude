@@ -8,6 +8,14 @@ Newest at top.
 
 ---
 
+## 2026-05-07 · Seller self-serve `/post` with founder moderation + verification call
+
+**Locked:** Pivoted off the V1 "founder-only publishing" lock. Any phone-verified user (Telegram bot login captures `users.phone`) sees PostFlow at `/post`; non-founder submissions land in `status='pending_review'` and surface in the founder's `/kabinet` ModerationList. Founder reviews each row, calls/visits the seller using the captured phone, then approves via `/api/listings/moderate` — approval flips status, auto-publishes the parent building, fires saved-search match-on-publish, sends seller a Telegram DM. Founder gets a Telegram DM via `notifyPendingListing()` the moment a non-founder submits. Anonymous /post → redirect to /voyti?redirect=/post. Form gained: required-field markers + inline error highlighting (A1), per-m² hint with district benchmark (A2), localStorage autosave with 24h restore banner (A3), confirm-before-publish modal (A4), partial-failure inline block (A5), photo-first nudge for sellers (A6).
+**Why:** Manual "message us, we'll post for you" was a conversion drag; sellers can self-serve safely now that every login is phone-verified and every submission is founder-reviewed before going public.
+**Affects:** `src/app/[locale]/post/page.tsx`, `src/app/[locale]/post/PostFlow.tsx`, `src/app/[locale]/post/draft-storage.ts` (new), `src/app/api/inventory/create/route.ts`, `src/lib/analytics/founder-notify.ts`, `src/app/[locale]/kabinet/page.tsx`, `src/components/primitives/{AppInput,AppSelect}.tsx` (red `*` on `required`). Pipeline that was already wired (moderation route, queue UI, listing actions) reused untouched.
+
+---
+
 ## 2026-05-06 · Brand consistency ripple across buyer-facing platform
 
 **Locked:** Lora serif H1 via inline `style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}` on /izbrannoe, /kvartiry, /novostroyki, /zhk/[slug] (statement headings). Eyebrow labels (uppercase tracking-widest stone-500) above section H2s on /zhk + /kvartira detail pages. Verified developer pill standardised: white bg + stone-200 border + green dot (replaces amber inline badge). /diaspora rebuilt to home pattern: pill + serif H1 with italic accent + 3 icon-tile trust cards + dark-band CTA with WhatsApp/Telegram. /kvartira H1 stays sans (numeric).

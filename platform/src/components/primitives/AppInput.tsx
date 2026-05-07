@@ -11,7 +11,18 @@ export interface AppInputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 export const AppInput = forwardRef<HTMLInputElement, AppInputProps>(
   (
-    { className, label, helperText, errorText, leftSlot, rightSlot, id, type = 'text', ...rest },
+    {
+      className,
+      label,
+      helperText,
+      errorText,
+      leftSlot,
+      rightSlot,
+      id,
+      type = 'text',
+      required,
+      ...rest
+    },
     ref,
   ) => {
     const generatedId = useId();
@@ -23,6 +34,11 @@ export const AppInput = forwardRef<HTMLInputElement, AppInputProps>(
         {label ? (
           <label htmlFor={inputId} className="text-meta font-medium text-stone-700">
             {label}
+            {required ? (
+              <span className="ml-0.5 text-semantic-error" aria-hidden>
+                *
+              </span>
+            ) : null}
           </label>
         ) : null}
         <div
@@ -37,6 +53,7 @@ export const AppInput = forwardRef<HTMLInputElement, AppInputProps>(
             ref={ref}
             id={inputId}
             type={type}
+            required={required}
             className={cn(
               'h-full w-full bg-transparent text-body text-stone-900 outline-none',
               'placeholder:text-stone-400',

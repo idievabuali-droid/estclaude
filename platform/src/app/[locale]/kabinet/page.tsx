@@ -142,10 +142,14 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
                   Сохранённые поиски
                 </AppButton>
               </Link>
-              {/* "Новое объявление" CTA is founder-only in V1: regular
-                  sellers go through /post → ContactCard, where we ask
-                  them to message us and we publish on their behalf. */}
-              {founder && isSeller ? (
+              {/* "Новое объявление" CTA — V1.1 update: opened to all
+                  logged-in users now that sellers can self-serve via
+                  /post (listings enter the moderation queue). The CTA
+                  appears once a user is already a seller (has at least
+                  one listing) — for first-timers the empty-state card
+                  below carries the entry point so the header doesn't
+                  shout at brand-new buyers who landed here by accident. */}
+              {isSeller ? (
                 <Link href="/post">
                   <AppButton variant="primary" size="md">
                     <Plus className="size-4" />
@@ -219,10 +223,11 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
                   <h3 className="text-h3 font-semibold text-stone-900">
                     У вас пока нет объявлений
                   </h3>
-                  {/* CTA copy diverges by role: founder posts directly,
-                      everyone else messages us and we post for them.
-                      Same /post link in both cases — the page itself
-                      branches between PostFlow and ContactCard. */}
+                  {/* CTA copy diverges by role — both link to /post,
+                      where the form itself branches:
+                        founder → publish immediately
+                        seller  → submit to moderation queue, founder
+                                  calls/visits before approving. */}
                   {founder ? (
                     <>
                       <p className="text-meta text-stone-500">
@@ -235,11 +240,10 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
                   ) : (
                     <>
                       <p className="text-meta text-stone-500">
-                        На старте мы публикуем объявления вручную: напишите нам, и мы
-                        разместим квартиру за вас.
+                        Разместите первую квартиру — мы проверим и опубликуем в течение дня.
                       </p>
                       <Link href="/post">
-                        <AppButton variant="primary">Связаться с нами</AppButton>
+                        <AppButton variant="primary">Разместить</AppButton>
                       </Link>
                     </>
                   )}

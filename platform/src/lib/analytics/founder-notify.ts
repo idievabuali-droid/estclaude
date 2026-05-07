@@ -61,3 +61,51 @@ export async function notifyFounder(text: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Notify the founder that a non-founder seller submitted a listing
+ * that's waiting in the moderation queue. Fired from
+ * `/api/inventory/create` after a successful insert when the
+ * submitter doesn't have an admin/staff role.
+ *
+ * Why a dedicated helper: the message format wants to be consistent
+ * across the few places we'd otherwise inline it (today just the
+ * inventory route, but the same shape will apply if we ever build
+ * an "edit triggered re-moderation" notification).
+ *
+ * Best-effort: failures get logged but the API response still
+ * succeeds — we don't want a Telegram outage blocking listing
+ * submission.
+ */
+export async function notifyPendingListing(opts: {
+  buildingName: string;
+  apartmentCount: number;
+  sellerPhone: string;
+  origin: string;
+}): Promise<boolean> {
+  const { buildingName, apartmentCount, sellerPhone, origin } = opts;
+  const phone = sellerPhone.startsWith('+') ? sellerPhone : `+${sellerPhone}`;
+  const aptLabel =
+    apartmentCount === 1
+      ? '1 квартира'
+      : `${apartmentCount} ${pluralRu(apartmentCount, ['квартира', 'квартиры', 'квартир'])}`;
+  const text = [
+    `📋 Новое объявление на проверке`,
+    `${buildingName} · ${aptLabel}`,
+    `Продавец: ${phone}`,
+    `Очередь: ${origin}/kabinet`,
+  ].join('\n');
+  return notifyFounder(text);
+}
+
+/** Russian plural helper — duplicated from PostFlow's local `plural`
+ *  because importing client-only helpers into a server module is
+ *  noisier than copying a 6-line function. */
+function pluralRu(n: number, forms: [string, string, string]): string {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return forms[2];
+  if (last > 1 && last < 5) return forms[1];
+  if (last === 1) return forms[0];
+  return forms[2];
+}

@@ -253,11 +253,12 @@ export function EditApartmentForm({
             ) : null}
 
             {/* Add new photos. Uploads happen immediately to Storage;
-                DB rows are inserted only when the seller hits Save. */}
+                DB rows are inserted only when the seller hits Save.
+                30 cap matches PostFlow + Cian/Bayut. */}
             <PhotoPicker
               label={visibleExisting.length === 0 ? 'Фото квартиры' : 'Добавить фото'}
               kind="unit_living"
-              max={Math.max(1, 15 - visibleExisting.length)}
+              max={Math.max(1, 30 - visibleExisting.length)}
               photos={newPhotos}
               onChange={setNewPhotos}
             />
