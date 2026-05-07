@@ -3,19 +3,54 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FilterChipSheet } from '@/components/blocks';
+import {
+  IllustrationMosque,
+  IllustrationSchool,
+  IllustrationKindergarten,
+  IllustrationHospital,
+  IllustrationSupermarket,
+  IllustrationTransit,
+  IllustrationPark,
+  IllustrationPharmacy,
+} from '@/components/illustrations';
 import { buildQuery, csvSet, type FilterParams } from './filter-state';
+
+/** POI icon registry — maps a serialisable string key to the actual
+ *  illustration component. Defined inside this client module so the
+ *  server-rendered parent can pass `iconKey: 'mosque'` (a string)
+ *  across the client boundary without React Server Components
+ *  complaining about non-serialisable function props.
+ *
+ *  Earlier the parent passed `Icon: IllustrationMosque` directly,
+ *  which crashed at render with "Functions cannot be passed directly
+ *  to Client Components." */
+const POI_ICONS = {
+  mosque: IllustrationMosque,
+  school: IllustrationSchool,
+  kindergarten: IllustrationKindergarten,
+  hospital: IllustrationHospital,
+  supermarket: IllustrationSupermarket,
+  transit: IllustrationTransit,
+  park: IllustrationPark,
+  pharmacy: IllustrationPharmacy,
+} as const;
+
+export type PoiIconKey = keyof typeof POI_ICONS;
 
 export interface MultiSelectOption {
   value: string;
   label: string;
-  /** Optional emoji prefix — legacy "Что рядом" usage. New code
-   *  should pass `Icon` instead so the visual vocabulary stays in
-   *  the monoline illustration system. */
+  /** Optional emoji prefix — legacy fallback. New code should pass
+   *  `iconKey` instead so the visual vocabulary stays in the
+   *  monoline illustration system. */
   emoji?: string;
-  /** Optional monoline illustration component for this option. When
-   *  set, replaces emoji. Sized at size-5 inside the chip — small
-   *  enough not to crowd the label. */
-  Icon?: React.ComponentType<{ className?: string }>;
+  /** Optional monoline illustration KEY (string, serialisable across
+   *  the server→client boundary). Looked up in POI_ICONS inside this
+   *  client module to render the actual component.
+   *
+   *  Why a key, not the component itself: Server Components can't
+   *  serialise functions to client-component props. */
+  iconKey?: PoiIconKey;
 }
 
 export interface MultiSelectChipProps {
@@ -130,14 +165,17 @@ export function MultiSelectChip({
                   : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-100')
               }
             >
-              {opt.Icon ? (
-                <opt.Icon
-                  className={
-                    'size-5 ' +
-                    (active ? 'text-terracotta-700' : 'text-stone-500')
-                  }
-                />
-              ) : opt.emoji ? (
+              {opt.iconKey ? (() => {
+                const Icon = POI_ICONS[opt.iconKey];
+                return (
+                  <Icon
+                    className={
+                      'size-5 ' +
+                      (active ? 'text-terracotta-700' : 'text-stone-500')
+                    }
+                  />
+                );
+              })() : opt.emoji ? (
                 <span className="mr-1" aria-hidden>
                   {opt.emoji}
                 </span>

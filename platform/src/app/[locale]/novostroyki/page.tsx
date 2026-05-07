@@ -16,18 +16,8 @@ import type { BuildingStatus } from '@/types/domain';
 import type { PoiCategory } from '@/services/poi';
 import { buildQuery, type FilterParams } from './filter-state';
 import { PriceChip } from './PriceChip';
-import { MultiSelectChip } from './MultiSelectChip';
+import { MultiSelectChip, type PoiIconKey } from './MultiSelectChip';
 import { NovostroykiFilterRail } from './FilterRail';
-import {
-  IllustrationMosque,
-  IllustrationSchool,
-  IllustrationKindergarten,
-  IllustrationHospital,
-  IllustrationSupermarket,
-  IllustrationTransit,
-  IllustrationPark,
-  IllustrationPharmacy,
-} from '@/components/illustrations';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { getExchangeRates } from '@/services/currency';
 
@@ -59,23 +49,24 @@ const AMENITIES_FILTERS: Array<{ value: string; label: string }> = [
 
 /** "Что рядом" mobile chip filters — POI categories within 1km walking
  *  distance. Mosque first per Tajik market relevance. Each entry pairs
- *  the POI value with a monoline illustration (replaces the previous
- *  emoji glyphs that read as inconsistent against the rest of the
- *  brand vocabulary). The illustration is also used by the
- *  NovostroykiFilterRail's "Что рядом" group. */
+ *  the POI value with a serialisable iconKey (string) — the matching
+ *  illustration is resolved inside MultiSelectChip's POI_ICONS map.
+ *  Plain strings can cross the Server→Client boundary; raw component
+ *  refs cannot, which crashed Next.js with "Functions cannot be passed
+ *  directly to Client Components." */
 const NEARBY_FILTERS: Array<{
   value: PoiCategory;
   label: string;
-  Icon: React.ComponentType<{ className?: string }>;
+  iconKey: PoiIconKey;
 }> = [
-  { value: 'mosque', label: 'Мечеть', Icon: IllustrationMosque },
-  { value: 'school', label: 'Школа', Icon: IllustrationSchool },
-  { value: 'kindergarten', label: 'Детский сад', Icon: IllustrationKindergarten },
-  { value: 'supermarket', label: 'Магазин', Icon: IllustrationSupermarket },
-  { value: 'hospital', label: 'Поликлиника', Icon: IllustrationHospital },
-  { value: 'pharmacy', label: 'Аптека', Icon: IllustrationPharmacy },
-  { value: 'transit', label: 'Транспорт', Icon: IllustrationTransit },
-  { value: 'park', label: 'Парк', Icon: IllustrationPark },
+  { value: 'mosque', label: 'Мечеть', iconKey: 'mosque' },
+  { value: 'school', label: 'Школа', iconKey: 'school' },
+  { value: 'kindergarten', label: 'Детский сад', iconKey: 'kindergarten' },
+  { value: 'supermarket', label: 'Магазин', iconKey: 'supermarket' },
+  { value: 'hospital', label: 'Поликлиника', iconKey: 'hospital' },
+  { value: 'pharmacy', label: 'Аптека', iconKey: 'pharmacy' },
+  { value: 'transit', label: 'Транспорт', iconKey: 'transit' },
+  { value: 'park', label: 'Парк', iconKey: 'park' },
 ];
 
 export default async function NovostroykiPage({
