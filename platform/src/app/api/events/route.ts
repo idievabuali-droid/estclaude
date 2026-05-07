@@ -19,6 +19,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
 import { readAnonIdServer } from '@/lib/analytics/anon-id';
+import { detectAndAlert } from '@/lib/analytics/friction-alerts';
 
 interface EventBody {
   type: string;
@@ -49,6 +50,12 @@ const ALLOWED_EVENT_TYPES = new Set([
   'callback_widget_typed_no_submit',
   'listing_revisit',
   'login_callback_submitted',
+  // Phase A feedback-loop additions:
+  'feedback_submitted',
+  'quiz_started',
+  'quiz_step_answered',
+  'quiz_completed',
+  'quiz_abandoned',
 ]);
 
 /** Soft per-anon rate limit. In-memory map (per serverless instance);
@@ -112,14 +119,26 @@ export async function POST(req: NextRequest) {
   void (async () => {
     try {
       const supabase = createAdminClient();
+      const pageUrl = (properties as { url?: string }).url ?? null;
       await supabase.from('events').insert({
         anon_id: anonId,
         user_id: user?.id ?? null,
         event_type: body.type,
         properties,
-        url: (properties as { url?: string }).url ?? null,
+        url: pageUrl,
         referrer,
         user_agent: userAgent,
+      });
+      // Friction-alerts pipeline — for the small subset of events that
+      // are real-time-actionable (repeat no-results, callback strand,
+      // feedback submission), DM the founder with a one-click drill-
+      // down link. Best-effort, non-blocking, swallows its own errors.
+      // The 202 has already been returned to the client.
+      await detectAndAlert({
+        eventType: body.type,
+        anonId,
+        properties,
+        pageUrl,
       });
     } catch (err) {
       console.error('events insert failed:', err);

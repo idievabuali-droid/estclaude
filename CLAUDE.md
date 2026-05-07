@@ -48,6 +48,7 @@ These are deliberate trade-offs that buy us speed at this stage. They become can
 - **Events table is the analytics source of truth.** All analytics queries aggregate from `events`. Don't denormalise into separate tables.
 - **`displayNameFromFilters()` in `src/lib/saved-searches/format.ts`** is the single canonical filter-to-Russian-label converter. Use it everywhere a filter set is shown to a human (saved searches list, 0-result dashboard rows, alerts).
 - **Match-on-publish runs inline** at `/api/inventory/create` and `/api/listings/moderate`, not via cron. `notifyMatchingListing()` in `src/lib/saved-searches/match.ts`.
+- **Feedback-loop stack: first-party `events` + Microsoft Clarity + real-time Telegram friction alerts.** PostHog deliberately NOT adopted at this stage — would create dual sources of truth with the existing `events` table + `/kabinet/analytics`. Clarity fills the only genuine gap (session replay + heatmaps); env var: `NEXT_PUBLIC_CLARITY_PROJECT_ID`. Friction alerts live in `src/lib/analytics/friction-alerts.ts`, fire from inside `/api/events` after insert, route through `notifyFounder()` in `src/lib/analytics/founder-notify.ts` (which reads founder's `tg_chat_id` via `user_roles.role='admin'`). Re-evaluate at ~50 weekly actives.
 
 ## Your role
 

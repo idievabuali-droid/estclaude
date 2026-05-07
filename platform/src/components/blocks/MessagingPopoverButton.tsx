@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ComponentType, type SVGProps } from '
 import { MessageSquare, MessageCircle, Send } from 'lucide-react';
 import { AppButton } from '@/components/primitives';
 import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/track';
 
 export interface MessagingPopoverButtonProps {
   /** WhatsApp deep-link (already includes the prefilled text). */
@@ -128,7 +129,14 @@ export function MessagingPopoverButton({
             target="_blank"
             rel="noopener noreferrer"
             role="menuitem"
-            onClick={() => setOpen(false)}
+            onClick={() => {
+              // Capture intent at the moment of handoff. The user is
+              // about to leave for WhatsApp where we lose visibility;
+              // this event lets the founder reconcile WhatsApp DMs to
+              // an anon_id timeline in /kabinet/analytics.
+              track('contact_button_click', { channel: 'whatsapp', source: 'popover' });
+              setOpen(false);
+            }}
             className="flex items-center gap-3 px-3 py-2.5 text-meta text-stone-900 hover:bg-stone-50"
           >
             <span className="inline-flex size-7 items-center justify-center rounded-full bg-[color:var(--color-fairness-great)] text-white" aria-hidden>
@@ -141,7 +149,10 @@ export function MessagingPopoverButton({
             target="_blank"
             rel="noopener noreferrer"
             role="menuitem"
-            onClick={() => setOpen(false)}
+            onClick={() => {
+              track('contact_button_click', { channel: 'telegram', source: 'popover' });
+              setOpen(false);
+            }}
             className="flex items-center gap-3 px-3 py-2.5 text-meta text-stone-900 hover:bg-stone-50"
           >
             <span className="inline-flex size-7 items-center justify-center rounded-full bg-[color:var(--color-semantic-info)] text-white" aria-hidden>
@@ -155,7 +166,10 @@ export function MessagingPopoverButton({
               target="_blank"
               rel="noopener noreferrer"
               role="menuitem"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                track('contact_button_click', { channel: 'imo', source: 'popover' });
+                setOpen(false);
+              }}
               className="flex items-center gap-3 px-3 py-2.5 text-meta text-stone-900 hover:bg-stone-50"
             >
               {/* IMO wordmark on sky-blue — Lucide doesn't ship an IMO

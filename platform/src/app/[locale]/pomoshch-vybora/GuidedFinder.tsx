@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, X } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { AppButton } from '@/components/primitives';
 import { LocationSearch } from '@/components/blocks';
 import { mockDistricts } from '@/lib/mock';
 import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/track';
 
 type Answers = {
   districts: string[];
@@ -155,6 +156,26 @@ export function GuidedFinder() {
 
   const step = STEPS[stepIdx]!;
   const isLast = stepIdx === STEPS.length - 1;
+
+  // Quiz lifecycle events. The wizard is the platform's highest-intent
+  // funnel and was previously invisible to /kabinet/analytics — buyers
+  // could drop on any step and we couldn't see which step.
+  //
+  // - quiz_started fires once on mount.
+  // - quiz_step_answered fires on each forward advance (in next()).
+  // - quiz_completed fires on the last advance, before router.push.
+  // - quiz_abandoned fires on unmount IF the wizard never reached
+  //   completion (e.g. user navigated away or closed the tab).
+  const completedRef = useRef(false);
+  useEffect(() => {
+    track('quiz_started');
+    return () => {
+      if (!completedRef.current) {
+        track('quiz_abandoned', { last_step: stepIdx + 1 });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const canAdvance = (() => {
     if (step.key === 'districts') return true; // skip allowed
     if (step.key === 'rooms') return answers.rooms.length > 0;
@@ -171,7 +192,19 @@ export function GuidedFinder() {
   })();
 
   function next() {
+    // Track the answer the buyer just gave on this step. The compact
+    // payload (step number + step key + summary of the answer) is
+    // enough to drive a per-step funnel in /kabinet/analytics without
+    // bloating the events table with raw form state.
+    track('quiz_step_answered', {
+      step_num: stepIdx + 1,
+      step_key: step.key,
+      answer_summary: summariseStepAnswer(step.key, answers),
+    });
     if (!isLast) return setStepIdx((i) => i + 1);
+    // Final advance — the wizard is about to navigate away.
+    track('quiz_completed');
+    completedRef.current = true;
 
     // Anchor: a building or developer pick is decisive — the buyer
     // wanted that specific thing, send them to its detail/scoped
@@ -496,6 +529,35 @@ export function GuidedFinder() {
 /** Picking "Не важно" deselects every specific value (and vice
  *  versa). Lets the buyer multi-select specific values like 1 + 2
  *  rooms without the "any" sentinel polluting the URL params. */
+/** Compact, JSON-friendly summary of the buyer's answer on a given
+ *  step. Used as the `answer_summary` property on the
+ *  `quiz_step_answered` event so /kabinet/analytics can show what
+ *  was picked at each drop-off without dumping raw form state. */
+function summariseStepAnswer(
+  stepKey: 'districts' | 'budget' | 'rooms' | 'finishing' | 'timing',
+  answers: Answers,
+): unknown {
+  switch (stepKey) {
+    case 'districts':
+      return {
+        districts: answers.districts,
+        anchor_kind: answers.anchor?.kind ?? null,
+      };
+    case 'budget':
+      return {
+        mode: answers.budgetMode,
+        budget: answers.budget,
+        max_monthly: answers.maxMonthly,
+      };
+    case 'rooms':
+      return { rooms: answers.rooms };
+    case 'finishing':
+      return { finishing: answers.finishing };
+    case 'timing':
+      return { timing: answers.timing };
+  }
+}
+
 function applyAnyMutex(next: string[]): string[] {
   const last = next[next.length - 1];
   if (last === 'any') return ['any'];
