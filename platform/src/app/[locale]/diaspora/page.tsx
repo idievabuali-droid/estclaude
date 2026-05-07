@@ -98,7 +98,7 @@ export default async function DiasporaPage({
           accent + subhead + two action buttons. Same warm gradient
           (terracotta-50/40 → stone-50) so a buyer arriving from /
           doesn't feel a tonal break. */}
-      <section className="border-b border-stone-200 bg-gradient-to-b from-terracotta-50/40 via-stone-50 to-stone-50 py-10 md:py-16">
+      <section className="border-b border-stone-200 bg-gradient-to-b from-terracotta-50/40 via-stone-50 to-stone-50 py-16 md:py-24">
         <AppContainer className="flex flex-col items-center gap-5 text-center md:gap-6">
           {/* Trust pill — same shape as home's hero pill: white bg,
               stone-200 border, green dot, uppercase tracking-wider.
@@ -157,7 +157,7 @@ export default async function DiasporaPage({
           + 3 cards. Diaspora-specific jobs: video tour, document
           check, time-zone flexibility. Replaces the prior bespoke
           inline content list. */}
-      <section className="border-b border-stone-200 bg-white py-10 md:py-14">
+      <section className="border-b border-stone-200 bg-white py-16 md:py-24">
         <AppContainer className="flex flex-col gap-6 md:gap-8">
           <div className="flex flex-col items-center gap-2 text-center">
             <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
@@ -199,7 +199,7 @@ export default async function DiasporaPage({
 
       {/* ─── Featured projects — same surface as home page ──── */}
       {featuredWithRefs.length > 0 ? (
-        <section className="py-10 md:py-14">
+        <section className="py-16 md:py-24">
           <AppContainer className="flex flex-col gap-5">
             <div className="flex items-end justify-between gap-3">
               <h2 className="text-h2 font-semibold text-stone-900">Рекомендуемые проекты</h2>
@@ -233,7 +233,7 @@ export default async function DiasporaPage({
 
       {/* ─── Свежие квартиры — same surface as home page ────── */}
       {recentRaw.length > 0 ? (
-        <section className="border-t border-stone-200 bg-stone-50 py-10 md:py-14">
+        <section className="border-t border-stone-200 bg-stone-50 py-16 md:py-24">
           <AppContainer className="flex flex-col gap-5">
             <div className="flex items-end justify-between gap-3">
               <h2 className="text-h2 font-semibold text-stone-900">Свежие квартиры</h2>
@@ -276,7 +276,7 @@ export default async function DiasporaPage({
           Telegram so an overseas buyer who's read the page can act in
           one tap. Eyebrow + serif H2 in white + stone-300 subline +
           outline white CTA. */}
-      <section className="bg-stone-900 py-10 md:py-14">
+      <section className="bg-stone-900 py-16 md:py-24">
         <AppContainer className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between md:gap-12">
           <div className="flex max-w-2xl flex-col gap-3">
             <div className="flex items-center gap-2 text-caption font-medium uppercase tracking-widest text-stone-400">

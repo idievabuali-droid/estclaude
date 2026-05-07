@@ -1,12 +1,11 @@
 'use client';
 
-import { MapPin, Building, Calendar, ArrowUpRight } from 'lucide-react';
+import { MapPin, Building, ArrowUpRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { formatPriceNumber, pluralRu } from '@/lib/format';
 import { STAGE_INFO } from '@/lib/building-stages';
-import { VerificationBadge } from './VerificationBadge';
 import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
 import { CardPhotoCarousel } from './CardPhotoCarousel';
@@ -84,7 +83,7 @@ export function BuildingCard({
           so the coloured placeholder + Building glyph show through. */}
       <CardPhotoCarousel
         photos={building.photo_urls}
-        aspect="16/9"
+        aspect="16/10"
         alt={building.name.ru}
         className="bg-stone-100"
         style={building.photo_urls.length === 0 ? { backgroundColor: building.cover_color } : undefined}
@@ -100,7 +99,10 @@ export function BuildingCard({
             {building.photo_urls.length === 0 ? (
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
                 <Building className="size-8 text-white/70" aria-hidden />
-                <span className="text-h3 font-semibold text-white drop-shadow-sm">
+                <span
+                  className="text-h3 font-semibold text-white drop-shadow-sm"
+                  style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+                >
                   {building.name.ru}
                 </span>
               </div>
@@ -108,17 +110,29 @@ export function BuildingCard({
           </>
         }
       >
-        {/* Stage chip + help popover. Sits below the carousel's "1/N"
-            counter when there are multiple photos so they don't fight
-            for the same corner. The "?" lets buyers learn what the
-            stage means without leaving the card. */}
+        {/* Combined stage + handover pill — Farrukh-the-buyer's spec:
+            ONE status pill with stage and handover quarter merged into
+            a single readable chip ("Строится · 2026-Q4"). White bg +
+            stone-200 border + green dot reads as accent without
+            competing with the photo. Sits below the carousel's "1/N"
+            counter when multiple photos exist. */}
         <div
           className={cn(
-            'absolute left-3 inline-flex items-center gap-1 rounded-sm bg-white/90 px-2 py-1 text-caption font-medium text-stone-900',
+            'absolute left-3 inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white/95 px-2.5 py-1 text-caption font-medium text-stone-700 backdrop-blur',
             building.photo_urls.length > 1 ? 'top-12' : 'top-3',
           )}
         >
+          <span
+            className="size-1.5 rounded-full bg-[color:var(--color-fairness-great)]"
+            aria-hidden
+          />
           {STAGE_INFO[building.status].label}
+          {building.handover_estimated_quarter ? (
+            <>
+              <span className="text-stone-400" aria-hidden>·</span>
+              <span className="tabular-nums">{building.handover_estimated_quarter}</span>
+            </>
+          ) : null}
           <StageInfoPopover status={building.status} stopParentClick />
         </div>
         <div className="absolute right-3 top-3 flex flex-col gap-2">
@@ -138,35 +152,35 @@ export function BuildingCard({
         </div>
       </CardPhotoCarousel>
 
-      <div className="flex flex-col gap-3 p-4">
-        {/* Identity row + verified badge stacked vertically so long badge text doesn't squeeze */}
+      <div className="flex flex-col gap-4 p-5">
+        {/* Identity block. Project name set in Lora serif — building
+            names read editorial-distinct, the way premium real-estate
+            platforms (Knight Frank, The Modern House) treat property
+            titles. Address demoted to a smaller muted line (the
+            interactive map chip pattern was visually competing with
+            the name + price). Verified pill matches home's hero pill
+            shape: white bg + stone-200 border + green dot. */}
         <div className="flex flex-col gap-2">
-          <div className="flex items-start gap-2">
-            <h3 className="flex-1 text-h3 font-semibold text-stone-900">{building.name.ru}</h3>
-          </div>
-          {/* Address as a clearly-interactive chip that opens the map
-              with this building's pin pre-selected. Border + arrow icon
-              make the affordance obvious — distinct from the surrounding
-              card text so users understand it's a separate action. */}
+          <h3
+            className="text-h2 font-semibold text-stone-900"
+            style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+          >
+            {building.name.ru}
+          </h3>
           <button
             type="button"
             onClick={openMap}
             aria-label={`Показать на карте: ${district.name.ru}, ${building.address.ru}`}
-            // max-w-full caps the chip at the card width on mobile so
-            // the truncated address has something to truncate against.
-            className="group inline-flex w-fit max-w-full items-center gap-1.5 rounded-sm border border-stone-200 bg-stone-50 px-2 py-1 text-left text-meta text-stone-700 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50 hover:text-terracotta-700 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
+            className="group inline-flex w-fit max-w-full items-center gap-1 text-left text-meta text-stone-500 transition-colors hover:text-terracotta-700 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
           >
-            <MapPin className="size-3.5 shrink-0 text-terracotta-600" />
+            <MapPin className="size-3.5 shrink-0 text-stone-400" aria-hidden />
             <span className="min-w-0 truncate">{district.name.ru} · {building.address.ru}</span>
-            <ArrowUpRight className="size-3 shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
+            <ArrowUpRight className="size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-60" aria-hidden />
           </button>
           {developer.is_verified ? (
-            // Click-through to the FAQ entry that explains what
-            // "Проверенный застройщик" actually means. Rendered as a
-            // button (not Link) because the whole card is wrapped in a
-            // parent <Link> and HTML disallows nested anchors — the
-            // earlier Link version triggered hydration errors that on
-            // mobile interrupted the photo carousel swipe gesture.
+            // Click-through to the FAQ entry. Rendered as a button (not
+            // Link) because the parent card is already an anchor and
+            // nested anchors break hydration + mobile carousel swipe.
             <button
               type="button"
               onClick={(e) => {
@@ -174,23 +188,25 @@ export function BuildingCard({
                 e.stopPropagation();
                 router.push('/tsentr-pomoshchi#verified-developer');
               }}
-              className="inline-flex w-fit"
+              className="inline-flex w-fit items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 text-caption font-medium text-stone-700 hover:border-stone-300"
               title="Что значит «Проверенный»?"
             >
-              <VerificationBadge tier="phone_verified" developerVerified />
+              <span
+                className="size-1.5 rounded-full bg-[color:var(--color-fairness-great)]"
+                aria-hidden
+              />
+              Проверенный застройщик
             </button>
           ) : null}
         </div>
 
-        {/* Price + handover. Total price is the headline (what shoppers
-            actually think in); per-m² stays as a smaller secondary
-            line for the comparison-savvy. Reversed from the earlier
-            per-m²-first layout because Madina-the-buyer was doing
-            arithmetic on the card to figure out what a 60m² unit
-            actually costs. */}
-        <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-stone-200 pt-3">
+        {/* Price — singular, confident. Per Farrukh's prescription: ONE
+            number on the card surface. Per-m² moved off the card (lives
+            on the project detail page where comparison-savvy buyers
+            land). Removes the arithmetic-on-the-card cognitive load. */}
+        <div className="flex flex-col gap-0.5 border-t border-stone-200 pt-3">
           {building.price_from_dirams ? (
-            <div className="flex flex-col">
+            <>
               <span className="text-caption text-stone-500">{tCommon('from')}</span>
               <div className="flex flex-wrap items-baseline gap-x-2">
                 <span className="text-h2 font-semibold tabular-nums text-stone-900">
@@ -204,31 +220,18 @@ export function BuildingCard({
                   />
                 ) : null}
               </div>
-              {building.price_per_m2_from_dirams ? (
-                <span className="text-caption tabular-nums text-stone-500">
-                  {formatPriceNumber(building.price_per_m2_from_dirams)} TJS / м²
-                </span>
-              ) : null}
-            </div>
+            </>
           ) : building.price_per_m2_from_dirams ? (
-            // Edge case: have per-m² but not total. Shouldn't happen
-            // in practice (price_from is computed at read time too)
-            // but keep a sane fallback.
-            <div className="flex flex-col">
+            // Edge case fallback: only per-m² known.
+            <>
               <span className="text-caption text-stone-500">{tCommon('from')}</span>
               <span className="text-h3 font-semibold tabular-nums text-stone-900">
                 {formatPriceNumber(building.price_per_m2_from_dirams)} TJS / м²
               </span>
-            </div>
+            </>
           ) : (
             <span className="text-meta text-stone-500">Цены уточняйте</span>
           )}
-          {building.handover_estimated_quarter ? (
-            <span className="inline-flex items-center gap-1 text-meta text-stone-700 tabular-nums">
-              <Calendar className="size-3.5" />
-              Сдача {building.handover_estimated_quarter}
-            </span>
-          ) : null}
         </div>
 
         {/* Available units preview. Header shows the total count

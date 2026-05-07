@@ -8,8 +8,9 @@ export interface CardPhotoCarouselProps {
   /** All photo URLs in display order, cover first. */
   photos: string[];
   /** Aspect ratio of the cover area, e.g. "4/3" for ListingCard,
-   *  "16/9" for BuildingCard. Pass as a Tailwind aspect literal string. */
-  aspect: '4/3' | '16/9';
+   *  "16/10" for BuildingCard (cinematic crop, premium real-estate
+   *  pattern). "16/9" kept for back-compat with any legacy callers. */
+  aspect: '4/3' | '16/9' | '16/10';
   /** Alt-text base — index appended automatically. */
   alt: string;
   /** Optional className passed to the root container so each card can
@@ -67,7 +68,8 @@ export function CardPhotoCarousel({
 }: CardPhotoCarouselProps) {
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
-  const aspectClass = aspect === '4/3' ? 'aspect-[4/3]' : 'aspect-[16/9]';
+  const aspectClass =
+    aspect === '4/3' ? 'aspect-[4/3]' : aspect === '16/10' ? 'aspect-[16/10]' : 'aspect-[16/9]';
 
   // Scroll listener wires the counter + dots to the live scroll position.
   // Only attached when there's actual scroll to listen to.

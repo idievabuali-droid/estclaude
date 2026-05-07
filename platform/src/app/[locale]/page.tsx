@@ -70,7 +70,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           search + "Найти" button / "или подобрать" sparkle / nav strip.
           Faint warm gradient (terracotta-50/40 → stone-50) reads as
           warm publication paper — atmosphere without competing visually. */}
-      <section className="border-b border-stone-200 bg-gradient-to-b from-terracotta-50/40 via-stone-50 to-stone-50 py-10 md:py-16">
+      <section className="border-b border-stone-200 bg-gradient-to-b from-terracotta-50/40 via-stone-50 to-stone-50 py-16 md:py-24">
         <AppContainer className="flex flex-col items-center gap-5 text-center md:gap-6">
           {/* Trust pill — green dot + uppercase tracking-wider claim.
               Honest copy: no fabricated count. */}
@@ -163,7 +163,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           First-class section between hero and Featured. Eyebrow label
           + H2 statement + 3 icon cards. Replaces the prior in-hero
           USP cards — better placement, single-job heading, breathable. */}
-      <section className="border-b border-stone-200 bg-white py-10 md:py-14">
+      <section className="border-b border-stone-200 bg-white py-16 md:py-24">
         <AppContainer className="flex flex-col gap-6 md:gap-8">
           <div className="flex flex-col items-center gap-2 text-center">
             <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
@@ -201,7 +201,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           mockup deferred — shared BuildingCard touches /izbrannoe +
           /novostroyki and warrants a separate variant pass. */}
       {featuredWithRefs.length > 0 ? (
-        <section className="py-10 md:py-14">
+        <section className="py-16 md:py-24">
           <AppContainer className="flex flex-col gap-5">
             <div className="flex items-end justify-between gap-3">
               <h2 className="text-h2 font-semibold text-stone-900 md:text-h1">
@@ -237,7 +237,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           One-tap Telegram subscribe. Always renders — empty inventory
           is exactly when subscribing carries the most value. Copy
           adapts based on listings count. */}
-      <section className="border-t border-stone-200 bg-stone-50 py-7">
+      <section className="border-t border-stone-200 bg-stone-50 py-12 md:py-16">
         <AppContainer>
           <div className="flex flex-col items-start gap-3 rounded-md border border-stone-200 bg-white p-5 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-col gap-1">
@@ -260,7 +260,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           headline + honest service-framing subline + outline CTA.
           Replaces the prior footer-band seller CTA — sellers reach
           /post via SiteHeader's "Разместить" + footer column. */}
-      <section className="bg-stone-900 py-10 md:py-14">
+      <section className="bg-stone-900 py-16 md:py-24">
         <AppContainer className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between md:gap-12">
           <div className="flex max-w-2xl flex-col gap-3">
             <div className="flex items-center gap-2 text-caption font-medium uppercase tracking-widest text-stone-400">
