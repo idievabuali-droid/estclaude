@@ -164,7 +164,7 @@ export function TelegramLogin({ redirect }: { redirect: string }) {
                   another device, so the link is the dominant CTA. */}
               <a
                 href={session.tgDeepLink}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-stone-900 px-4 text-meta font-semibold text-white hover:bg-stone-800 md:hidden"
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-terracotta-600 px-4 text-meta font-semibold text-white hover:bg-terracotta-700 md:hidden"
               >
                 <MessageCircle className="size-4" /> Открыть в Telegram
               </a>

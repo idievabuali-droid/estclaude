@@ -73,7 +73,7 @@
      `--font-lora` CSS variable comes from next/font/google in
      app/layout.tsx so the font family name picks up the hashed name
      Next generates for caching. */
-  --font-serif: var(--font-lora), Georgia, 'Times New Roman', serif;
+  --font-serif: var(--font-display), Georgia, 'Times New Roman', serif;
 
   --text-display: 2rem; /* 32px */
   --text-h1: 1.5rem; /* 24px */

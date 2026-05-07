@@ -101,7 +101,7 @@ export function BuildingCard({
                 <Building className="size-8 text-white/70" aria-hidden />
                 <span
                   className="text-h3 font-semibold text-white drop-shadow-sm"
-                  style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+                  style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
                 >
                   {building.name.ru}
                 </span>
@@ -163,7 +163,7 @@ export function BuildingCard({
         <div className="flex flex-col gap-2">
           <h3
             className="text-h2 font-semibold text-stone-900"
-            style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+            style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
           >
             {building.name.ru}
           </h3>

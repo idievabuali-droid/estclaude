@@ -201,7 +201,7 @@ export default async function NovostroykiPage({
             <div className="flex min-w-0 flex-col gap-1">
               <h1
                 className="text-h1 font-semibold text-stone-900"
-                style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+                style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
               >
                 {scopedDeveloper
                   ? `Проекты от ${scopedDeveloper.display_name.ru}`

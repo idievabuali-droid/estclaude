@@ -1,4 +1,4 @@
-import { BookmarkPlus, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import {
@@ -8,6 +8,7 @@ import {
   AppCardContent,
 } from '@/components/primitives';
 import { ListingCard, BuildingCard, MarkSavedItemsSeen, AnonSavedView } from '@/components/blocks';
+import { IllustrationHouseHeart } from '@/components/illustrations';
 import { getMySavedItems, type SavedChangeBadge } from '@/services/saved';
 import { getDistrictBenchmarks } from '@/services/benchmarks';
 import { getCurrentUser } from '@/lib/auth/session';
@@ -64,7 +65,7 @@ export default async function IzbrannoePage({
           <AppContainer className="flex flex-col gap-4 py-5">
             <h1
               className="text-h1 font-semibold text-stone-900"
-              style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
             >
               {tNav('saved')}
             </h1>
@@ -127,7 +128,7 @@ export default async function IzbrannoePage({
           <div className="flex flex-col gap-1">
             <h1
               className="text-h1 font-semibold text-stone-900"
-              style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
             >
               {tNav('saved')}
             </h1>
@@ -251,6 +252,12 @@ function SavedCardWrapper({
   );
 }
 
+/**
+ * Empty state — inviting, not apologetic. Custom monoline HouseHeart
+ * illustration in terracotta-700 anchors the surface; serif H2 makes
+ * the prompt feel editorial rather than form-like; primary CTA back
+ * to the catalog gives the buyer a clear next step.
+ */
 function EmptyState({
   title,
   description,
@@ -265,11 +272,18 @@ function EmptyState({
   return (
     <AppCard>
       <AppCardContent>
-        <div className="flex flex-col items-center gap-3 py-6 text-center">
-          <BookmarkPlus className="size-8 text-stone-400" aria-hidden />
-          <div className="flex flex-col gap-1">
-            <h3 className="text-h3 font-semibold text-stone-900">{title}</h3>
-            <p className="text-meta text-stone-500">{description}</p>
+        <div className="flex flex-col items-center gap-5 px-4 py-12 text-center">
+          <span className="text-terracotta-700">
+            <IllustrationHouseHeart className="size-20" />
+          </span>
+          <div className="flex max-w-md flex-col gap-2">
+            <h2
+              className="text-h2 font-semibold text-stone-900"
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+            >
+              {title}
+            </h2>
+            <p className="text-body text-stone-600">{description}</p>
           </div>
           <Link href={ctaHref}>
             <AppButton variant="primary">{ctaLabel}</AppButton>

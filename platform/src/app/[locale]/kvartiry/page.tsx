@@ -155,7 +155,7 @@ export default async function KvartiryPage({
           <div className="flex flex-col gap-1">
             <h1
               className="text-h1 font-semibold text-stone-900"
-              style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
             >
               {scopedBuilding
                 ? `Квартиры в ${scopedBuilding.name.ru}`

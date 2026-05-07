@@ -1,8 +1,13 @@
-import { ArrowRight, ArrowUpRight, Video, FileCheck2, Clock4, MessageCircle } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, MessageCircle } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer } from '@/components/primitives';
 import { BuildingCard, ListingCard, CurrencyPicker } from '@/components/blocks';
+import {
+  IllustrationVideoCall,
+  IllustrationDocuments,
+  IllustrationWorldClock,
+} from '@/components/illustrations';
 import {
   listFeaturedBuildings,
   listBuildings,
@@ -114,7 +119,7 @@ export default async function DiasporaPage({
               default --font-serif overrides our @theme custom one. */}
           <h1
             className="text-h1 font-semibold leading-[var(--leading-h1)] tracking-[-0.01em] text-stone-900 md:text-display"
-            style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+            style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
           >
             Покупка квартиры в Вахдате —{' '}
             <em className="italic text-terracotta-700">из любой точки мира.</em>
@@ -165,24 +170,24 @@ export default async function DiasporaPage({
             </span>
             <h2
               className="text-h2 font-semibold leading-[var(--leading-h2)] text-stone-900 md:text-h1"
-              style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
             >
               Покупка из-за границы — без сюрпризов.
             </h2>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-5">
             <TrustCard
-              Icon={Video}
+              Illustration={IllustrationVideoCall}
               title="Видеотур по WhatsApp"
               body="Покажем квартиру и стройку в реальном времени."
             />
             <TrustCard
-              Icon={FileCheck2}
+              Illustration={IllustrationDocuments}
               title="Проверка документов"
               body="Сверим продавца, договор и право собственности."
             />
             <TrustCard
-              Icon={Clock4}
+              Illustration={IllustrationWorldClock}
               title="Ваш часовой пояс"
               body="Связываемся, когда удобно вам — ОАЭ, Россия, Турция."
             />
@@ -285,7 +290,7 @@ export default async function DiasporaPage({
             </div>
             <h2
               className="text-h2 font-semibold leading-[var(--leading-h2)] text-white md:text-h1"
-              style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
             >
               Напишите — подберём квартиру и проверим продавца.
             </h2>
@@ -320,27 +325,32 @@ export default async function DiasporaPage({
 }
 
 /**
- * Trust block card — icon in a tinted square + title + body. Reuses
- * the home page's terracotta-50 + terracotta-700 icon-tile pattern
- * for visual cohesion between the two surfaces.
+ * Trust block card — custom monoline illustration anchor + serif H3
+ * title + body. Same pattern as home's TrustCard so a buyer arriving
+ * from / sees the same visual vocabulary.
  */
 function TrustCard({
-  Icon,
+  Illustration,
   title,
   body,
 }: {
-  Icon: React.ComponentType<{ className?: string }>;
+  Illustration: React.ComponentType<{ className?: string }>;
   title: string;
   body: string;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-stone-200 bg-white p-5">
-      <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-terracotta-50 text-terracotta-700">
-        <Icon className="size-5" aria-hidden />
+    <div className="flex flex-col gap-4 rounded-md border border-stone-200 bg-white p-6">
+      <span className="text-terracotta-700">
+        <Illustration className="size-14" />
       </span>
       <div className="flex flex-col gap-1">
-        <p className="text-meta font-semibold text-stone-900">{title}</p>
-        <p className="text-caption text-stone-600">{body}</p>
+        <p
+          className="text-h3 font-semibold text-stone-900"
+          style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+        >
+          {title}
+        </p>
+        <p className="text-meta text-stone-600">{body}</p>
       </div>
     </div>
   );

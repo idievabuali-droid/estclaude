@@ -1,4 +1,3 @@
-import { Bell, BookmarkPlus, Construction } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
 import { AppContainer } from '@/components/primitives';
@@ -43,41 +42,59 @@ export default async function VoytiPage({
   }
 
   return (
-    <section className="bg-stone-50 py-7 md:py-8">
-      <AppContainer className="flex max-w-md flex-col gap-5">
-        {/* What login unlocks — Madina audit caught that the page just
-            said "Войти" with no benefits. Three concrete reasons up
-            front, before either method is shown. */}
-        <div className="rounded-md border border-stone-200 bg-white p-4">
-          <h2 className="mb-3 text-meta font-semibold text-stone-900">
-            Что вы получите
-          </h2>
-          <ul className="flex flex-col gap-2 text-meta text-stone-700">
-            <li className="flex items-start gap-2">
-              <BookmarkPlus className="mt-0.5 size-4 shrink-0 text-terracotta-600" aria-hidden />
-              Сохраняйте квартиры и ЖК в одном месте на всех устройствах
-            </li>
-            <li className="flex items-start gap-2">
-              <Bell className="mt-0.5 size-4 shrink-0 text-terracotta-600" aria-hidden />
-              Уведомления, когда у сохранённых меняется цена или появляются
-              новые квартиры
-            </li>
-            <li className="flex items-start gap-2">
-              <Construction className="mt-0.5 size-4 shrink-0 text-terracotta-600" aria-hidden />
-              Подписка на ход стройки — приходят свежие фото с площадки
-            </li>
-          </ul>
+    // Warm canvas (terracotta-50/30 → stone-50) so the page reads as
+    // branded rather than generic SaaS-grey, even in its minimal form.
+    <section className="flex min-h-[calc(100vh-3.5rem)] items-center bg-gradient-to-b from-terracotta-50/30 via-stone-50 to-stone-50 py-12 md:py-20">
+      <AppContainer className="flex max-w-md flex-col gap-6">
+        {/* Wordmark in serif — quiet brand presence above the H1.
+            Logo at top of a centered card is the established login-page
+            grammar (Stripe, Linear, Cal.com all use it). */}
+        <div className="flex flex-col items-center gap-1 text-center">
+          <span
+            className="text-h2 font-semibold text-terracotta-700 tracking-[-0.01em]"
+            style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+          >
+            ЖК.tj
+          </span>
         </div>
 
-        <TelegramLogin redirect={target} />
+        {/* Centered card — max-w-md, white surface on warm canvas,
+            generous padding, no shadow (the canvas tint provides the
+            visual lift). */}
+        <div className="flex flex-col gap-5 rounded-md border border-stone-200 bg-white p-7">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <h1
+              className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900"
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+            >
+              Вход через Telegram
+            </h1>
+            <p
+              className="text-meta italic text-stone-500"
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+            >
+              Без SMS — только тап в боте.
+            </p>
+          </div>
 
-        <div className="flex items-center gap-3 text-caption uppercase tracking-wide text-stone-400">
-          <span className="h-px flex-1 bg-stone-200" />
-          или
-          <span className="h-px flex-1 bg-stone-200" />
+          <TelegramLogin redirect={target} />
+
+          {/* "или" divider — thin grey lines either side, caption-sized
+              uppercase between. */}
+          <div className="flex items-center gap-3 text-caption uppercase tracking-wide text-stone-400">
+            <span className="h-px flex-1 bg-stone-200" />
+            или
+            <span className="h-px flex-1 bg-stone-200" />
+          </div>
+
+          <WhatsAppCallback source="/voyti" />
         </div>
 
-        <WhatsAppCallback source="/voyti" />
+        {/* Tiny privacy disclaimer below the card — sets the tone
+            without adding anxiety. */}
+        <p className="text-center text-caption text-stone-500">
+          Мы не передаём ваш номер третьим лицам.
+        </p>
       </AppContainer>
     </section>
   );

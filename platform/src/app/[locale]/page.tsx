@@ -1,7 +1,12 @@
-import { Sparkles, ArrowUpRight, ShieldCheck, Image as ImageIcon, Clock, Globe2 } from 'lucide-react';
+import { Sparkles, ArrowUpRight, Globe2 } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { AppContainer } from '@/components/primitives';
 import { BuildingCard, LocationSearch, HomeSubscribeButton } from '@/components/blocks';
+import {
+  IllustrationBuilding,
+  IllustrationCamera,
+  IllustrationCompass,
+} from '@/components/illustrations';
 import { Link } from '@/i18n/navigation';
 import {
   listFeaturedBuildings,
@@ -87,7 +92,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               reliable path. */}
           <h1
             className="text-h1 font-semibold leading-[var(--leading-h1)] tracking-[-0.01em] text-stone-900 md:text-display"
-            style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+            style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
           >
             {t('heroTitle')}{' '}
             <em className="italic text-terracotta-700">{t('heroTitleAccent')}</em>
@@ -171,24 +176,24 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </span>
             <h2
               className="text-h2 font-semibold leading-[var(--leading-h2)] text-stone-900 md:text-h1"
-              style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
             >
               Покупка — это серьёзно. Мы относимся так же.
             </h2>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-5">
             <TrustCard
-              Icon={ShieldCheck}
+              Illustration={IllustrationBuilding}
               title="Каждый ЖК посетили"
               body="Команда выезжает на стройку лично."
             />
             <TrustCard
-              Icon={ImageIcon}
+              Illustration={IllustrationCamera}
               title="Реальные фото, не рендеры"
               body="Обновляем еженедельно."
             />
             <TrustCard
-              Icon={Clock}
+              Illustration={IllustrationCompass}
               title="Подбор за 2 минуты"
               body="Покажем подходящие именно вам."
             />
@@ -288,28 +293,34 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 }
 
 /**
- * Trust block card — icon in a tinted square + title + body. Three
- * of these in a row on desktop, stacked on mobile. Reuses the
- * terracotta-50 + terracotta-700 icon-tile pattern that pairs with
- * the warm hero gradient above.
+ * Trust block card — custom monoline illustration anchor + serif H3
+ * title + body. The illustration sits large at the top (size-14)
+ * rendered in terracotta-700 line, no tile background — Linear /
+ * Stripe / Notion pattern where the illustration IS the visual
+ * anchor, not contained inside a tile.
  */
 function TrustCard({
-  Icon,
+  Illustration,
   title,
   body,
 }: {
-  Icon: React.ComponentType<{ className?: string }>;
+  Illustration: React.ComponentType<{ className?: string }>;
   title: string;
   body: string;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-stone-200 bg-white p-5">
-      <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-terracotta-50 text-terracotta-700">
-        <Icon className="size-5" aria-hidden />
+    <div className="flex flex-col gap-4 rounded-md border border-stone-200 bg-white p-6">
+      <span className="text-terracotta-700">
+        <Illustration className="size-14" />
       </span>
       <div className="flex flex-col gap-1">
-        <p className="text-meta font-semibold text-stone-900">{title}</p>
-        <p className="text-caption text-stone-600">{body}</p>
+        <p
+          className="text-h3 font-semibold text-stone-900"
+          style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+        >
+          {title}
+        </p>
+        <p className="text-meta text-stone-600">{body}</p>
       </div>
     </div>
   );

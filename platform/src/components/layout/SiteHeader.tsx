@@ -28,7 +28,7 @@ export async function SiteHeader() {
               colour, it's the brand-identity moment of the chrome. */}
           <span
             className="text-h3 tracking-[-0.01em]"
-            style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+            style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
           >ЖК.tj</span>
         </Link>
 

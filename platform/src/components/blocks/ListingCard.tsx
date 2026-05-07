@@ -1,13 +1,9 @@
 'use client';
 
-import { MapPin, ArrowUpRight } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { ChevronRight } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo } from '@/lib/format';
-import { AppChip } from '@/components/primitives';
-import { FairnessIndicator, computeFairness, type FairnessLevel } from './FairnessIndicator';
-import { InstallmentDisplay } from './InstallmentDisplay';
 import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
 import { CardPhotoCarousel } from './CardPhotoCarousel';
@@ -16,13 +12,6 @@ import { PriceConversion } from './PriceConversion';
 import { track } from '@/lib/analytics/track';
 import type { MockListing, MockBuilding } from '@/lib/mock';
 import type { ExchangeRates, SupportedCurrency } from '@/services/currency';
-
-const FINISHING_TONE = {
-  no_finish: 'finishing-no-finish',
-  pre_finish: 'finishing-pre-finish',
-  full_finish: 'finishing-full-finish',
-  owner_renovated: 'finishing-owner-renovated',
-} as const;
 
 export interface ListingCardProps {
   listing: MockListing;
@@ -55,7 +44,13 @@ export function ListingCard({
   // so callers don't need to be touched when the badge returns.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   developerVerified,
+  // districtMedianPerM2 + districtSampleSize previously drove the
+  // FairnessIndicator on the card body. Per the design pass, fairness
+  // moves to the apartment detail page so the card stays uncluttered.
+  // Kept in the prop signature so callers don't break.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   districtMedianPerM2,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   districtSampleSize = 0,
   hideBuildingName,
   currency,
@@ -63,23 +58,21 @@ export function ListingCard({
   className,
 }: ListingCardProps) {
   const showConversion = currency && currency !== 'TJS' && rates != null;
-  const tFinishing = useTranslations('Finishing');
   const router = useRouter();
 
-  /** Address row navigates to the map with this building's pin pre-selected,
-   *  so users can see where the place actually is and pivot to nearby
-   *  buildings without losing their browse position. stopPropagation
-   *  prevents the parent card-Link from also firing. */
-  function openMap(e: React.MouseEvent) {
+  /** Building chevron-link sends the buyer to the project detail page —
+   *  natural semantic for "this listing belongs to ЖК Vahdat Park,
+   *  click to see the project." Was the map drilldown previously, but
+   *  on a listing card "go to ЖК" is the higher-intent next step
+   *  (Cian + Avito both wire it this way). */
+  function openZhk(e: React.MouseEvent) {
     e.stopPropagation();
     e.preventDefault();
-    router.push(`/novostroyki?view=karta&focus=${building.slug}&from=kvartira&fromSlug=${listing.slug}`);
+    router.push(`/zhk/${building.slug}`);
   }
 
-  const fairness =
-    districtMedianPerM2 != null
-      ? computeFairness(Number(listing.price_per_m2_dirams), districtMedianPerM2, districtSampleSize)
-      : null;
+  const hasInstallment =
+    listing.installment_available && listing.installment_monthly_amount_dirams != null;
 
   return (
     <Link
@@ -98,12 +91,9 @@ export function ListingCard({
         className,
       )}
     >
-      {/* Cover area. CardPhotoCarousel takes over photo rendering and
-          lets the buyer swipe through every uploaded photo inline.
-          Overlays are kept to a minimum: counter + save toggle only.
-          Floor / rooms+m² / installment chips were dropped from the
-          photo because they all repeat what row 2 + the InstallmentDisplay
-          row already say — buyers reported the duplication felt cluttered. */}
+      {/* Cover. Per design pass: rooms·m² chip top-left as the visual
+          anchor (was inline metadata that competed with price), heart
+          top-right. Carousel keeps its dots. */}
       <CardPhotoCarousel
         photos={listing.photo_urls}
         aspect="4/3"
@@ -112,13 +102,13 @@ export function ListingCard({
         style={listing.photo_urls.length === 0 ? { backgroundColor: listing.cover_color } : undefined}
         persistentOverlay={
           listing.photo_urls.length === 0 ? (
-            // Placeholder mode — there's no photo to compete with, so
-            // the giant rooms+m² label keeps the empty card looking
-            // intentional rather than blank.
             <>
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/30" />
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-h1 font-semibold text-white drop-shadow-sm tabular-nums">
+                <span
+                  className="text-h1 font-semibold text-white drop-shadow-sm tabular-nums"
+                  style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+                >
                   {listing.rooms_count}-комн
                 </span>
                 <span className="text-meta font-medium text-white/85 tabular-nums">
@@ -129,29 +119,26 @@ export function ListingCard({
           ) : null
         }
       >
+        {/* Top-left: rooms · m² chip — the unit identity at a glance. */}
+        <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-caption font-semibold text-stone-900 backdrop-blur tabular-nums">
+          {listing.rooms_count}-комн · {formatM2(listing.size_m2)}
+        </div>
+        {/* Top-right: heart + (V1-hidden) compare. */}
         <div className="absolute right-3 top-3 flex flex-col gap-2">
           <SaveToggle type="listing" id={listing.id} />
-          {/* Compare hidden in V1 — see lib/feature-flags.ts. */}
           {FEATURES.compare ? (
             <CompareToggle type="listings" id={listing.id} />
           ) : null}
         </div>
       </CardPhotoCarousel>
 
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        {/* VerificationBadge hidden in V1 — tier claims are hollow when
-            the founder is the one verifying every listing. The
-            "Проверенный застройщик" badge stays on building cards
-            (BuildingCard), where it's a real, defensible claim. */}
-
-        {/* Row 1: price (full width, no competing badge). When the
-            visitor has set a foreign currency, each TJS amount is
-            paired with its ≈ equivalent INLINE on the same baseline,
-            so the buyer reads "180 000 TJS  ≈ 1 800 000 ₽" as one
-            unit. flex-wrap means narrow cards (mobile) drop the
-            conversion to the next line rather than overflow — but
-            the pair stays semantically grouped either way. */}
+      <div className="flex flex-1 flex-col gap-3 p-5">
+        {/* Three-line stack per the prescription: floor info (muted),
+            price (large), per-m² (muted, smaller). */}
         <div className="flex flex-col gap-0.5">
+          <span className="text-caption text-stone-500 tabular-nums">
+            {formatFloor(listing.floor_number, listing.total_floors)} эт
+          </span>
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className="text-h2 font-semibold tabular-nums text-stone-900">
               {formatPriceNumber(listing.price_total_dirams)} TJS
@@ -179,65 +166,43 @@ export function ListingCard({
           </div>
         </div>
 
-        {/* Row 2: rooms + size + finishing */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-meta font-medium text-stone-700 tabular-nums">
-            {listing.rooms_count}-комн · {formatM2(listing.size_m2)} · {formatFloor(listing.floor_number, listing.total_floors)} эт
-          </span>
-          <AppChip
-            asStatic
-            tone={FINISHING_TONE[listing.finishing_type]}
-          >
-            {tFinishing(listing.finishing_type)}
-          </AppChip>
-        </div>
+        {/* Divider separating numerics from project context. */}
+        <div className="h-px bg-stone-200" />
 
-        {/* Row 3: building name + address as a clearly-interactive chip
-            that opens the map with this building's pin pre-selected.
-            Border + arrow icon make the affordance obvious — without
-            them, users read it as static gray label and miss the map. */}
+        {/* Building name in serif italic with chevron — links to the
+            ЖК detail page (the higher-intent next step from a listing
+            card). Cuts the previous address chip; the project page
+            carries that information. */}
         {!hideBuildingName ? (
           <button
             type="button"
-            onClick={openMap}
-            aria-label={`Показать на карте: ${building.name.ru}, ${building.address.ru}`}
-            // max-w-full caps the chip at the parent's width on
-            // mobile so the truncated address actually has something
-            // to truncate against. With only w-fit the chip grew to
-            // content width and pushed past 375px, causing internal
-            // horizontal scroll inside the card on mobile.
-            className="group inline-flex w-fit max-w-full items-center gap-1.5 rounded-sm border border-stone-200 bg-stone-50 px-2 py-1 text-left text-meta text-stone-700 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50 hover:text-terracotta-700 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
+            onClick={openZhk}
+            aria-label={`Открыть ${building.name.ru}`}
+            className="group/zhk inline-flex w-fit max-w-full items-center gap-1 text-left text-meta italic text-stone-600 transition-colors hover:text-terracotta-700 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
+            style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
           >
-            <MapPin className="size-3.5 shrink-0 text-terracotta-600" />
-            <span className="min-w-0 truncate">{building.name.ru} · {building.address.ru}</span>
-            <ArrowUpRight className="size-3 shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
+            <span className="min-w-0 truncate">{building.name.ru}</span>
+            <ChevronRight className="size-3.5 shrink-0 opacity-60 transition-opacity group-hover/zhk:opacity-100" />
           </button>
         ) : null}
 
-        {/* Row 4: fairness */}
-        {fairness ? (
-          <FairnessIndicator level={fairness.level as FairnessLevel} deltaPercent={fairness.deltaPercent} />
-        ) : null}
-
-        {/* Installment terms — shown only when the seller offers
-            financing. Listings without installment simply omit the
-            row (was previously rendering the 'save' translation key
-            as a stub, which displayed as an out-of-context "Сохранить"). */}
-        {listing.installment_available && listing.installment_monthly_amount_dirams ? (
-          <InstallmentDisplay
-            variant="inline"
-            monthlyDirams={listing.installment_monthly_amount_dirams}
-            firstPaymentPercent={listing.installment_first_payment_percent ?? 30}
-            termMonths={listing.installment_term_months ?? 84}
-            totalPriceDirams={listing.price_total_dirams}
-          />
-        ) : null}
-
-        {/* Posted-ago — fresh-vs-stale signal buyers care about. Caption
-            size + muted colour so it doesn't compete with the price. */}
-        <span className="text-caption text-stone-400">
-          Опубликовано {formatPostedAgo(listing.published_at)}
-        </span>
+        {/* Bottom row — rassrochka pill (the decision number for many
+            Tajik buyers, hence given visual weight as a soft terracotta
+            pill) on the left, posted-ago in muted grey on the right.
+            mt-auto keeps the row pinned to card bottom across varying
+            content lengths. */}
+        <div className="mt-auto flex items-center justify-between gap-2">
+          {hasInstallment ? (
+            <span className="inline-flex items-center rounded-full bg-terracotta-50 px-2.5 py-1 text-caption font-semibold text-terracotta-800 tabular-nums">
+              от {formatPriceNumber(listing.installment_monthly_amount_dirams!)} TJS / мес
+            </span>
+          ) : (
+            <span aria-hidden />
+          )}
+          <span className="text-caption text-stone-400">
+            {formatPostedAgo(listing.published_at)}
+          </span>
+        </div>
       </div>
     </Link>
   );

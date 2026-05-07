@@ -239,7 +239,7 @@ export default async function BuildingDetailPage({
         <AppContainer className="flex flex-col gap-2">
           <h1
             className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display"
-            style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+            style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
           >
             {building.name.ru}
           </h1>
