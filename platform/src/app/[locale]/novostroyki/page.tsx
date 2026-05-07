@@ -199,7 +199,10 @@ export default async function NovostroykiPage({
         <AppContainer className="flex flex-col gap-4 py-5">
           <div className="flex items-end justify-between gap-3">
             <div className="flex min-w-0 flex-col gap-1">
-              <h1 className="text-h1 font-semibold text-stone-900">
+              <h1
+                className="text-h1 font-semibold text-stone-900"
+                style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+              >
                 {scopedDeveloper
                   ? `Проекты от ${scopedDeveloper.display_name.ru}`
                   : sp.near_label

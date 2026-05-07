@@ -237,7 +237,10 @@ export default async function BuildingDetailPage({
           gradient over the photo. */}
       <section className="border-b border-stone-200 bg-white py-4">
         <AppContainer className="flex flex-col gap-2">
-          <h1 className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display">
+          <h1
+            className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display"
+            style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+          >
             {building.name.ru}
           </h1>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -257,10 +260,13 @@ export default async function BuildingDetailPage({
               <span>от {developer.display_name.ru}</span>
               {developer.is_verified ? (
                 <span
-                  className="inline-flex items-center gap-0.5 rounded-sm bg-amber-50 px-1.5 py-0.5 text-caption font-medium text-[color:var(--color-badge-tier-developer)]"
+                  className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 text-caption font-medium text-stone-700"
                   title="Проверенный застройщик"
                 >
-                  <BadgeCheck className="size-3" aria-hidden />
+                  <span
+                    className="size-1.5 rounded-full bg-[color:var(--color-fairness-great)]"
+                    aria-hidden
+                  />
                   Проверенный
                 </span>
               ) : null}
@@ -398,6 +404,9 @@ export default async function BuildingDetailPage({
         <AppContainer className="flex flex-col gap-5">
           <div className="flex items-end justify-between gap-3">
             <div className="flex flex-col gap-1">
+              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                Квартиры
+              </span>
               <h2 className="text-h2 font-semibold text-stone-900">
                 Доступные квартиры
               </h2>
@@ -472,6 +481,9 @@ export default async function BuildingDetailPage({
           <AppContainer className="flex flex-col gap-3">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div className="flex flex-col gap-1">
+                <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                  Стройка
+                </span>
                 <h2 className="text-h2 font-semibold text-stone-900">Ход строительства</h2>
                 <p className="text-meta text-stone-500">
                   Обновлено: {latestProgressMonth.label} · {progressTotalCount} фото
@@ -518,7 +530,12 @@ export default async function BuildingDetailPage({
       {/* ─── 5. ABOUT / DESCRIPTION ──────────────────────────────── */}
       <section id="about" className="scroll-mt-28 py-6">
         <AppContainer className="flex flex-col gap-4">
-          <h2 className="text-h2 font-semibold text-stone-900">О проекте</h2>
+          <div className="flex flex-col gap-1">
+            <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+              Описание
+            </span>
+            <h2 className="text-h2 font-semibold text-stone-900">О проекте</h2>
+          </div>
           <p className="text-body text-stone-700">{building.description.ru}</p>
           <div className="flex flex-wrap gap-2">
             {building.amenities.map((a) => (
@@ -687,7 +704,12 @@ export default async function BuildingDetailPage({
       {similarBuildings.length > 0 ? (
         <section className="border-t border-stone-200 bg-stone-50 py-6 pb-24 md:pb-7">
           <AppContainer className="flex flex-col gap-5">
-            <h2 className="text-h2 font-semibold text-stone-900">Похожие ЖК</h2>
+            <div className="flex flex-col gap-1">
+              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                Альтернативы
+              </span>
+              <h2 className="text-h2 font-semibold text-stone-900">Похожие ЖК</h2>
+            </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
               {similarBuildings.map((b) => (
                 <BuildingCard

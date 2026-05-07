@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { MapPin, ArrowUpRight, BadgeCheck, Calendar, Layers, Users } from 'lucide-react';
+import { MapPin, ArrowUpRight, Calendar, Layers, Users } from 'lucide-react';
 import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
@@ -270,10 +270,13 @@ export default async function ListingDetailPage({
               {developer.is_verified ? (
                 <Link
                   href="/tsentr-pomoshchi#verified-developer"
-                  className="inline-flex items-center gap-1 rounded-sm bg-amber-50 px-1.5 py-0.5 text-caption font-medium text-amber-800 hover:bg-amber-100"
+                  className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 text-caption font-medium text-stone-700 hover:border-stone-300"
                   title="Что значит «Проверенный»?"
                 >
-                  <BadgeCheck className="size-3" aria-hidden />
+                  <span
+                    className="size-1.5 rounded-full bg-[color:var(--color-fairness-great)]"
+                    aria-hidden
+                  />
                   Проверенный
                 </Link>
               ) : null}
@@ -375,7 +378,12 @@ export default async function ListingDetailPage({
           the section always renders with at least the finishing row. */}
       <section className="border-t border-stone-200 py-6">
         <AppContainer className="flex flex-col gap-3">
-          <h2 className="text-h2 font-semibold text-stone-900">Об этой квартире</h2>
+          <div className="flex flex-col gap-1">
+            <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+              Параметры
+            </span>
+            <h2 className="text-h2 font-semibold text-stone-900">Об этой квартире</h2>
+          </div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
             <AppChip asStatic tone={FINISHING_TONE[listing.finishing_type]}>
               {tFinishing(listing.finishing_type)}
@@ -408,7 +416,12 @@ export default async function ListingDetailPage({
       {floorPlanUrl ? (
         <section className="border-t border-stone-200 bg-stone-50 py-6">
           <AppContainer className="flex flex-col gap-3">
-            <h2 className="text-h2 font-semibold text-stone-900">Планировка</h2>
+            <div className="flex flex-col gap-1">
+              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                Чертёж
+              </span>
+              <h2 className="text-h2 font-semibold text-stone-900">Планировка</h2>
+            </div>
             {/* Tap opens the original photo in a new tab — full-size
                 viewing without an extra lightbox dependency. cursor-
                 zoom-in hints the affordance. */}
@@ -434,7 +447,12 @@ export default async function ListingDetailPage({
       {listing.unit_description.ru?.trim() ? (
         <section className="border-t border-stone-200 py-6">
           <AppContainer className="flex flex-col gap-3">
-            <h2 className="text-h2 font-semibold text-stone-900">Описание</h2>
+            <div className="flex flex-col gap-1">
+              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                От продавца
+              </span>
+              <h2 className="text-h2 font-semibold text-stone-900">Описание</h2>
+            </div>
             <p className="text-body text-stone-700">{listing.unit_description.ru}</p>
           </AppContainer>
         </section>
@@ -446,7 +464,12 @@ export default async function ListingDetailPage({
       {listing.installment_available && listing.installment_monthly_amount_dirams ? (
         <section id="rassrochka" className="scroll-mt-20 border-t border-stone-200 bg-white py-6">
           <AppContainer className="flex flex-col gap-3">
-            <h2 className="text-h2 font-semibold text-stone-900">Рассрочка от застройщика</h2>
+            <div className="flex flex-col gap-1">
+              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                Условия
+              </span>
+              <h2 className="text-h2 font-semibold text-stone-900">Рассрочка от застройщика</h2>
+            </div>
             <InstallmentDisplay
               monthlyDirams={listing.installment_monthly_amount_dirams}
               firstPaymentPercent={listing.installment_first_payment_percent ?? 30}
@@ -469,7 +492,12 @@ export default async function ListingDetailPage({
           the live count so the buyer knows whether it's worth tapping. */}
       <section className="border-t border-stone-200 py-6">
         <AppContainer className="flex flex-col gap-3">
-          <h2 className="text-h2 font-semibold text-stone-900">О доме</h2>
+          <div className="flex flex-col gap-1">
+            <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+              Здание
+            </span>
+            <h2 className="text-h2 font-semibold text-stone-900">О доме</h2>
+          </div>
           <AppCard>
             <AppCardContent>
               <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:gap-4">
@@ -539,7 +567,12 @@ export default async function ListingDetailPage({
       {showDeveloperCard ? (
         <section className="border-t border-stone-200 bg-stone-50 py-6">
           <AppContainer className="flex flex-col gap-3">
-            <h2 className="text-h2 font-semibold text-stone-900">О застройщике</h2>
+            <div className="flex flex-col gap-1">
+              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                Кто строит
+              </span>
+              <h2 className="text-h2 font-semibold text-stone-900">О застройщике</h2>
+            </div>
             <AppCard>
               <AppCardContent>
                 <div className="flex flex-col gap-3">
@@ -548,10 +581,13 @@ export default async function ListingDetailPage({
                     {developer.is_verified ? (
                       <Link
                         href="/tsentr-pomoshchi#verified-developer"
-                        className="inline-flex items-center gap-1 rounded-sm bg-amber-50 px-1.5 py-0.5 text-caption font-medium text-amber-800 hover:bg-amber-100"
+                        className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 text-caption font-medium text-stone-700 hover:border-stone-300"
                         title="Что значит «Проверенный»?"
                       >
-                        <BadgeCheck className="size-3" aria-hidden />
+                        <span
+                          className="size-1.5 rounded-full bg-[color:var(--color-fairness-great)]"
+                          aria-hidden
+                        />
                         Проверенный
                       </Link>
                     ) : null}
@@ -617,7 +653,12 @@ export default async function ListingDetailPage({
       {similar.length > 0 ? (
         <section className="border-t border-stone-200 bg-stone-50 py-6">
           <AppContainer className="flex flex-col gap-5">
-            <h2 className="text-h2 font-semibold text-stone-900">Похожие в этом ЖК</h2>
+            <div className="flex flex-col gap-1">
+              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                Альтернативы
+              </span>
+              <h2 className="text-h2 font-semibold text-stone-900">Похожие в этом ЖК</h2>
+            </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
               {similar.map((l) => (
                 <ListingCard

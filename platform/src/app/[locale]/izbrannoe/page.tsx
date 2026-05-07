@@ -62,7 +62,12 @@ export default async function IzbrannoePage({
       <>
         <section className="border-b border-stone-200 bg-white">
           <AppContainer className="flex flex-col gap-4 py-5">
-            <h1 className="text-h1 font-semibold text-stone-900">{tNav('saved')}</h1>
+            <h1
+              className="text-h1 font-semibold text-stone-900"
+              style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+            >
+              {tNav('saved')}
+            </h1>
             <div className="inline-flex w-fit items-center rounded-md border border-stone-200 bg-white p-1">
               <Link
                 href="/izbrannoe?tab=listings"
@@ -120,7 +125,12 @@ export default async function IzbrannoePage({
       <section className="border-b border-stone-200 bg-white">
         <AppContainer className="flex flex-col gap-4 py-5">
           <div className="flex flex-col gap-1">
-            <h1 className="text-h1 font-semibold text-stone-900">{tNav('saved')}</h1>
+            <h1
+              className="text-h1 font-semibold text-stone-900"
+              style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+            >
+              {tNav('saved')}
+            </h1>
             <p className="text-meta text-stone-500 tabular-nums">
               {savedBuildings.length + savedListings.length} объектов
               {totalChanges > 0

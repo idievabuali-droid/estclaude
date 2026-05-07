@@ -1,4 +1,4 @@
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Video, FileCheck2, Clock4, MessageCircle } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer } from '@/components/primitives';
@@ -14,35 +14,22 @@ import { listListings } from '@/services/listings';
 import { getDistrictBenchmarks } from '@/services/benchmarks';
 import { getExchangeRates } from '@/services/currency';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
+import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
 
 /**
  * /diaspora — landing page for buyers living abroad.
  *
- * Consistency principle: this page reuses the SAME building / listing
- * cards, headers, container rhythm, and section pattern as the home
- * page. Diaspora users get the same shopping surface as anyone else,
- * just with two extra affordances they specifically need:
+ * Design pass: brought into the home page's editorial-luxury voice.
+ * Hero now matches: pill + Lora serif H1 with italic accent + subhead
+ * + two action buttons. Trust block: 3 icon-tile cards (Видеотур /
+ * Проверка документов / Часовой пояс). Dark band before footer
+ * surfaces WhatsApp/Telegram contact (the action this surface is
+ * actually for). Same BuildingCard / ListingCard rhythm as the home
+ * page so a diaspora visitor sees a coherent product, not an outlier.
  *
- *   1. CurrencyPicker — pick RUB / USD / EUR / GBP / KZT / TRY and
- *      every BuildingCard / ListingCard renders a foreign-currency
- *      equivalent under the TJS price (cookie-driven, persists across
- *      pages).
- *
- *   2. Help-center link instead of fake contact info. The previous
- *      version of this page hardcoded `+992 90 000 00 00` and
- *      `@example_bot` as "real" diaspora-team contacts — that's
- *      worse than no contact, because a buyer who taps WhatsApp gets
- *      a dead chat and concludes the platform is fake.
- *
- * Removed in this V1 pass (was bespoke to /diaspora and inconsistent
- * with the rest of the site):
- *   - Long bespoke hero (pre-title pill + paragraph + 2 CTAs)
- *   - "Trust pillars" 3-card row — same info already shown via the
- *     verified / source / tier badges on every card
- *   - "Quick filters" chip row — duplicated /novostroyki's filter bar
- *     and one of the chips (`?installment=true` on /kvartiry) linked
- *     to a filter that doesn't exist
- *   - Three big contact-channel cards with placeholder phone numbers
+ * Honest copy: "Готовы помочь" (no fabricated counts) — the platform
+ * is pre-launch; claiming "помогли N families" would burn trust the
+ * second a buyer asked which families.
  */
 export default async function DiasporaPage({
   params,
@@ -97,54 +84,114 @@ export default async function DiasporaPage({
   ]);
   const recentDeveloperMap = new Map(recentDeveloperEntries);
 
+  // Prefilled WhatsApp message — buyer lands in chat with the founder
+  // already knowing they're abroad and what they're asking for.
+  const whatsappPrefill = encodeURIComponent(
+    'Здравствуйте! Пишу из-за границы. Можете сделать видеообзор квартиры?',
+  );
+  const whatsappHref = `${FOUNDER_CONTACTS.whatsappLink}?text=${whatsappPrefill}`;
+
   return (
     <>
-      {/* ─── Slim hero, matching home page ────────────────────── */}
-      <section className="border-b border-stone-200 bg-stone-50 py-5">
-        <AppContainer className="flex flex-col gap-4">
-          <h1 className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display">
-            Покупка квартиры из-за границы
+      {/* ─── HERO ─────────────────────────────────────────────────
+          Mirrors the home pattern: pill + Lora serif H1 with italic
+          accent + subhead + two action buttons. Same warm gradient
+          (terracotta-50/40 → stone-50) so a buyer arriving from /
+          doesn't feel a tonal break. */}
+      <section className="border-b border-stone-200 bg-gradient-to-b from-terracotta-50/40 via-stone-50 to-stone-50 py-10 md:py-16">
+        <AppContainer className="flex flex-col items-center gap-5 text-center md:gap-6">
+          {/* Trust pill — same shape as home's hero pill: white bg,
+              stone-200 border, green dot, uppercase tracking-wider.
+              Honest copy — no fabricated counts. */}
+          <span className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-1 text-caption font-medium uppercase tracking-wider text-stone-700">
+            <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
+            Видеотуры и проверка документов
+          </span>
+
+          {/* H1 with italic serif accent — editorial-luxury pattern.
+              Whole H1 in Lora serif; accent clause picks up italic +
+              terracotta. Inline fontFamily because Tailwind v4's
+              default --font-serif overrides our @theme custom one. */}
+          <h1
+            className="text-h1 font-semibold leading-[var(--leading-h1)] tracking-[-0.01em] text-stone-900 md:text-display"
+            style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+          >
+            Покупка квартиры в Вахдате —{' '}
+            <em className="italic text-terracotta-700">из любой точки мира.</em>
           </h1>
-          <p className="text-body text-stone-700">
-            Видеообзор по WhatsApp, проверка документов — без поездки в
-            Таджикистан. Цены сразу в вашей валюте.
+
+          {/* Subhead — Inter sans for clarity. Service framing without
+              false promises. */}
+          <p className="max-w-xl text-meta text-stone-700 md:text-body">
+            Видеообзор по WhatsApp, проверка документов и продавца — без
+            поездки в Таджикистан. Цены сразу в вашей валюте.
           </p>
-          <div className="flex flex-wrap gap-2">
+
+          {/* Two action buttons — primary terracotta + neutral
+              secondary. Same hierarchy as home's "Найти" + sparkle
+              link. Primary opens WhatsApp with prefilled context;
+              secondary browses inventory. */}
+          <div className="flex w-full max-w-md flex-col gap-2 sm:flex-row sm:items-stretch sm:justify-center">
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-terracotta-600 px-6 text-meta font-semibold text-white transition-colors hover:bg-terracotta-700"
+            >
+              <MessageCircle className="size-4" aria-hidden />
+              Запросить видеообзор
+            </a>
             <Link
               href="/novostroyki"
-              className="inline-flex h-10 items-center gap-2 rounded-md border border-terracotta-300 bg-terracotta-50 px-3 text-meta font-medium text-terracotta-800 transition-colors hover:border-terracotta-500 hover:bg-terracotta-100"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-6 text-meta font-semibold text-stone-900 transition-colors hover:border-stone-400 hover:bg-stone-100"
             >
-              {tNav('buildings')}
-              <ArrowRight className="size-3.5" />
-            </Link>
-            <Link
-              href="/kvartiry"
-              className="inline-flex h-10 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-meta font-medium text-stone-800 transition-colors hover:border-stone-400 hover:bg-stone-100"
-            >
-              {tNav('apartments')}
-              <ArrowRight className="size-3.5" />
+              Смотреть {tNav('buildings').toLowerCase()}
+              <ArrowRight className="size-3.5" aria-hidden />
             </Link>
           </div>
-          {/* Direct WhatsApp tap so the buyer can actually request the
-              videoобзор / документы the headline promises. Without it,
-              the headline reads like marketing copy that points
-              nowhere — buyers from Russia / UAE / Germany lose the
-              thread and bounce. The link routes to the founder; the
-              prefilled message names the page so the founder lands in
-              chat with the right context. */}
-          <a
-            href="https://wa.me/992935563306?text=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%9F%D0%B8%D1%88%D1%83%20%D0%B8%D0%B7-%D0%B7%D0%B0%20%D0%B3%D1%80%D0%B0%D0%BD%D0%B8%D1%86%D1%8B.%20%D0%9C%D0%BE%D0%B6%D0%B5%D1%82%D0%B5%20%D1%81%D0%B4%D0%B5%D0%BB%D0%B0%D1%82%D1%8C%20%D0%B2%D0%B8%D0%B4%D0%B5%D0%BE%D0%BE%D0%B1%D0%B7%D0%BE%D1%80%20%D0%BA%D0%B2%D0%B0%D1%80%D1%82%D0%B8%D1%80%D1%8B%3F"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex w-fit items-center gap-2 text-meta font-medium text-terracotta-700 underline-offset-4 hover:underline"
-          >
-            Запросить видеообзор в WhatsApp →
-          </a>
+        </AppContainer>
+      </section>
+
+      {/* ─── TRUST BLOCK — 3 icon-tile cards ─────────────────────
+          Mirrors home's "Почему ЖК.tj" pattern. Eyebrow + serif H2
+          + 3 cards. Diaspora-specific jobs: video tour, document
+          check, time-zone flexibility. Replaces the prior bespoke
+          inline content list. */}
+      <section className="border-b border-stone-200 bg-white py-10 md:py-14">
+        <AppContainer className="flex flex-col gap-6 md:gap-8">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+              Как мы помогаем
+            </span>
+            <h2
+              className="text-h2 font-semibold leading-[var(--leading-h2)] text-stone-900 md:text-h1"
+              style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+            >
+              Покупка из-за границы — без сюрпризов.
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-5">
+            <TrustCard
+              Icon={Video}
+              title="Видеотур по WhatsApp"
+              body="Покажем квартиру и стройку в реальном времени."
+            />
+            <TrustCard
+              Icon={FileCheck2}
+              title="Проверка документов"
+              body="Сверим продавца, договор и право собственности."
+            />
+            <TrustCard
+              Icon={Clock4}
+              title="Ваш часовой пояс"
+              body="Связываемся, когда удобно вам — ОАЭ, Россия, Турция."
+            />
+          </div>
         </AppContainer>
       </section>
 
       {/* ─── Currency picker — diaspora-specific, inline ─────── */}
-      <section className="border-b border-stone-200 bg-white py-5">
+      <section className="border-b border-stone-200 bg-stone-50 py-5">
         <AppContainer>
           <CurrencyPicker initial={currency} sampleRates={rates.rates} />
         </AppContainer>
@@ -152,7 +199,7 @@ export default async function DiasporaPage({
 
       {/* ─── Featured projects — same surface as home page ──── */}
       {featuredWithRefs.length > 0 ? (
-        <section className="py-7">
+        <section className="py-10 md:py-14">
           <AppContainer className="flex flex-col gap-5">
             <div className="flex items-end justify-between gap-3">
               <h2 className="text-h2 font-semibold text-stone-900">Рекомендуемые проекты</h2>
@@ -186,7 +233,7 @@ export default async function DiasporaPage({
 
       {/* ─── Свежие квартиры — same surface as home page ────── */}
       {recentRaw.length > 0 ? (
-        <section className="border-t border-stone-200 bg-stone-50 py-7">
+        <section className="border-t border-stone-200 bg-stone-50 py-10 md:py-14">
           <AppContainer className="flex flex-col gap-5">
             <div className="flex items-end justify-between gap-3">
               <h2 className="text-h2 font-semibold text-stone-900">Свежие квартиры</h2>
@@ -223,30 +270,78 @@ export default async function DiasporaPage({
         </section>
       ) : null}
 
-      {/* ─── Help-center link ─────────────────────────────────
-           Replaces the previous three contact-channel cards that all
-           pointed to placeholder numbers (+992 90 000 00 00,
-           @example_bot, etc.). Showing a fake-functional contact UI
-           is worse than showing a single honest help link, because
-           the buyer taps and gets nothing — and concludes the
-           platform is abandoned. Wire real diaspora-team contacts
-           into the help center when they exist. */}
-      <section className="border-t border-stone-200 py-7 pb-9">
-        <AppContainer className="flex flex-col items-start gap-3">
-          <h2 className="text-h2 font-semibold text-stone-900">Нужна помощь?</h2>
-          <p className="text-body text-stone-700">
-            Опишите, что ищете, и наша команда поможет подобрать квартиру и
-            проверить продавца.
-          </p>
-          <Link
-            href="/tsentr-pomoshchi"
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-stone-300 bg-white px-4 text-meta font-medium text-stone-900 transition-colors hover:border-stone-400 hover:bg-stone-100"
-          >
-            Открыть центр помощи
-            <ArrowRight className="size-3.5" />
-          </Link>
+      {/* ─── DARK BAND — direct contact CTA ──────────────────────
+          Mirrors home's diaspora dark band, adapted for this surface:
+          instead of pointing back to /diaspora, it surfaces WhatsApp +
+          Telegram so an overseas buyer who's read the page can act in
+          one tap. Eyebrow + serif H2 in white + stone-300 subline +
+          outline white CTA. */}
+      <section className="bg-stone-900 py-10 md:py-14">
+        <AppContainer className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between md:gap-12">
+          <div className="flex max-w-2xl flex-col gap-3">
+            <div className="flex items-center gap-2 text-caption font-medium uppercase tracking-widest text-stone-400">
+              <MessageCircle className="size-4 text-terracotta-400" aria-hidden />
+              Готовы начать?
+            </div>
+            <h2
+              className="text-h2 font-semibold leading-[var(--leading-h2)] text-white md:text-h1"
+              style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}
+            >
+              Напишите — подберём квартиру и проверим продавца.
+            </h2>
+            <p className="text-meta text-stone-300">
+              Готовы помочь покупателям из ОАЭ, России, Турции и других стран.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row md:flex-col md:gap-2 lg:flex-row">
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-md border border-white px-5 text-meta font-semibold text-white transition-colors hover:bg-white hover:text-stone-900"
+            >
+              WhatsApp
+              <ArrowUpRight className="size-3.5" aria-hidden />
+            </a>
+            <a
+              href={FOUNDER_CONTACTS.telegramLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-md border border-white px-5 text-meta font-semibold text-white transition-colors hover:bg-white hover:text-stone-900"
+            >
+              Telegram
+              <ArrowUpRight className="size-3.5" aria-hidden />
+            </a>
+          </div>
         </AppContainer>
       </section>
     </>
+  );
+}
+
+/**
+ * Trust block card — icon in a tinted square + title + body. Reuses
+ * the home page's terracotta-50 + terracotta-700 icon-tile pattern
+ * for visual cohesion between the two surfaces.
+ */
+function TrustCard({
+  Icon,
+  title,
+  body,
+}: {
+  Icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-stone-200 bg-white p-5">
+      <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-terracotta-50 text-terracotta-700">
+        <Icon className="size-5" aria-hidden />
+      </span>
+      <div className="flex flex-col gap-1">
+        <p className="text-meta font-semibold text-stone-900">{title}</p>
+        <p className="text-caption text-stone-600">{body}</p>
+      </div>
+    </div>
   );
 }
