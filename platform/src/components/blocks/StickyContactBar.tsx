@@ -1,83 +1,64 @@
 'use client';
 
-import type { ComponentType } from 'react';
-import { Phone } from 'lucide-react';
-import { AppButton } from '@/components/primitives';
+import { MessageCircle } from 'lucide-react';
+import { formatPriceNumber } from '@/lib/format';
 import type { ContactLinks } from '@/lib/contact-links';
 import { MessagingPopoverButton } from './MessagingPopoverButton';
 
 export interface StickyContactBarProps {
   links: ContactLinks;
-  /** Short label for the intent button — "Визит" or "Онлайн-показ".
-   *  Currently used only as aria-label since the button is icon-only. */
-  intentShortLabel: string;
-  IntentIcon: ComponentType<{ className?: string }>;
-  onIntent: () => void;
+  /** "от X TJS" anchor on the left of the bar. Per the senior-design
+   *  prescription this is the highest-impact mobile pattern: the bar
+   *  is grounded in what the buyer is choosing on (the price), not a
+   *  generic toolbar of contact channels. Optional — falls back to a
+   *  short "Цена в объявлении" label when no price is passed. */
+  priceFromDirams?: bigint | null;
 }
 
 /**
- * Sticky bottom bar (mobile only). Consolidated layout:
- *   [ 💬 Сообщения (labeled primary, flex-1) ] [ Звонок ] [ Визит ]
+ * Mobile sticky bottom bar for /kvartira detail. Aligned to /zhk's
+ * BuildingStickyContact pattern per the senior-design prescription:
  *
- * Was 5 buttons (WA labeled + TG/IMO/Phone/Intent icon-stacks) which
- * felt cluttered and made the primary action ambiguous. The user
- * walked the live mobile site on iPhone and flagged it as messy.
+ *   "...a sticky bottom bar appears once you scroll past the hero:
+ *    'от 168 000 TJS' on the left, 'Связаться' CTA on the right."
  *
- * New layout: one "Сообщения" popover (WhatsApp / Telegram / IMO),
- * one "Звонок", one "Визит". Three buttons, each one a distinct
- * intent (chat / call / book). Buyer doesn't have to guess which
- * messenger; they tap Сообщения and the popover lets them pick.
- *
- * The intent button (rightmost) opens the visit/online-showing form
- * via onIntent — same modal that the desktop "Запланировать" CTA opens.
+ * Replaces the prior 3-button layout (Сообщения + Звонок + Визит)
+ * which split visual weight three ways and made the primary action
+ * ambiguous. Now: price grounds the bar, single "Связаться" CTA
+ * opens the channel popover (WhatsApp / Telegram / IMO). Phone tap
+ * is one step deeper inside the popover; Визит/Онлайн-показ flow
+ * lives on the desktop CTAs + the inline form modal.
  */
-function IconWithLabel({
-  icon,
-  label,
-}: {
-  icon: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <span className="flex flex-col items-center justify-center gap-0.5 leading-none">
-      {icon}
-      <span className="text-[10px] font-medium">{label}</span>
-    </span>
-  );
-}
-
-export function StickyContactBar({
-  links,
-  intentShortLabel,
-  IntentIcon,
-  onIntent,
-}: StickyContactBarProps) {
+export function StickyContactBar({ links, priceFromDirams }: StickyContactBarProps) {
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white shadow-md md:hidden"
       style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
     >
-      <div className="flex items-center gap-1.5 px-3 pt-3">
-        <MessagingPopoverButton
-          variant="primary-mobile"
-          whatsappHref={links.whatsapp}
-          telegramHref={links.telegram}
-          imoHref={links.imo}
-        />
-        <a href={links.call} aria-label="Позвонить">
-          <AppButton variant="secondary" size="md" className="h-12 px-2 py-1">
-            <IconWithLabel icon={<Phone className="size-4" aria-hidden />} label="Звонок" />
-          </AppButton>
-        </a>
-        <AppButton
-          variant="secondary"
-          size="md"
-          onClick={onIntent}
-          aria-label={intentShortLabel}
-          className="h-12 px-2 py-1"
-        >
-          <IconWithLabel icon={<IntentIcon className="size-4" />} label={intentShortLabel} />
-        </AppButton>
+      <div className="flex items-center gap-3 px-3 pt-3">
+        {/* LEFT: price anchor — "от X TJS" or fallback. */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {priceFromDirams != null ? (
+            <span className="truncate text-meta font-semibold tabular-nums text-stone-900">
+              {formatPriceNumber(priceFromDirams)} TJS
+            </span>
+          ) : (
+            <span className="truncate text-meta font-semibold text-stone-900">
+              Цена в объявлении
+            </span>
+          )}
+        </div>
+        {/* RIGHT: single primary CTA. */}
+        <div className="shrink-0">
+          <MessagingPopoverButton
+            variant="primary-mobile"
+            whatsappHref={links.whatsapp}
+            telegramHref={links.telegram}
+            imoHref={links.imo}
+            label="Связаться"
+            Icon={MessageCircle}
+          />
+        </div>
       </div>
     </div>
   );

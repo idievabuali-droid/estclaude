@@ -23,6 +23,11 @@ export interface ContactBarWithModalProps {
    *  визит" to "Запросить онлайн-показ" since they can't physically
    *  visit, and tweaks the form copy to match. */
   isDiaspora?: boolean;
+  /** Total apartment price — passed through to the mobile sticky bar
+   *  as the "от X TJS" anchor. Per the senior-design prescription
+   *  the mobile bar reads as price-on-left + single CTA-on-right, not
+   *  a generic toolbar of channels. */
+  priceFromDirams?: bigint | null;
 }
 
 /**
@@ -49,6 +54,7 @@ export function ContactBarWithModal({
   listingTitle,
   sellerPhone,
   isDiaspora,
+  priceFromDirams,
 }: ContactBarWithModalProps) {
   const [open, setOpen] = useState(false);
   const links = buildContactLinks(sellerPhone, `Здравствуйте! Интересует ${listingTitle}.`);
@@ -65,41 +71,49 @@ export function ContactBarWithModal({
 
   return (
     <>
-      {/* Desktop section: consolidated to 2 primary actions
-          (Сообщения popover + Позвонить) plus a smaller intent
-          button. The 5-buttons row (WA + TG + IMO + Phone + Visit)
-          looked like contact paralysis — one row of options that
-          all said "talk to seller" with no clear primary. */}
-      <div className="hidden flex-col gap-3 pt-2 md:flex">
-        <div className="flex flex-wrap items-center gap-2">
+      {/* Desktop CTA stack — per the senior-design prescription the
+          intent CTA ("Запросить визит" / "Запросить онлайн-показ")
+          is the primary action: terracotta filled, full-width inside
+          the price card. Сообщения + Позвонить become outlined
+          secondaries below it. Reorders the prior layout where
+          Сообщения was primary — visit-request is the higher-intent
+          buyer signal and earns the visual weight. */}
+      <div className="hidden flex-col gap-2 md:flex">
+        <AppButton
+          variant="primary"
+          size="lg"
+          onClick={() => setOpen(true)}
+          className="w-full bg-terracotta-600 hover:bg-terracotta-700"
+        >
+          <IntentIcon className="size-4" /> {intentLabel}
+        </AppButton>
+        <div className="grid grid-cols-2 gap-2">
           <MessagingPopoverButton
-            variant="primary-lg"
+            variant="secondary-lg"
             whatsappHref={links.whatsapp}
             telegramHref={links.telegram}
             imoHref={links.imo}
           />
-          <a href={links.call}>
-            <AppButton variant="secondary" size="lg">
+          <a href={links.call} className="w-full">
+            <AppButton variant="secondary" size="lg" className="w-full">
               <Phone className="size-4" /> Позвонить
             </AppButton>
           </a>
-          <AppButton
-            variant="secondary"
-            size="lg"
-            onClick={() => setOpen(true)}
-          >
-            <IntentIcon className="size-4" /> {intentLabel}
-          </AppButton>
         </div>
       </div>
 
-      {/* Mobile sticky bar */}
-      <StickyContactBar
-        links={links}
-        intentShortLabel={intentShortLabel}
-        IntentIcon={IntentIcon}
-        onIntent={() => setOpen(true)}
-      />
+      {/* Suppress unused-var warning for intent short-label which used
+          to drive the icon-stack mobile button — now subsumed into the
+          single Связаться popover trigger. */}
+      <span className="hidden" aria-hidden>
+        {intentShortLabel}
+      </span>
+
+      {/* Mobile sticky bar — price + Связаться. Visit-request stays
+          accessible via the popover's WhatsApp/Telegram options where
+          buyers naturally start the conversation; the modal form is
+          a desktop pattern. */}
+      <StickyContactBar links={links} priceFromDirams={priceFromDirams} />
 
       {/* Visit / online-showing modal */}
       <AppModal

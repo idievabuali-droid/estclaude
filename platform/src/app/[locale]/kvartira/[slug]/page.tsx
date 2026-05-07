@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppChip, AppCard, AppCardContent } from '@/components/primitives';
-import { InstallmentDisplay, ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle, ShareButton, NearbyChips, PhotoGallery } from '@/components/blocks';
+import { ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle, ShareButton, NearbyChips, PhotoGallery } from '@/components/blocks';
 import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo } from '@/lib/format';
@@ -246,26 +246,44 @@ export default async function ListingDetailPage({
         </AppContainer>
       </nav>
 
-      {/* ─── §1 ЗАГОЛОВОК (lean — what + where + when only) ─────── */}
-      {/* Title block carries only the orientation answers. Finishing,
-          bathroom layout, and meta (posted-ago, views) used to live
-          here too; they've moved to §4 and §13 so the title reads as
-          a single coherent "this is what apartment, in which building,
-          when ready" block. */}
-      <section className="border-b border-stone-200 bg-white py-4">
-        <AppContainer className="flex flex-col gap-3">
-          <h1 className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display">
-            {listing.rooms_count}-комн · {formatM2(listing.size_m2)} · {formatFloor(listing.floor_number, listing.total_floors)} эт
-          </h1>
-          <div className="flex flex-col gap-1">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      {/* ─── SUMMARY BAND ────────────────────────────────────────
+          Two-column layout below the gallery hero per the senior-
+          design prescription. Left column carries identity (H1 in
+          serif + ЖК link in serif italic + verified pill + На карте);
+          right column carries action (price block + dual CTAs).
+          Stacks on mobile so identity reads above action.
+
+          Replaces the prior split §1 (title) + §2 (price+CTAs)
+          sections — they were stacked but disconnected. The unified
+          summary band reads as a single decision module and matches
+          /zhk's hero-summary pattern. */}
+      <section className="border-b border-stone-200 bg-white py-6 md:py-10">
+        <AppContainer className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between md:gap-12">
+          {/* LEFT: identity */}
+          <div className="flex flex-col gap-3 md:flex-1">
+            <h1
+              className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900 md:text-display"
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+            >
+              {listing.rooms_count}-комн · {formatM2(listing.size_m2)} · {formatFloor(listing.floor_number, listing.total_floors)} эт
+            </h1>
+            {/* ЖК name in serif italic (per prescription) + verified pill
+                + map link. The italic serif reads as editorial
+                attribution — "this apartment is in [italic project name]"
+                — same vocabulary as the listing card's chevron-link. */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <Link
                 href={`/zhk/${building.slug}`}
-                className="inline-flex items-center gap-1 text-meta text-stone-700 hover:text-terracotta-600"
+                className="group inline-flex items-center gap-1 text-meta text-stone-700 transition-colors hover:text-terracotta-700"
               >
-                <MapPin className="size-3.5" />
-                <span className="font-medium text-stone-900">{building.name.ru}</span>
+                <span
+                  className="italic"
+                  style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+                >
+                  {building.name.ru}
+                </span>
                 <span className="text-stone-500">· {district.name.ru}</span>
+                <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
               </Link>
               {developer.is_verified ? (
                 <Link
@@ -282,90 +300,81 @@ export default async function ListingDetailPage({
               ) : null}
               <Link
                 href={`/novostroyki?view=karta&focus=${building.slug}&from=kvartira&fromSlug=${slug}`}
-                className="group inline-flex items-center gap-1 rounded-sm border border-stone-200 bg-stone-50 px-2 py-0.5 text-caption font-medium text-stone-700 transition-colors hover:border-terracotta-300 hover:bg-terracotta-50 hover:text-terracotta-700"
+                className="group inline-flex items-center gap-1 text-caption font-medium text-stone-500 transition-colors hover:text-terracotta-700"
                 aria-label="Показать на карте"
               >
-                <MapPin className="size-3 text-terracotta-600" />
-                <span>На карте</span>
+                <MapPin className="size-3" />
+                На карте
                 <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
               </Link>
             </div>
             {building.status === 'delivered' ? (
-              <span className="text-caption font-medium text-stone-900">
+              <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-caption font-medium text-stone-700">
+                <span
+                  className="size-1.5 rounded-full bg-[color:var(--color-fairness-great)]"
+                  aria-hidden
+                />
                 Готов к заселению
               </span>
             ) : building.handover_estimated_quarter ? (
-              <span className="inline-flex items-center gap-1 text-caption text-stone-700">
+              <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-caption font-medium text-stone-700">
                 <Calendar className="size-3 text-stone-500" aria-hidden />
                 Сдача {building.handover_estimated_quarter}
               </span>
             ) : null}
           </div>
-        </AppContainer>
-      </section>
 
-      {/* ─── §2 ЦЕНА (with magic-moment monthly line) ──────────── */}
-      <section className="border-b border-stone-200 bg-white py-4">
-        <AppContainer className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-baseline gap-x-3">
-            <span className="text-display font-semibold tabular-nums text-stone-900">
-              {formatPriceNumber(listing.price_total_dirams)} TJS
-            </span>
-            {isDiaspora && rates ? (
-              <PriceConversion
-                priceDirams={listing.price_total_dirams}
-                target={currency}
-                rates={rates}
-                variant="block"
-              />
-            ) : null}
-          </div>
-          <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="text-meta text-stone-500 tabular-nums">
-              {formatPriceNumber(listing.price_per_m2_dirams)} TJS / м²
-            </span>
-            {isDiaspora && rates ? (
-              <PriceConversion
-                priceDirams={listing.price_per_m2_dirams}
-                target={currency}
-                rates={rates}
-                perM2
-              />
-            ) : null}
-          </div>
-          {/* Magic moment: the affordability glance. Buyer's "can I
-              actually afford this monthly?" answered before they
-              scroll. Anchors to the full Рассрочка section below for
-              term details. Renders only when installment is offered. */}
-          {listing.installment_available && listing.installment_monthly_amount_dirams ? (
-            <a
-              href="#rassrochka"
-              className="inline-flex w-fit items-center gap-1.5 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
-            >
-              <span>
-                Ежемесячно от{' '}
-                <span className="tabular-nums">
-                  {formatPriceNumber(listing.installment_monthly_amount_dirams)} TJS
+          {/* RIGHT: price block + CTAs (decision module) */}
+          <div className="flex flex-col gap-4 rounded-md border border-stone-200 bg-stone-50/60 p-5 md:w-[22rem] md:shrink-0">
+            <div className="flex flex-col gap-1">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-display font-semibold tabular-nums text-stone-900">
+                  {formatPriceNumber(listing.price_total_dirams)} TJS
                 </span>
-              </span>
-              {listing.installment_term_months ? (
-                <span className="text-stone-500"> · рассрочка {listing.installment_term_months} мес</span>
+              </div>
+              {isDiaspora && rates ? (
+                <PriceConversion
+                  priceDirams={listing.price_total_dirams}
+                  target={currency}
+                  rates={rates}
+                  variant="block"
+                />
               ) : null}
-              <ArrowUpRight className="size-3.5" aria-hidden />
-            </a>
-          ) : null}
-          {/* Contact cluster — desktop renders inline here (channels +
-              intent button); mobile renders nothing inline and pins
-              the same actions to a sticky bottom bar via the
-              component's own portal. Folded into the price section so
-              the contact buttons sit immediately next to the price on
-              desktop and we don't add an empty wrapper section on
-              mobile (the inline desktop layout uses `hidden md:flex`). */}
-          <ContactBarWithModal
-            listingTitle={`${listing.rooms_count}-комн в ${building.name.ru}`}
-            sellerPhone={sellerPhone}
-            isDiaspora={isDiaspora}
-          />
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-caption text-stone-500 tabular-nums">
+                  {formatPriceNumber(listing.price_per_m2_dirams)} TJS / м²
+                </span>
+                {isDiaspora && rates ? (
+                  <PriceConversion
+                    priceDirams={listing.price_per_m2_dirams}
+                    target={currency}
+                    rates={rates}
+                    perM2
+                  />
+                ) : null}
+              </div>
+              {/* Soft terracotta rassrochka pill — anchors to §7
+                  Условия (the 3-metric card section). Reads as a
+                  decisive monthly number, not a price footnote. */}
+              {listing.installment_available && listing.installment_monthly_amount_dirams ? (
+                <a
+                  href="#rassrochka"
+                  className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-terracotta-50 px-2.5 py-1 text-caption font-semibold text-terracotta-800 tabular-nums hover:bg-terracotta-100"
+                >
+                  Рассрочка от {formatPriceNumber(listing.installment_monthly_amount_dirams)} TJS / мес
+                </a>
+              ) : null}
+            </div>
+            {/* Dual CTAs + secondary contact strip — handled by
+                ContactBarWithModal which renders inline on desktop
+                and pins to the mobile sticky bar on smaller widths. */}
+            <ContactBarWithModal
+              listingTitle={`${listing.rooms_count}-комн в ${building.name.ru}`}
+              sellerPhone={sellerPhone}
+              isDiaspora={isDiaspora}
+              priceFromDirams={listing.price_total_dirams}
+            />
+          </div>
         </AppContainer>
       </section>
 
@@ -463,21 +472,33 @@ export default async function ListingDetailPage({
           top of the viewport when the magic-moment anchor jumps here. */}
       {listing.installment_available && listing.installment_monthly_amount_dirams ? (
         <section id="rassrochka" className="scroll-mt-20 border-t border-stone-200 bg-white py-6">
-          <AppContainer className="flex flex-col gap-3">
+          <AppContainer className="flex flex-col gap-4">
             <div className="flex flex-col gap-1">
               <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
                 Условия
               </span>
               <h2 className="text-h2 font-semibold text-stone-900">Рассрочка от застройщика</h2>
             </div>
-            <InstallmentDisplay
-              monthlyDirams={listing.installment_monthly_amount_dirams}
-              firstPaymentPercent={listing.installment_first_payment_percent ?? 30}
-              termMonths={listing.installment_term_months ?? 84}
-              totalPriceDirams={listing.price_total_dirams}
-              currency={currency}
-              rates={rates}
-            />
+            {/* 3-metric cards per the senior-design prescription:
+                "В МЕСЯЦ / 3 400 TJS", "ПЕРВЫЙ ВЗНОС / 30%", "СРОК /
+                84 мес". Each card: micro-uppercase label above + serif
+                number beneath. Turns generic financial info into
+                something that reads like a guarantee, not a
+                line-of-text. */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+              <RassrochkaMetric
+                label="В месяц"
+                value={`${formatPriceNumber(listing.installment_monthly_amount_dirams)} TJS`}
+              />
+              <RassrochkaMetric
+                label="Первый взнос"
+                value={`${listing.installment_first_payment_percent ?? 30}%`}
+              />
+              <RassrochkaMetric
+                label="Срок"
+                value={`${listing.installment_term_months ?? 84} мес`}
+              />
+            </div>
             <p className="text-meta text-stone-500">
               Без скрытых процентов. Условия фиксируются в договоре.
             </p>
@@ -705,6 +726,28 @@ export default async function ListingDetailPage({
       {/* Mobile sticky contact bar is rendered by ContactBarWithModal
           in §3 — it floats fixed regardless of scroll position. */}
     </>
+  );
+}
+
+/**
+ * Single metric card for the Рассрочка 3-card grid. Micro-uppercase
+ * label above + serif tabular number beneath. Reads as a quiet
+ * financial guarantee — three of these in a row turn a generic
+ * installment line into something a buyer can scan with confidence.
+ */
+function RassrochkaMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-1.5 rounded-md border border-stone-200 bg-stone-50/60 p-4">
+      <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+        {label}
+      </span>
+      <span
+        className="text-h2 font-semibold tabular-nums text-stone-900"
+        style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+      >
+        {value}
+      </span>
+    </div>
   );
 }
 

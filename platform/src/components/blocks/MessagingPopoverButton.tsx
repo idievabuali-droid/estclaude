@@ -13,10 +13,14 @@ export interface MessagingPopoverButtonProps {
   /** IMO deep-link, or null when IMO is unsupported. */
   imoHref?: string | null;
   /** Visual variant:
-   *   primary-lg: desktop labeled big button (used in detail-page contact section)
+   *   primary-lg: desktop labeled big button (stone-900 filled)
+   *   secondary-lg: desktop labeled big button (white + stone-300 border).
+   *     Used when an even-higher-intent CTA (e.g. "Запросить визит") is
+   *     the primary on the same page and Сообщения should read as a
+   *     peer to "Позвонить" rather than competing with the primary.
    *   primary-mobile: mobile sticky-bar primary slot (labeled, flex-1)
    *   icon-stack: mobile sticky-bar icon-with-label slot (compact) */
-  variant: 'primary-lg' | 'primary-mobile' | 'icon-stack';
+  variant: 'primary-lg' | 'secondary-lg' | 'primary-mobile' | 'icon-stack';
   /** Override the trigger label. Default "Сообщения". /zhk uses
    *  "Связаться" per the senior-design prescription so the sticky
    *  bar reads as a single decision action, not a generic toolbar. */
@@ -69,6 +73,13 @@ export function MessagingPopoverButton({
     if (variant === 'primary-lg') {
       return (
         <AppButton variant="primary" size="lg" onClick={() => setOpen((v) => !v)}>
+          <TriggerIcon className="size-4" /> {triggerLabel}
+        </AppButton>
+      );
+    }
+    if (variant === 'secondary-lg') {
+      return (
+        <AppButton variant="secondary" size="lg" className="w-full" onClick={() => setOpen((v) => !v)}>
           <TriggerIcon className="size-4" /> {triggerLabel}
         </AppButton>
       );
