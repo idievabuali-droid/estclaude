@@ -8,6 +8,14 @@ Newest at top.
 
 ---
 
+## 2026-05-06 · Brand consistency ripple across buyer-facing platform
+
+**Locked:** Lora serif H1 via inline `style={{ fontFamily: 'var(--font-lora), Georgia, serif' }}` on /izbrannoe, /kvartiry, /novostroyki, /zhk/[slug] (statement headings). Eyebrow labels (uppercase tracking-widest stone-500) above section H2s on /zhk + /kvartira detail pages. Verified developer pill standardised: white bg + stone-200 border + green dot (replaces amber inline badge). /diaspora rebuilt to home pattern: pill + serif H1 with italic accent + 3 icon-tile trust cards + dark-band CTA with WhatsApp/Telegram. /kvartira H1 stays sans (numeric).
+**Why:** Home shipped a distinct editorial-luxury voice; every other surface read as a different product, breaking the brand the moment the buyer tapped a card.
+**Affects:** `/diaspora`, `/zhk/[slug]`, `/kvartira/[slug]`, `/kvartiry`, `/novostroyki`, `/izbrannoe` page files. Cards (`BuildingCard`, `ListingCard`) deliberately untouched — separate global card pass. `/pomoshch-vybora` (GuidedFinder) + operator surfaces deferred. Inline fontFamily because Tailwind v4's default `--font-serif` shadows the @theme custom one.
+
+---
+
 ## 2026-05-04 · Share, photo carousel, contact affordances, USP strip, developer filter
 
 **Locked:** ShareButton on /kvartira + /zhk heroes (Web Share API / popover fallback). Photo carousel + fullscreen lightbox on /kvartira. WhatsApp contact pill on BuildingCard. 3-USP strip on home. Developer filter on /novostroyki. OpenGraph metadata on both detail pages.
