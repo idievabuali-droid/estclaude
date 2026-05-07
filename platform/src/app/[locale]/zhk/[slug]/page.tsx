@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { MapPin, Calendar, Layers, Users, Camera, ArrowUpRight, BadgeCheck, MessageCircle } from 'lucide-react';
+import { MapPin, Calendar, Layers, Users, Camera, ArrowUpRight, MessageCircle } from 'lucide-react';
 import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
 import { buildContactLinks } from '@/lib/contact-links';
 import { setRequestLocale } from 'next-intl/server';
@@ -609,10 +609,13 @@ export default async function BuildingDetailPage({
                       {developer.is_verified ? (
                         <Link
                           href="/tsentr-pomoshchi#verified-developer"
-                          className="inline-flex items-center gap-1 rounded-sm bg-amber-50 px-2 py-0.5 text-caption font-medium text-[color:var(--color-badge-tier-developer)] hover:bg-amber-100"
+                          className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 text-caption font-medium text-stone-700 hover:border-stone-300"
                           title="Что значит «Проверенный»?"
                         >
-                          <BadgeCheck className="size-3.5" aria-hidden />
+                          <span
+                            className="size-1.5 rounded-full bg-[color:var(--color-fairness-great)]"
+                            aria-hidden
+                          />
                           Проверенный
                         </Link>
                       ) : null}
