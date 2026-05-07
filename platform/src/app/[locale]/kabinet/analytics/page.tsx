@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
-import { Flame, AlertTriangle } from 'lucide-react';
+import { Flame, AlertTriangle, MessageSquare, Compass, Bell } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import {
   AppContainer,
@@ -108,6 +108,39 @@ export default async function AnalyticsPage({
   const listingEngagement: Record<string, number> = {};
   const buildingEngagement: Record<string, number> = {};
 
+  // Recent feedback feed — collect every feedback_submitted event in
+  // window so the founder can read all messages at a glance, sorted
+  // newest first. This was previously only visible per-visitor in the
+  // drill-down; now it's a first-class dashboard block.
+  const recentFeedback: Array<{
+    anonId: string;
+    occurredAt: string;
+    category: string;
+    text: string;
+    contact: string | null;
+    pageUrl: string | null;
+  }> = [];
+
+  // Quiz funnel — count distinct anon_ids that hit each milestone.
+  // Same anon-id-set pattern as the main funnel so a buyer who
+  // re-started the quiz isn't double-counted.
+  const quizSets = {
+    started: new Set<string>(),
+    answeredStep: new Set<string>(),
+    completed: new Set<string>(),
+    abandoned: new Set<string>(),
+  };
+  const quizStepCounts: Record<number, Set<string>> = {};
+
+  // Recent friction events — the same patterns the friction-alerts
+  // pipeline pings the founder about. Mirroring them onto the dashboard
+  // so the founder can audit the pipeline + see signals without
+  // depending on Telegram inbox memory. We store the raw events here
+  // and post-process afterwards (the "3rd no-results in 30 min" rule
+  // needs a windowed count we don't have during the loop).
+  const allNoResultEvents: Array<{ anonId: string; occurredAt: string; pageUrl: string | null }> = [];
+  const callbackStrandedEvents: Array<{ anonId: string; occurredAt: string; listingId: string | null }> = [];
+
   for (const e of events) {
     const anonId = e.anon_id as string;
     const evType = e.event_type as string;
@@ -158,6 +191,47 @@ export default async function AnalyticsPage({
       };
       cur.visitorIds.add(anonId);
       noResultsByVisitor[filtersKey] = cur;
+      // Mirror raw event for friction-alert audit log.
+      allNoResultEvents.push({
+        anonId,
+        occurredAt: e.occurred_at as string,
+        pageUrl: (props.url as string | undefined) ?? null,
+      });
+    }
+    if (evType === 'callback_widget_typed_no_submit') {
+      callbackStrandedEvents.push({
+        anonId,
+        occurredAt: e.occurred_at as string,
+        listingId: (props.listing_id as string | undefined) ?? null,
+      });
+    }
+    if (evType === 'feedback_submitted') {
+      recentFeedback.push({
+        anonId,
+        occurredAt: e.occurred_at as string,
+        category: (props.category as string | undefined) ?? 'idea',
+        text: (props.text as string | undefined) ?? '',
+        contact: (props.contact as string | undefined) ?? null,
+        pageUrl: (props.page_url as string | undefined) ?? null,
+      });
+    }
+    if (evType === 'quiz_started') {
+      quizSets.started.add(anonId);
+    }
+    if (evType === 'quiz_step_answered') {
+      quizSets.answeredStep.add(anonId);
+      const stepNum = Number(props.step_num);
+      if (Number.isFinite(stepNum)) {
+        const set = quizStepCounts[stepNum] ?? new Set<string>();
+        set.add(anonId);
+        quizStepCounts[stepNum] = set;
+      }
+    }
+    if (evType === 'quiz_completed') {
+      quizSets.completed.add(anonId);
+    }
+    if (evType === 'quiz_abandoned') {
+      quizSets.abandoned.add(anonId);
     }
     visitorStages.set(anonId, stage);
 
@@ -187,6 +261,103 @@ export default async function AnalyticsPage({
     if (s.gaveCallback) funnelCounts.gaveCallback++;
     if (s.clickedContact) funnelCounts.clickedContact++;
   }
+
+  // ─── Recent feedback feed (newest first, cap 20) ──────────────
+  recentFeedback.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1));
+  const recentFeedbackCapped = recentFeedback.slice(0, 20);
+
+  // ─── Quiz funnel — 5-step bar chart ────────────────────────────
+  // Per-step counts use the distinct-anon-id Sets accumulated above.
+  // For step N we count buyers who answered step N at any point in
+  // window. quiz_started seeds step 0 (the visitor saw the question
+  // but didn't answer); the wizard has 5 steps so we render 1–5.
+  const quizFunnel = [
+    { stepNum: 0, label: 'Начали', count: quizSets.started.size },
+    {
+      stepNum: 1,
+      label: 'Шаг 1: Районы',
+      count: (quizStepCounts[1] ?? new Set()).size,
+    },
+    {
+      stepNum: 2,
+      label: 'Шаг 2: Бюджет',
+      count: (quizStepCounts[2] ?? new Set()).size,
+    },
+    {
+      stepNum: 3,
+      label: 'Шаг 3: Комнат',
+      count: (quizStepCounts[3] ?? new Set()).size,
+    },
+    {
+      stepNum: 4,
+      label: 'Шаг 4: Отделка',
+      count: (quizStepCounts[4] ?? new Set()).size,
+    },
+    {
+      stepNum: 5,
+      label: 'Шаг 5: Сроки',
+      count: (quizStepCounts[5] ?? new Set()).size,
+    },
+    { stepNum: 6, label: 'Завершили', count: quizSets.completed.size },
+  ];
+  const quizMaxCount = Math.max(...quizFunnel.map((s) => s.count), 1);
+
+  // ─── Friction-alert audit log ─────────────────────────────────
+  // Replicates the same patterns `lib/analytics/friction-alerts.ts`
+  // pings the founder about, so the dashboard mirrors what showed
+  // up (or should have shown up) in Telegram. Three sources:
+  //   (a) feedback_submitted — every entry in recentFeedbackCapped
+  //   (b) callback_widget_typed_no_submit — every event
+  //   (c) "third no-result in 30 min" — windowed count per anon
+  const frictionAlerts: Array<{
+    occurredAt: string;
+    anonId: string;
+    kind: 'feedback' | 'callback_strand' | 'no_results';
+    summary: string;
+  }> = [];
+  for (const f of recentFeedback) {
+    frictionAlerts.push({
+      occurredAt: f.occurredAt,
+      anonId: f.anonId,
+      kind: 'feedback',
+      summary: `${categoryLabel(f.category)} · ${f.text.slice(0, 80)}${f.text.length > 80 ? '…' : ''}`,
+    });
+  }
+  for (const c of callbackStrandedEvents) {
+    frictionAlerts.push({
+      occurredAt: c.occurredAt,
+      anonId: c.anonId,
+      kind: 'callback_strand',
+      summary: c.listingId ? `Не отправил заявку (listing ${c.listingId.slice(0, 8)})` : 'Не отправил заявку',
+    });
+  }
+  // Detect "third no-result in 30 min" — bucket events per anon, sort
+  // by time, and emit one alert at the moment the 3rd hits. Same rule
+  // friction-alerts.ts uses live.
+  const noResultByAnon = new Map<string, Array<{ occurredAt: string; pageUrl: string | null }>>();
+  for (const ev of allNoResultEvents) {
+    const list = noResultByAnon.get(ev.anonId) ?? [];
+    list.push({ occurredAt: ev.occurredAt, pageUrl: ev.pageUrl });
+    noResultByAnon.set(ev.anonId, list);
+  }
+  for (const [anonId, list] of noResultByAnon) {
+    list.sort((a, b) => (a.occurredAt < b.occurredAt ? -1 : 1));
+    for (let i = 2; i < list.length; i++) {
+      const here = new Date(list[i]!.occurredAt).getTime();
+      const window2Ago = new Date(list[i - 2]!.occurredAt).getTime();
+      if (here - window2Ago <= 30 * 60 * 1000) {
+        frictionAlerts.push({
+          occurredAt: list[i]!.occurredAt,
+          anonId,
+          kind: 'no_results',
+          summary: `3-й «ничего не найдено» за 30 мин · ${list[i]!.pageUrl ?? '/'}`,
+        });
+        break; // emit once per anon (matches the live pipeline)
+      }
+    }
+  }
+  frictionAlerts.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1));
+  const frictionAlertsCapped = frictionAlerts.slice(0, 20);
 
   // ─── Hot leads ──────────────────────────────────────────────
   const hotLeads = await findHotLeads({
@@ -347,6 +518,22 @@ export default async function AnalyticsPage({
 
           {/* Hot leads — the actionable list. */}
           <HotLeadsBlock leads={hotLeads} />
+
+          {/* Recent feedback — every "Сообщить о проблеме" submission
+              from the floating button, newest first. Used to be only
+              visible per-visitor in drill-down. Now first-class. */}
+          <RecentFeedbackBlock rows={recentFeedbackCapped} />
+
+          {/* Quiz funnel — 7-bar chart (start → 5 steps → complete)
+              showing where buyers drop in the wizard. Highest-intent
+              funnel; was previously invisible to the dashboard. */}
+          <QuizFunnelBlock funnel={quizFunnel} maxCount={quizMaxCount} />
+
+          {/* Friction-alerts audit log — mirror of what the founder
+              should have seen in Telegram. Lets the founder check the
+              pipeline didn't drop alerts + browse alerts that were
+              read-and-forgotten in chat history. */}
+          <FrictionAlertsBlock rows={frictionAlertsCapped} />
 
           {/* 0-result searches — direct inventory acquisition signal. */}
           <NoResultsBlock rows={noResultsRanked} />
@@ -703,6 +890,242 @@ function EngagementList({
   );
 }
 
+/**
+ * Recent feedback feed — every `feedback_submitted` event in window,
+ * newest first. Each row links to the per-visitor drill-down so the
+ * founder can read the full session that produced the feedback.
+ */
+function RecentFeedbackBlock({
+  rows,
+}: {
+  rows: Array<{
+    anonId: string;
+    occurredAt: string;
+    category: string;
+    text: string;
+    contact: string | null;
+    pageUrl: string | null;
+  }>;
+}) {
+  return (
+    <AppCard>
+      <AppCardContent>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="size-5 text-stone-500" aria-hidden />
+            <h2 className="text-h2 font-semibold text-stone-900">Обратная связь</h2>
+            {rows.length > 0 ? (
+              <AppBadge variant="neutral">{rows.length}</AppBadge>
+            ) : null}
+          </div>
+          <p className="text-meta text-stone-500">
+            Сообщения от посетителей через кнопку «Сообщить о проблеме».
+            Самые свежие сверху.
+          </p>
+          {rows.length === 0 ? (
+            <p className="text-meta text-stone-500">
+              Никто пока не оставил сообщение.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {rows.map((r) => (
+                <li
+                  key={r.anonId + r.occurredAt}
+                  className="flex flex-col gap-1 border-t border-stone-100 pt-3 first:border-t-0 first:pt-0"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-meta font-medium text-stone-900">
+                        {categoryLabel(r.category)}
+                      </span>
+                      {r.pageUrl ? (
+                        <span className="text-caption text-stone-500">
+                          · {r.pageUrl}
+                        </span>
+                      ) : null}
+                    </div>
+                    <span className="text-caption text-stone-500 tabular-nums">
+                      {relativeTime(r.occurredAt)}
+                    </span>
+                  </div>
+                  <p className="text-meta text-stone-700">«{r.text}»</p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {r.contact ? (
+                      <span className="text-caption text-stone-600">
+                        Связь: <span className="font-medium">{r.contact}</span>
+                      </span>
+                    ) : null}
+                    <Link
+                      href={`/kabinet/analytics/${r.anonId}`}
+                      className="text-caption font-medium text-terracotta-700 hover:text-terracotta-800"
+                    >
+                      Посмотреть сессию →
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </AppCardContent>
+    </AppCard>
+  );
+}
+
+/**
+ * Quiz funnel — 7 horizontal bars (start → step1..5 → complete) with
+ * counts + relative widths so the founder can see at a glance which
+ * step is the killer. Drop-off between adjacent bars surfaces in red.
+ */
+function QuizFunnelBlock({
+  funnel,
+  maxCount,
+}: {
+  funnel: Array<{ stepNum: number; label: string; count: number }>;
+  maxCount: number;
+}) {
+  return (
+    <AppCard>
+      <AppCardContent>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <Compass className="size-5 text-stone-500" aria-hidden />
+            <h2 className="text-h2 font-semibold text-stone-900">Подбор квартиры</h2>
+          </div>
+          <p className="text-meta text-stone-500">
+            Где покупатели бросают мастер-подбора (/pomoshch-vybora). Чем
+            больше падение между шагами — тем сильнее этот шаг сбивает.
+          </p>
+          {funnel[0]!.count === 0 ? (
+            <p className="text-meta text-stone-500">
+              Никто пока не запускал подбор за выбранный период.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {funnel.map((s, i) => {
+                const widthPct = maxCount > 0 ? Math.max(2, Math.round((s.count / maxCount) * 100)) : 0;
+                const prev = i > 0 ? funnel[i - 1]!.count : null;
+                const dropPct = prev != null && prev > 0 ? Math.round(((prev - s.count) / prev) * 100) : null;
+                const isLast = i === funnel.length - 1;
+                return (
+                  <li key={s.stepNum} className="flex items-center gap-3">
+                    <span className="w-32 shrink-0 text-caption text-stone-700">
+                      {s.label}
+                    </span>
+                    <div className="relative h-6 flex-1 rounded-sm bg-stone-100">
+                      <div
+                        className={
+                          'absolute inset-y-0 left-0 rounded-sm ' +
+                          (isLast
+                            ? 'bg-[color:var(--color-fairness-great)]'
+                            : 'bg-terracotta-600')
+                        }
+                        style={{ width: `${widthPct}%` }}
+                        aria-hidden
+                      />
+                    </div>
+                    <span className="w-10 shrink-0 text-right text-meta font-semibold tabular-nums text-stone-900">
+                      {s.count}
+                    </span>
+                    <span
+                      className={
+                        'w-16 shrink-0 text-caption tabular-nums ' +
+                        (dropPct == null
+                          ? 'text-transparent'
+                          : dropPct >= 50
+                          ? 'text-rose-600'
+                          : dropPct > 0
+                          ? 'text-stone-500'
+                          : 'text-transparent')
+                      }
+                    >
+                      {dropPct != null && dropPct > 0 ? `−${dropPct}%` : ''}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </AppCardContent>
+    </AppCard>
+  );
+}
+
+/**
+ * Friction-alerts audit log — mirrors what the founder should have
+ * seen in Telegram. Three event kinds rendered with consistent shape:
+ * timestamp, anon_id link, summary line. Cap 20 newest.
+ */
+function FrictionAlertsBlock({
+  rows,
+}: {
+  rows: Array<{
+    occurredAt: string;
+    anonId: string;
+    kind: 'feedback' | 'callback_strand' | 'no_results';
+    summary: string;
+  }>;
+}) {
+  const kindLabel = (k: string): string => {
+    if (k === 'feedback') return '💬 Обратная связь';
+    if (k === 'callback_strand') return '📞 Не отправил заявку';
+    if (k === 'no_results') return '🕳️ Ищет не из каталога';
+    return k;
+  };
+  return (
+    <AppCard>
+      <AppCardContent>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <Bell className="size-5 text-stone-500" aria-hidden />
+            <h2 className="text-h2 font-semibold text-stone-900">События для внимания</h2>
+            {rows.length > 0 ? (
+              <AppBadge variant="neutral">{rows.length}</AppBadge>
+            ) : null}
+          </div>
+          <p className="text-meta text-stone-500">
+            То же, что отправляется в Telegram бот в реальном времени —
+            продублировано здесь, чтобы можно было пересмотреть.
+          </p>
+          {rows.length === 0 ? (
+            <p className="text-meta text-stone-500">
+              За выбранный период тревожных событий не было.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {rows.map((r, idx) => (
+                <li
+                  key={r.anonId + r.occurredAt + idx}
+                  className="flex flex-wrap items-start justify-between gap-2 border-t border-stone-100 pt-2 first:border-t-0 first:pt-0"
+                >
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-caption font-medium text-stone-700">
+                      {kindLabel(r.kind)}
+                    </span>
+                    <span className="text-meta text-stone-700">{r.summary}</span>
+                  </div>
+                  <div className="flex flex-col items-end gap-0.5">
+                    <span className="text-caption tabular-nums text-stone-500">
+                      {relativeTime(r.occurredAt)}
+                    </span>
+                    <Link
+                      href={`/kabinet/analytics/${r.anonId}`}
+                      className="text-caption font-medium text-terracotta-700 hover:text-terracotta-800"
+                    >
+                      anon {r.anonId.slice(0, 8)} →
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </AppCardContent>
+    </AppCard>
+  );
+}
+
 function computeFromIso(range: NonNullable<PageSearchParams['range']>, customFrom: string | undefined): string {
   if (range === 'custom' && customFrom) return customFrom;
   const days = range === 'today' ? 1 : range === '7d' ? 7 : 30;
@@ -721,6 +1144,23 @@ function channelLabel(channel: string): string {
   if (channel === 'telegram') return 'Telegram';
   if (channel === 'phone') return 'Звонок';
   return channel;
+}
+
+function categoryLabel(category: string): string {
+  if (category === 'bug') return '🆘 Баг';
+  if (category === 'confusion') return '😕 Непонятно';
+  if (category === 'missing') return '🔍 Не нашёл';
+  if (category === 'idea') return '💡 Идея';
+  return category;
+}
+
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  const diffSec = Math.round((Date.now() - then) / 1000);
+  if (diffSec < 60) return 'только что';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} мин назад`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} ч назад`;
+  return `${Math.floor(diffSec / 86400)} дн назад`;
 }
 
 function pluralVisitors(n: number): string {

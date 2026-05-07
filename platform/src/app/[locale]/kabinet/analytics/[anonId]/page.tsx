@@ -163,7 +163,26 @@ export default async function VisitorPage({
               ? `Первый визит ${formatTs(bundle.firstSeen)} · последний ${formatTs(bundle.lastSeen!)} · ${profile.pageViewCount} просмотр(ов)`
               : 'Нет событий'}
           </p>
-          <code className="text-caption text-stone-400">anon_id: {anonId}</code>
+          <div className="flex flex-wrap items-center gap-3">
+            <code className="text-caption text-stone-400">anon_id: {anonId}</code>
+            {/* Clarity drill-down — opens the Clarity recordings tab
+                pre-filtered to this anon_id. Clarity uses its own user
+                identifier internally, but its dashboard accepts a
+                custom-tag filter; the simplest reliable jump is into
+                the project's recordings list (founder filters on date
+                + identifies by behaviour). When project ID isn't
+                configured the link is hidden. */}
+            {process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID ? (
+              <a
+                href={`https://clarity.microsoft.com/projects/view/${process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID}/recordings`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-caption font-medium text-terracotta-700 hover:text-terracotta-800"
+              >
+                Записи сессий в Clarity ↗
+              </a>
+            ) : null}
+          </div>
         </AppContainer>
       </section>
 

@@ -8,19 +8,32 @@ import { toast } from '@/components/primitives/AppToast';
 import { cn } from '@/lib/utils';
 import { track } from '@/lib/analytics/track';
 
-/** Operator-only routes — the founder doesn't need a feedback widget
- *  on her own back-office surfaces. The widget would also crowd the
- *  /post and /kabinet edit forms and isn't a buyer-facing brand
- *  moment in those contexts. */
-function isOperatorPath(pathname: string): boolean {
+/** Routes where the floating "Сообщить о проблеме" button does NOT
+ *  render. Two reasons to skip:
+ *
+ *  1. Operator surfaces — founder doesn't need to report bugs to
+ *     herself: /kabinet, /post, /post/edit.
+ *  2. Pages with their own sticky bottom-bar contact CTA. /zhk and
+ *     /kvartira already have a "Связаться" sticky bar in the same
+ *     bottom-right region. A second floating contact-shaped pill
+ *     visually clashes with the listing CTA — verified at 375px,
+ *     both buttons stack on top of each other and the icons read
+ *     as the same thing. Hiding the feedback button here keeps the
+ *     listing CTA as the single bottom-right action; the buyer can
+ *     still report problems from the home/listing-list pages and
+ *     the after-contact-completion confirmation pages.
+ *  3. Wizard — Typeform-style focused experience; no floating CTA. */
+function shouldHideOnPath(pathname: string): boolean {
   // Strip locale prefix (e.g. "/ru/kabinet/..." → "/kabinet/...")
   const stripped = pathname.replace(/^\/[a-z]{2}(?=\/|$)/, '');
   return (
     stripped.startsWith('/kabinet') ||
     stripped.startsWith('/post') ||
-    // Also skip the onboarding wizard — it's a Typeform-style focused
-    // experience and a floating button competes with that.
-    stripped.startsWith('/pomoshch-vybora')
+    stripped.startsWith('/pomoshch-vybora') ||
+    // Detail pages with sticky bottom contact bar — don't compete
+    // with the conversion CTA.
+    /^\/zhk\/[^/]+$/.test(stripped) ||
+    /^\/kvartira\/[^/]+$/.test(stripped)
   );
 }
 
@@ -82,9 +95,10 @@ export function FeedbackButton() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
-  // Render nothing on operator surfaces. The early return MUST come
-  // after every hook above so React's hook-order invariant holds.
-  if (isOperatorPath(pathname || '')) return null;
+  // Render nothing on hidden surfaces (operator + detail-page-with-
+  // sticky-bar + wizard). The early return MUST come after every
+  // hook above so React's hook-order invariant holds.
+  if (shouldHideOnPath(pathname || '')) return null;
 
   function reset() {
     setCategory(null);
@@ -132,27 +146,32 @@ export function FeedbackButton() {
 
   return (
     <>
-      {/* Floating trigger — bottom-right, above mobile-bottom-nav.
-          Stone-900 keeps it as a quiet platform action; it shouldn't
-          out-shout the actual primary CTAs on a page. */}
+      {/* Floating trigger — bottom-LEFT (deliberate, to NOT collide
+          with sticky-bar Связаться/contact CTAs on listing surfaces).
+          Quiet white pill with a small alert icon. The label is
+          "Сообщить о проблеме" / "Что не работает?" — clear that
+          this is for REPORTING, not requesting help. The earlier
+          "Помогите улучшить" framing read as a backwards "you help
+          US" ask in Russian and got confused with the listing
+          contact CTAs. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Сообщить о проблеме"
         className={cn(
-          'fixed z-30 inline-flex h-11 items-center gap-2 rounded-full',
-          'border border-stone-200 bg-white px-4 text-meta font-medium',
-          'text-stone-700 shadow-md transition-all',
-          'hover:border-stone-300 hover:bg-stone-50',
-          // Bottom-right, lifted above the mobile-bottom-nav (which
-          // sits ~56px tall + safe-area). On desktop just bottom-5.
-          'bottom-[max(5rem,calc(4.5rem+env(safe-area-inset-bottom)))] right-4',
-          'md:bottom-5 md:right-5',
+          'fixed z-30 inline-flex h-10 items-center gap-1.5 rounded-full',
+          'border border-stone-200 bg-white px-3 text-caption font-medium',
+          'text-stone-600 shadow-sm transition-all',
+          'hover:border-stone-300 hover:bg-stone-50 hover:text-stone-900',
+          // Bottom-LEFT — opposite corner from the listing contact
+          // sticky bar. Lifted above the mobile-bottom-nav.
+          'bottom-[max(5rem,calc(4.5rem+env(safe-area-inset-bottom)))] left-4',
+          'md:bottom-5 md:left-5',
         )}
       >
-        <MessageSquare className="size-4" aria-hidden />
-        <span className="hidden sm:inline">Помогите улучшить</span>
-        <span className="sm:hidden">Помогите</span>
+        <MessageSquare className="size-3.5" aria-hidden />
+        <span className="hidden sm:inline">Сообщить о проблеме</span>
+        <span className="sm:hidden">Проблема?</span>
       </button>
 
       {open ? (
