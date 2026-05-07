@@ -209,7 +209,10 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         <section className="py-16 md:py-24">
           <AppContainer className="flex flex-col gap-5">
             <div className="flex items-end justify-between gap-3">
-              <h2 className="text-h2 font-semibold text-stone-900 md:text-h1">
+              <h2
+                className="text-h2 font-semibold text-stone-900 md:text-h1"
+                style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+              >
                 Рекомендуемые проекты
               </h2>
               <Link
@@ -246,7 +249,10 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         <AppContainer>
           <div className="flex flex-col items-start gap-3 rounded-md border border-stone-200 bg-white p-5 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-col gap-1">
-              <h2 className="text-h3 font-semibold text-stone-900">
+              <h2
+                className="text-h3 font-semibold text-stone-900"
+                style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+              >
                 {hasListings ? 'Не нашли подходящую?' : 'Узнаете первыми'}
               </h2>
               <p className="text-meta text-stone-700">
@@ -272,7 +278,10 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               <Globe2 className="size-4 text-terracotta-400" aria-hidden />
               Покупаете из-за границы?
             </div>
-            <h2 className="text-h2 font-semibold leading-[var(--leading-h2)] text-white md:text-h1">
+            <h2
+              className="text-h2 font-semibold leading-[var(--leading-h2)] text-white md:text-h1"
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+            >
               Видеотуры, проверка документов, звонки в вашем часовом поясе.
             </h2>
             <p className="text-meta text-stone-300">

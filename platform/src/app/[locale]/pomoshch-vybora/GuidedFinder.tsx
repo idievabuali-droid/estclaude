@@ -349,10 +349,10 @@ export function GuidedFinder() {
                       });
                     }}
                   />
-                  <p className="text-caption text-stone-500">
-                    Знаете конкретное место — школу, ЖК, район? Введите
-                    название.
-                  </p>
+                  {/* Search-input subhead removed — the same line now
+                      lives at the page-level step subhead, just above
+                      the question. Keeping it twice produced a visible
+                      duplicate. */}
                 </div>
 
                 {/* Picked anchor chip — shows what the buyer chose

@@ -391,7 +391,7 @@ export default async function ListingDetailPage({
             <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
               Параметры
             </span>
-            <h2 className="text-h2 font-semibold text-stone-900">Об этой квартире</h2>
+            <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>Об этой квартире</h2>
           </div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
             <AppChip asStatic tone={FINISHING_TONE[listing.finishing_type]}>
@@ -429,7 +429,7 @@ export default async function ListingDetailPage({
               <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
                 Чертёж
               </span>
-              <h2 className="text-h2 font-semibold text-stone-900">Планировка</h2>
+              <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>Планировка</h2>
             </div>
             {/* Tap opens the original photo in a new tab — full-size
                 viewing without an extra lightbox dependency. cursor-
@@ -460,7 +460,7 @@ export default async function ListingDetailPage({
               <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
                 От продавца
               </span>
-              <h2 className="text-h2 font-semibold text-stone-900">Описание</h2>
+              <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>Описание</h2>
             </div>
             <p className="text-body text-stone-700">{listing.unit_description.ru}</p>
           </AppContainer>
@@ -477,7 +477,7 @@ export default async function ListingDetailPage({
               <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
                 Условия
               </span>
-              <h2 className="text-h2 font-semibold text-stone-900">Рассрочка от застройщика</h2>
+              <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>Рассрочка от застройщика</h2>
             </div>
             {/* 3-metric cards per the senior-design prescription:
                 "В МЕСЯЦ / 3 400 TJS", "ПЕРВЫЙ ВЗНОС / 30%", "СРОК /
@@ -517,7 +517,7 @@ export default async function ListingDetailPage({
             <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
               Здание
             </span>
-            <h2 className="text-h2 font-semibold text-stone-900">О доме</h2>
+            <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>О доме</h2>
           </div>
           <AppCard>
             <AppCardContent>
@@ -592,7 +592,7 @@ export default async function ListingDetailPage({
               <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
                 Кто строит
               </span>
-              <h2 className="text-h2 font-semibold text-stone-900">О застройщике</h2>
+              <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>О застройщике</h2>
             </div>
             <AppCard>
               <AppCardContent>
@@ -678,7 +678,7 @@ export default async function ListingDetailPage({
               <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
                 Альтернативы
               </span>
-              <h2 className="text-h2 font-semibold text-stone-900">Похожие в этом ЖК</h2>
+              <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>Похожие в этом ЖК</h2>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
               {similar.map((l) => (

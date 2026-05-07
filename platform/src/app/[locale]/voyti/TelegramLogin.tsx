@@ -1,14 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Send, MessageCircle } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useRouter } from '@/i18n/navigation';
-import {
-  AppCard,
-  AppCardContent,
-  AppButton,
-} from '@/components/primitives';
+import { AppButton } from '@/components/primitives';
 
 const POLL_INTERVAL_MS = 2_000;
 
@@ -118,43 +114,44 @@ export function TelegramLogin({ redirect }: { redirect: string }) {
   }
 
   return (
-    <AppCard>
-      <AppCardContent>
-        <div className="flex flex-col gap-5">
-          <div className="flex flex-col items-center gap-2 text-center">
-            <span className="inline-flex size-12 items-center justify-center rounded-full bg-terracotta-100 text-terracotta-700">
-              <Send className="size-5" />
-            </span>
-            <h1 className="text-h2 font-semibold text-stone-900">
-              Вход через Telegram
-            </h1>
-            <p className="text-meta text-stone-500">
-              {state === 'expired'
-                ? 'Ссылка устарела. Нажмите, чтобы попробовать снова.'
-                : state === 'qr'
-                  ? 'Откройте бота в Telegram и поделитесь номером.'
-                  : 'Один тап в Telegram — без SMS и без кодов.'}
-            </p>
-          </div>
+    // No outer card / heading: the parent /voyti page now owns the
+    // wordmark, H1, italic disclaimer, and the visual card that
+    // wraps this widget. Keeping a duplicate H1 + icon-tile in here
+    // produced "Вход через Telegram" twice on mobile (once page-
+    // level serif H1, once nested H1 inside this component).
+    <div className="flex flex-col gap-5">
+      {/* Per-state contextual line — only shown for QR/expired since
+          the intro-state subhead lives at the page level. */}
+      {state === 'qr' || state === 'expired' ? (
+        <p className="text-center text-meta text-stone-500">
+          {state === 'expired'
+            ? 'Ссылка устарела. Нажмите, чтобы попробовать снова.'
+            : 'Откройте бота в Telegram и поделитесь номером.'}
+        </p>
+      ) : null}
 
-          {state === 'intro' || state === 'starting' ? (
-            <div className="flex flex-col gap-3">
-              <AppButton
-                variant="primary"
-                size="lg"
-                onClick={startLogin}
-                loading={state === 'starting'}
-              >
-                <MessageCircle className="size-4" /> Войти через Telegram
-              </AppButton>
-              {error ? (
-                <p className="text-center text-meta text-rose-600">{error}</p>
-              ) : null}
-              <p className="text-center text-caption text-stone-500">
-                Telegram должен быть установлен. Никаких SMS — только тап в боте.
-              </p>
-            </div>
+      {state === 'intro' || state === 'starting' ? (
+        <div className="flex flex-col gap-3">
+          {/* Brand-warm primary — deliberate exception to the
+              platform's stone-900 default. Login is the moment trust
+              starts; the terracotta-filled button reads as the
+              warmest action on the platform, matching the prescription
+              ("Telegram button as the primary, full-width, terracotta
+              — with the Telegram icon on the left"). */}
+          <AppButton
+            variant="primary"
+            size="lg"
+            onClick={startLogin}
+            loading={state === 'starting'}
+            className="w-full bg-terracotta-600 hover:bg-terracotta-700 active:bg-terracotta-800"
+          >
+            <MessageCircle className="size-4" /> Войти через Telegram
+          </AppButton>
+          {error ? (
+            <p className="text-center text-meta text-rose-600">{error}</p>
           ) : null}
+        </div>
+      ) : null}
 
           {state === 'qr' && session && qrDataUrl ? (
             <div className="flex flex-col items-center gap-4">
@@ -212,13 +209,16 @@ export function TelegramLogin({ redirect }: { redirect: string }) {
             </div>
           ) : null}
 
-          {state === 'expired' ? (
-            <AppButton variant="primary" size="lg" onClick={startLogin}>
-              Попробовать снова
-            </AppButton>
-          ) : null}
-        </div>
-      </AppCardContent>
-    </AppCard>
+      {state === 'expired' ? (
+        <AppButton
+          variant="primary"
+          size="lg"
+          onClick={startLogin}
+          className="w-full bg-terracotta-600 hover:bg-terracotta-700 active:bg-terracotta-800"
+        >
+          Попробовать снова
+        </AppButton>
+      ) : null}
+    </div>
   );
 }

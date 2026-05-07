@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Smartphone, MessageCircle, BookmarkPlus } from 'lucide-react';
+import { Smartphone, MessageCircle } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { AppButton, AppContainer, AppCard, AppCardContent } from '@/components/primitives';
+import { IllustrationHouseHeart } from '@/components/illustrations';
 import { ListingCard } from './ListingCard';
 import { BuildingCard } from './BuildingCard';
 import { listAnonSaves } from '@/lib/anon-saves';
@@ -140,20 +141,29 @@ export function AnonSavedView({ tab }: { tab: 'buildings' | 'listings' }) {
       <AppContainer>
         <AppCard>
           <AppCardContent>
-            <div className="flex flex-col items-center gap-4 py-8 text-center">
-              <BookmarkPlus className="size-10 text-stone-400" aria-hidden />
+            <div className="flex flex-col items-center gap-5 px-4 py-12 text-center">
+              <span className="text-terracotta-700">
+                <IllustrationHouseHeart className="size-20" />
+              </span>
               <div className="flex max-w-md flex-col gap-2">
-                <h2 className="text-h2 font-semibold text-stone-900">
-                  Сохраняйте интересные варианты
+                <h2
+                  className="text-h2 font-semibold text-stone-900"
+                  style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+                >
+                  Сохраняйте понравившиеся квартиры
                 </h2>
-                <p className="text-meta text-stone-600">
+                <p className="text-body text-stone-600">
                   Нажмите на закладку на любой карточке — мы запомним выбор.
-                  А войдя через Telegram, вы получите уведомления о смене цены
-                  и новых квартирах.
+                  А войдя через Telegram, вы получите уведомления о смене
+                  цены и новых квартирах.
                 </p>
               </div>
               <Link href="/voyti?redirect=/izbrannoe">
-                <AppButton variant="primary" size="lg">
+                <AppButton
+                  variant="primary"
+                  size="lg"
+                  className="bg-terracotta-600 hover:bg-terracotta-700 active:bg-terracotta-800"
+                >
                   <MessageCircle className="size-4" /> Войти через Telegram
                 </AppButton>
               </Link>

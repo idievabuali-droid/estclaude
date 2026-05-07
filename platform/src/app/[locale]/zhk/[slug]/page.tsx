@@ -464,7 +464,7 @@ export default async function BuildingDetailPage({
               <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
                 Квартиры
               </span>
-              <h2 className="text-h2 font-semibold text-stone-900">
+              <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>
                 Доступные квартиры
               </h2>
               <p className="text-meta text-stone-500 tabular-nums">{listings.length} объявлений</p>
@@ -541,7 +541,7 @@ export default async function BuildingDetailPage({
                 <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
                   Стройка
                 </span>
-                <h2 className="text-h2 font-semibold text-stone-900">Ход строительства</h2>
+                <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>Ход строительства</h2>
                 <p className="text-meta text-stone-500">
                   Обновлено: {latestProgressMonth.label} · {progressTotalCount} фото
                 </p>
@@ -591,7 +591,7 @@ export default async function BuildingDetailPage({
             <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
               Описание
             </span>
-            <h2 className="text-h2 font-semibold text-stone-900">О проекте</h2>
+            <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>О проекте</h2>
           </div>
           <p className="text-body text-stone-700">{building.description.ru}</p>
           <div className="flex flex-wrap gap-2">
@@ -659,7 +659,7 @@ export default async function BuildingDetailPage({
             <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
               Кто строит
             </span>
-            <h2 className="text-h2 font-semibold text-stone-900">О застройщике</h2>
+            <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>О застройщике</h2>
           </div>
           <AppCard>
             <AppCardContent>
@@ -799,7 +799,7 @@ export default async function BuildingDetailPage({
               <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
                 Альтернативы
               </span>
-              <h2 className="text-h2 font-semibold text-stone-900">Похожие ЖК</h2>
+              <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>Похожие ЖК</h2>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
               {similarBuildings.map((b) => (

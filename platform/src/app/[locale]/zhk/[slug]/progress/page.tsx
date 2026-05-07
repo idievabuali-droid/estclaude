@@ -47,7 +47,10 @@ export default async function ProgressPage({
             <ChevronLeft className="size-4" /> {building.name.ru}
           </Link>
           <div className="flex flex-col gap-1">
-            <h1 className="text-h1 font-semibold text-stone-900">Ход строительства</h1>
+            <h1
+              className="text-h1 font-semibold text-stone-900"
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+            >Ход строительства</h1>
             <p className="text-meta text-stone-500">
               Реальные фото с площадки. Загружает {developer.display_name.ru}; платформа
               сверяет дату и метаданные перед публикацией.

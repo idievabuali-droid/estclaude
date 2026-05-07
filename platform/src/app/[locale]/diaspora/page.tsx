@@ -207,7 +207,10 @@ export default async function DiasporaPage({
         <section className="py-16 md:py-24">
           <AppContainer className="flex flex-col gap-5">
             <div className="flex items-end justify-between gap-3">
-              <h2 className="text-h2 font-semibold text-stone-900">Рекомендуемые проекты</h2>
+              <h2
+                className="text-h2 font-semibold text-stone-900"
+                style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+              >Рекомендуемые проекты</h2>
               <Link
                 href="/novostroyki"
                 className="shrink-0 text-meta font-medium text-terracotta-600 hover:text-terracotta-700"
@@ -241,7 +244,10 @@ export default async function DiasporaPage({
         <section className="border-t border-stone-200 bg-stone-50 py-16 md:py-24">
           <AppContainer className="flex flex-col gap-5">
             <div className="flex items-end justify-between gap-3">
-              <h2 className="text-h2 font-semibold text-stone-900">Свежие квартиры</h2>
+              <h2
+                className="text-h2 font-semibold text-stone-900"
+                style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+              >Свежие квартиры</h2>
               <Link
                 href="/kvartiry"
                 className="shrink-0 text-meta font-medium text-terracotta-600 hover:text-terracotta-700"
