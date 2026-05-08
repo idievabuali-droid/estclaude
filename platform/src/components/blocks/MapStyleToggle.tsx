@@ -8,39 +8,48 @@ import { cn } from '@/lib/utils';
  *  else. Free, no API key, OSM-based. */
 export const STREETS_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 
-/** Hybrid satellite — Esri World Imagery (raster) with the Esri
- *  reference-overlay raster on top, so street + neighbourhood + POI
- *  labels remain readable on satellite imagery. Two raster sources
- *  stacked; both free and OSM-compatible.
+/** Hybrid satellite — Esri World Imagery (raster) with OpenStreetMap
+ *  raster on top at reduced opacity, so streets + landmark + POI
+ *  labels remain readable on satellite imagery while the imagery
+ *  itself shows through. Same pattern Mapbox Satellite Streets uses.
  *
- *  Without the labels overlay, sellers complained that "Спутник" mode
- *  was great for spotting buildings visually but useless for figuring
- *  out which street they were looking at — the labels overlay is what
- *  makes a satellite map actually navigable. Standard pattern from
- *  Google Maps "Hybrid" view, Mapbox Satellite Streets, etc.
+ *  Why OSM and not Esri's reference overlay: Esri's
+ *  Reference/World_Boundaries_and_Places + World_Transportation are
+ *  effectively empty for Tajikistan (verified by probing tiles —
+ *  every TJ tile comes back as a ~3KB blank PNG). OSM has rich
+ *  Vahdat data — every street, every landmark, every neighbourhood
+ *  is labelled.
  *
- *  Attribution required per Esri's terms — both sources surface their
- *  © strings via maplibre's attribution control. */
+ *  Tile usage: OSM Foundation's policy permits light per-user usage
+ *  (each seller loads ~10-20 tiles per /post session — well below any
+ *  threshold). Attribution surfaces via maplibre's attribution control.
+ *
+ *  Opacity 0.55: empirically the balance where street labels stay
+ *  legible AND the satellite imagery underneath remains recognizable
+ *  enough that sellers can spot their building from above. Same
+ *  opacity Mapbox Satellite Streets uses by default. */
 export const SATELLITE_STYLE: StyleSpecification = {
   version: 8,
   sources: {
     'esri-imagery': {
       type: 'raster',
       tiles: [
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       ],
       tileSize: 256,
       maxzoom: 19,
       attribution: '© Esri, Maxar, Earthstar Geographics',
     },
-    'esri-reference': {
+    'osm-streets': {
       type: 'raster',
       tiles: [
-        'https://services.arcgisonline.com/arcgis/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+        'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
       ],
       tileSize: 256,
       maxzoom: 19,
-      attribution: '© Esri',
+      attribution: '© OpenStreetMap contributors',
     },
   },
   layers: [
@@ -50,12 +59,10 @@ export const SATELLITE_STYLE: StyleSpecification = {
       source: 'esri-imagery',
     },
     {
-      id: 'esri-reference-layer',
+      id: 'osm-streets-overlay',
       type: 'raster',
-      source: 'esri-reference',
-      // Slight transparency so the imagery underneath stays
-      // recognisable around dense label clusters.
-      paint: { 'raster-opacity': 0.85 },
+      source: 'osm-streets',
+      paint: { 'raster-opacity': 0.55 },
     },
   ],
 };
