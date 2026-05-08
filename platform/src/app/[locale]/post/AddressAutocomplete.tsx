@@ -257,6 +257,18 @@ export function AddressAutocomplete({
             <li className="px-3 py-2 text-meta text-stone-500">Поиск…</li>
           ) : null}
 
+          {/* 0-results hint — fired when the seller has typed enough
+              to search but our POI / building / district data didn't
+              match anything. Vahdat OSM coverage is patchy at the
+              street level; this hint reassures sellers that they can
+              still proceed via the "Use as typed" row + manual pin. */}
+          {!loading && hits.length === 0 && showFreeRow ? (
+            <li className="border-b border-stone-100 px-3 py-2 text-caption text-stone-500">
+              Не нашли «{value.trim()}» — введите адрес и поставьте метку
+              на карте ниже.
+            </li>
+          ) : null}
+
           {hits.map((hit, i) => (
             <li
               key={`${hit.sourceKind}-${'id' in hit ? hit.id : i}`}

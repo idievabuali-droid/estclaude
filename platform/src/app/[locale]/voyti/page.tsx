@@ -41,6 +41,22 @@ export default async function VoytiPage({
     redirect(target);
   }
 
+  // Contextual one-liner above the H1 when we know WHY the user
+  // landed here — feedback from the seller-journey roleplay was
+  // "I clicked Разместить квартиру, why am I suddenly at a login
+  // page?" Setting context up front keeps the redirect from feeling
+  // like a generic auth wall. Falls through to no banner for visits
+  // that started directly at /voyti (header CTA, footer link, etc).
+  const redirectContext: Record<string, string> = {
+    '/post': 'Чтобы разместить квартиру, войдите через Telegram.',
+    '/kabinet': 'Чтобы открыть кабинет, войдите через Telegram.',
+    '/izbrannoe': 'Чтобы посмотреть избранное, войдите через Telegram.',
+  };
+  // Match by prefix so /kabinet/analytics, /post/edit/123 etc all
+  // pick up the right copy.
+  const contextLine =
+    Object.entries(redirectContext).find(([prefix]) => target.startsWith(prefix))?.[1] ?? null;
+
   return (
     // Warm canvas (terracotta-50/30 → stone-50) so the page reads as
     // branded rather than generic SaaS-grey, even in its minimal form.
@@ -63,6 +79,11 @@ export default async function VoytiPage({
             visual lift). */}
         <div className="flex flex-col gap-5 rounded-md border border-stone-200 bg-white p-7">
           <div className="flex flex-col items-center gap-2 text-center">
+            {contextLine ? (
+              <span className="text-meta font-medium text-terracotta-700">
+                {contextLine}
+              </span>
+            ) : null}
             <h1
               className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900"
               style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
