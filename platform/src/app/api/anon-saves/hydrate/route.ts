@@ -40,7 +40,8 @@ interface AnonSavedListing {
   kind: 'listing';
   saved_at: string;
   listing: MockListing;
-  building: MockBuilding;
+  /** NULL for standalone listings (no parent ЖК). */
+  building: MockBuilding | null;
   developer: MockDeveloper | null;
 }
 
@@ -167,13 +168,17 @@ export async function POST(req: Request): Promise<Response> {
 
   const listings: AnonSavedListing[] = listingsRaw.map((l) => {
     const listing = mapListing(l);
-    const building = buildingMap.get(listing.building_id)!;
+    // Standalone listings: building=null, no developer. The /izbrannoe
+    // anon view renders the address line from listing.street_address.
+    const building = listing.building_id
+      ? buildingMap.get(listing.building_id) ?? null
+      : null;
     return {
       kind: 'listing' as const,
       saved_at: savedAtFor(listing.id, 'listing'),
       listing,
       building,
-      developer: devMap.get(building.developer_id) ?? null,
+      developer: building ? devMap.get(building.developer_id) ?? null : null,
     };
   });
 
@@ -198,7 +203,9 @@ export async function POST(req: Request): Promise<Response> {
     ),
     hydratePhotos(
       'building',
-      listings.map((l) => l.building),
+      listings
+        .map((l) => l.building)
+        .filter((b): b is MockBuilding => b != null),
     ),
     hydratePhotos(
       'listing',

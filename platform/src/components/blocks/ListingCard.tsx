@@ -15,7 +15,10 @@ import type { ExchangeRates, SupportedCurrency } from '@/services/currency';
 
 export interface ListingCardProps {
   listing: MockListing;
-  building: MockBuilding;
+  /** NULL when the listing is standalone (no parent ЖК). The card
+   *  swaps the ЖК-name italic line for "{district} · {address}" when
+   *  building is null. */
+  building: MockBuilding | null;
   developerVerified: boolean;
   districtMedianPerM2?: number | null;
   districtSampleSize?: number;
@@ -64,8 +67,13 @@ export function ListingCard({
    *  natural semantic for "this listing belongs to ЖК Vahdat Park,
    *  click to see the project." Was the map drilldown previously, but
    *  on a listing card "go to ЖК" is the higher-intent next step
-   *  (Cian + Avito both wire it this way). */
+   *  (Cian + Avito both wire it this way).
+   *
+   *  Standalone listings have no project page, so this handler is
+   *  unused for them — the card renders an address line instead of
+   *  the ЖК-link button. */
   function openZhk(e: React.MouseEvent) {
+    if (!building) return;
     e.stopPropagation();
     e.preventDefault();
     router.push(`/zhk/${building.slug}`);
@@ -81,7 +89,7 @@ export function ListingCard({
         track('listing_card_click', {
           listing_id: listing.id,
           listing_slug: listing.slug,
-          building_id: building.id,
+          building_id: building?.id ?? null,
         })
       }
       className={cn(
@@ -169,21 +177,37 @@ export function ListingCard({
         {/* Divider separating numerics from project context. */}
         <div className="h-px bg-stone-200" />
 
-        {/* Building name in serif italic with chevron — links to the
-            ЖК detail page (the higher-intent next step from a listing
-            card). Cuts the previous address chip; the project page
-            carries that information. */}
+        {/* Project line — two visual variants:
+              - In a ЖК: serif italic name + chevron-link to /zhk page.
+              - Standalone: quiet "{address}" line with a small "Без ЖК"
+                tag. No link (standalone has no project page).
+            hideBuildingName suppresses both (used inside /zhk pages
+            where the parent context is already obvious).
+        */}
         {!hideBuildingName ? (
-          <button
-            type="button"
-            onClick={openZhk}
-            aria-label={`Открыть ${building.name.ru}`}
-            className="group/zhk inline-flex w-fit max-w-full items-center gap-1 text-left text-meta italic text-stone-600 transition-colors hover:text-terracotta-700 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
-            style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
-          >
-            <span className="min-w-0 truncate">{building.name.ru}</span>
-            <ChevronRight className="size-3.5 shrink-0 opacity-60 transition-opacity group-hover/zhk:opacity-100" />
-          </button>
+          building ? (
+            <button
+              type="button"
+              onClick={openZhk}
+              aria-label={`Открыть ${building.name.ru}`}
+              className="group/zhk inline-flex w-fit max-w-full items-center gap-1 text-left text-meta italic text-stone-600 transition-colors hover:text-terracotta-700 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
+              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+            >
+              <span className="min-w-0 truncate">{building.name.ru}</span>
+              <ChevronRight className="size-3.5 shrink-0 opacity-60 transition-opacity group-hover/zhk:opacity-100" />
+            </button>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <span className="inline-flex items-center gap-1.5 text-meta text-stone-600">
+                <span className="inline-flex items-center rounded-sm bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-stone-500">
+                  Без ЖК
+                </span>
+                {listing.street_address ? (
+                  <span className="min-w-0 truncate">{listing.street_address}</span>
+                ) : null}
+              </span>
+            </div>
+          )
         ) : null}
 
         {/* Bottom row — rassrochka pill (the decision number for many

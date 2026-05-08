@@ -58,7 +58,12 @@ export async function listMyListings(userId = MOCK_FOUNDER_USER_ID): Promise<Sel
     buildingMap.set(r.id, rowToBuilding(r));
   }
 
-  return listings.map((l) => ({ ...l, building: buildingMap.get(l.building_id) ?? null }));
+  // Standalone listings (no parent ЖК) get `building: null` here too.
+  // The seller dashboard renders the address in their absence.
+  return listings.map((l) => ({
+    ...l,
+    building: l.building_id ? buildingMap.get(l.building_id) ?? null : null,
+  }));
 }
 
 export async function getMyNotifications(userId = MOCK_FOUNDER_USER_ID): Promise<SellerNotification[]> {

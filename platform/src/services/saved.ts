@@ -39,7 +39,8 @@ export type SavedListing = {
   kind: 'listing';
   saved_at: string;
   listing: MockListing;
-  building: MockBuilding;
+  /** NULL for standalone listings (no parent ЖК). */
+  building: MockBuilding | null;
   developer: MockDeveloper | null;
   /** Set when listing.updated_at is newer than change_badges_seen_at. */
   changeBadge: SavedChangeBadge | null;
@@ -223,14 +224,19 @@ export async function getMySavedItems(userId: string): Promise<{
 
   const listings: SavedListing[] = listingsRaw.map((l) => {
     const listing = mapListing(l);
-    const building = buildingMap.get(listing.building_id)!;
+    // Standalone listings (no parent ЖК) save with building=null. The
+    // savedRow + change-badge logic still works — they hang off the
+    // listing id, not the building.
+    const building = listing.building_id
+      ? buildingMap.get(listing.building_id) ?? null
+      : null;
     const savedRow = savedRowFor(listing.id, 'listing');
     return {
       kind: 'listing',
       saved_at: savedRow?.saved_at ?? new Date().toISOString(),
       listing,
       building,
-      developer: devMap.get(building.developer_id) ?? null,
+      developer: building ? devMap.get(building.developer_id) ?? null : null,
       changeBadge: listingChangeBadge(listing),
     };
   });
@@ -260,7 +266,11 @@ export async function getMySavedItems(userId: string): Promise<{
     ),
     hydratePhotos(
       'building',
-      listings.map((l) => l.building),
+      // Standalone listings have building=null; skip them — there's
+      // nothing to hydrate for a non-existent parent.
+      listings
+        .map((l) => l.building)
+        .filter((b): b is MockBuilding => b != null),
     ),
     hydratePhotos(
       'listing',

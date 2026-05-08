@@ -106,7 +106,15 @@ export default async function IzbrannoePage({
     isDiaspora ? getExchangeRates() : Promise.resolve(null),
   ]);
 
-  const districtIds = [...new Set(savedListings.map((s) => s.building.district_id))];
+  // District ids — pulled from EITHER the parent ЖК (in-ЖК listings)
+  // or the listing's own district_id (standalones, building=null).
+  const districtIds = [
+    ...new Set(
+      savedListings
+        .map((s) => s.building?.district_id ?? s.listing.district_id ?? null)
+        .filter((id): id is string => id != null),
+    ),
+  ];
   const benchmarks = await getDistrictBenchmarks(districtIds);
 
   // Headline change-summary — "У вас 3 обновления" — gives Madina an
@@ -174,7 +182,11 @@ export default async function IzbrannoePage({
             ) : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
                 {savedListings.map((s) => {
-                  const benchmark = benchmarks.get(s.building.district_id);
+                  const benchmarkDistrictId =
+                    s.building?.district_id ?? s.listing.district_id ?? null;
+                  const benchmark = benchmarkDistrictId
+                    ? benchmarks.get(benchmarkDistrictId)
+                    : null;
                   return (
                     <SavedCardWrapper key={s.listing.id} badge={s.changeBadge}>
                       <ListingCard

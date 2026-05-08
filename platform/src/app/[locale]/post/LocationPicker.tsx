@@ -1,8 +1,14 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import maplibregl, { type Map as MaplibreMap, type Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import {
+  MapStyleToggle,
+  resolveMapStyle,
+  STREETS_STYLE_URL,
+  type MapStyleId,
+} from '@/components/blocks/MapStyleToggle';
 
 export interface LocationPickerProps {
   /** Map's initial center — usually the selected district's centroid,
@@ -31,6 +37,9 @@ export interface LocationPickerProps {
  *    the marker (faster than drag on touch).
  *  - When `centerKey` changes (district swap), we recenter map + reset
  *    marker + emit the new centroid as the chosen point.
+ *  - Streets / Satellite toggle in the top-right corner — sellers
+ *    spotting their building from above is faster than recognising
+ *    the street name on the OSM streets style.
  *
  * Reuses the OpenFreeMap tile source from MapView.tsx — keeps us on a
  * single vendor and avoids needing API keys.
@@ -52,6 +61,8 @@ export function LocationPicker({
     onChangeRef.current = onChange;
   }, [onChange]);
 
+  const [mapStyle, setMapStyle] = useState<MapStyleId>('streets');
+
   // Initial mount: build the map + marker exactly once. We treat
   // `centerKey` as the recenter trigger in a separate effect below
   // so that re-mounting the map (which is expensive) only happens on
@@ -62,7 +73,7 @@ export function LocationPicker({
     const startLng = value?.lng ?? centerLng;
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: 'https://tiles.openfreemap.org/styles/liberty',
+      style: STREETS_STYLE_URL,
       center: [startLng, startLat],
       zoom: 14,
       // In-map (i) attribution removed — license attribution lives
@@ -116,18 +127,33 @@ export function LocationPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only on key change
   }, [centerKey]);
 
+  // Style swap. setStyle() reloads tiles in place; the marker survives
+  // because it's rendered as a DOM overlay (not a map layer).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setStyle(resolveMapStyle(mapStyle));
+  }, [mapStyle]);
+
   return (
     <div className="flex flex-col gap-2">
       <span className="text-meta font-medium text-stone-700">
         Расположение на карте
       </span>
-      <div
-        ref={containerRef}
-        className="h-[280px] w-full overflow-hidden rounded-md border border-stone-200"
-      />
+      <div className="relative h-[280px] w-full overflow-hidden rounded-md border border-stone-200">
+        <div ref={containerRef} className="size-full" />
+        {/* Toggle floats above the map. top-3 left-3 keeps it clear of
+            maplibre's own zoom control on top-right. */}
+        <MapStyleToggle
+          current={mapStyle}
+          onChange={setMapStyle}
+          className="absolute left-3 top-3 z-10"
+        />
+      </div>
       <p className="text-caption text-stone-500">
-        Перетащите метку на точное место дома или нажмите по карте. По
-        умолчанию метка стоит в центре района.
+        Перетащите метку на точное место дома или нажмите по карте. Переключитесь
+        на «Спутник», чтобы увидеть реальный вид сверху. По умолчанию метка стоит
+        в центре района.
       </p>
     </div>
   );

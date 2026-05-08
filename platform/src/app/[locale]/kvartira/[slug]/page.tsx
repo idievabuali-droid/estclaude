@@ -49,8 +49,11 @@ export async function generateMetadata({
   // budget?" before she opens the link.
   const priceTjs = Math.round(Number(listing.price_total_dirams) / 100);
   const priceFmt = new Intl.NumberFormat('ru-RU').format(priceTjs);
-  const title = `${listing.rooms_count}-комн ${formatM2(listing.size_m2)} · ${priceFmt} TJS · ${building.name.ru}`;
-  const description = listing.unit_description.ru || `${listing.rooms_count}-комн в ${building.name.ru}, ${formatM2(listing.size_m2)}, ${formatFloor(listing.floor_number, listing.total_floors)}.`;
+  // Standalone listings (no parent ЖК) use street address as the
+  // location anchor in the title; ЖК listings use the project name.
+  const locationAnchor = building?.name.ru ?? listing.street_address ?? '—';
+  const title = `${listing.rooms_count}-комн ${formatM2(listing.size_m2)} · ${priceFmt} TJS · ${locationAnchor}`;
+  const description = listing.unit_description.ru || `${listing.rooms_count}-комн в ${locationAnchor}, ${formatM2(listing.size_m2)}, ${formatFloor(listing.floor_number, listing.total_floors)}.`;
   // OG image: cover photo when uploaded, falls back to nothing (the
   // chat client will use its default behaviour). next-intl + Next 16
   // resolve relative URLs against the metadataBase, so an absolute URL
@@ -122,13 +125,25 @@ export default async function ListingDetailPage({
   const currency = await readCurrencyCookie();
   const isDiaspora = currency != null && currency !== 'TJS';
 
+  // Standalone vs in-ЖК split. JSX below guards each building-using
+  // section directly (`{building ? ... : ...}`); the locals here are
+  // the per-listing coords + label that work for both shapes — building
+  // value when in a ЖК, listing value when standalone.
+  const effectiveLat = building?.latitude ?? listing.latitude;
+  const effectiveLng = building?.longitude ?? listing.longitude;
+  const locationLabel = building?.name.ru ?? listing.street_address ?? '';
+
   // Parallelise the rest. Was sequential before — the slowest single
   // call (getNearbyPOIs hits Overpass live, ~1-3s) blocked everything
   // after it, multiplying perceived latency on Tajik mobile networks.
   const [visitor, rates, pois, stats] = await Promise.all([
     getCurrentUser(),
     isDiaspora ? getExchangeRates() : Promise.resolve(null),
-    getNearbyPOIs(building.latitude, building.longitude),
+    // Skip POI fetch when we have no coords (standalone seller didn't
+    // drop the pin). The compact-nearby section silently hides below.
+    effectiveLat != null && effectiveLng != null
+      ? getNearbyPOIs(effectiveLat, effectiveLng)
+      : Promise.resolve({} as Awaited<ReturnType<typeof getNearbyPOIs>>),
     getListingStats(listing.id, listing.slug),
   ]);
 
@@ -163,17 +178,25 @@ export default async function ListingDetailPage({
   // "Все квартиры в этом доме (N) →" CTA. The `similar` list is
   // capped at 3 by getListing(), so we need a separate count query
   // for the accurate total. `head: true` skips the row payload.
-  const { count: buildingUnitCount } = await photoSupabase
-    .from('listings')
-    .select('id', { count: 'exact', head: true })
-    .eq('building_id', listing.building_id)
-    .eq('status', 'active');
+  // Skipped entirely for standalone listings — there's no parent
+  // building to count siblings under.
+  let buildingUnitCount: number | null = null;
+  if (listing.building_id) {
+    const { count } = await photoSupabase
+      .from('listings')
+      .select('id', { count: 'exact', head: true })
+      .eq('building_id', listing.building_id)
+      .eq('status', 'active');
+    buildingUnitCount = count ?? null;
+  }
 
   // §9 О застройщике renders only when the developer has trust depth
   // (years on the market or a project count). Without those, the card
   // would be an empty shell that adds visual noise without signal.
+  // Standalone listings have no developer at all.
   const showDeveloperCard =
-    developer.years_active != null || developer.projects_completed_count != null;
+    developer != null &&
+    (developer.years_active != null || developer.projects_completed_count != null);
 
   // §4 view_notes line — locale 'ru' for now (Tajik translations
   // optional in the schema). Trim avoids rendering whitespace-only.
@@ -190,14 +213,14 @@ export default async function ListingDetailPage({
         <div className="relative">
           <PhotoGallery
             photos={photoUrls}
-            alt={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} в ${building.name.ru}`}
+            alt={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} ${building ? `в ${building.name.ru}` : `на ${listing.street_address ?? '—'}`}`}
             heroAspect="21/9"
           />
           <div className="pointer-events-none absolute right-3 top-3 z-20 flex items-center gap-2 md:right-5 md:top-5">
             <div className="pointer-events-auto">
               <ShareButton
                 compact
-                text={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} в ${building.name.ru}`}
+                text={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} ${building ? `в ${building.name.ru}` : `на ${listing.street_address ?? '—'}`}`}
                 title={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
               />
             </div>
@@ -215,7 +238,7 @@ export default async function ListingDetailPage({
           <div className="absolute right-3 top-3 z-10 flex items-center gap-2 md:right-5 md:top-5">
             <ShareButton
               compact
-              text={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} в ${building.name.ru}`}
+              text={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} ${building ? `в ${building.name.ru}` : `на ${listing.street_address ?? '—'}`}`}
               title={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
             />
             <SaveToggle type="listing" id={listing.id} />
@@ -233,12 +256,23 @@ export default async function ListingDetailPage({
               </Link>
             </li>
             <li aria-hidden className="shrink-0">›</li>
-            <li className="shrink-0">
-              <Link href={`/zhk/${building.slug}`} className="hover:text-terracotta-600">
-                {building.name.ru}
-              </Link>
-            </li>
-            <li aria-hidden className="shrink-0">›</li>
+            {/* Standalone listings have no project page — show district
+                name in the breadcrumb instead of a /zhk link. */}
+            {building ? (
+              <>
+                <li className="shrink-0">
+                  <Link href={`/zhk/${building.slug}`} className="hover:text-terracotta-600">
+                    {building.name.ru}
+                  </Link>
+                </li>
+                <li aria-hidden className="shrink-0">›</li>
+              </>
+            ) : (
+              <>
+                <li className="shrink-0 text-stone-500">{district.name.ru}</li>
+                <li aria-hidden className="shrink-0">›</li>
+              </>
+            )}
             <li className="shrink-0 text-stone-900">
               {listing.rooms_count}-комн · {formatM2(listing.size_m2)}
             </li>
@@ -272,20 +306,35 @@ export default async function ListingDetailPage({
                 attribution — "this apartment is in [italic project name]"
                 — same vocabulary as the listing card's chevron-link. */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <Link
-                href={`/zhk/${building.slug}`}
-                className="group inline-flex items-center gap-1 text-meta text-stone-700 transition-colors hover:text-terracotta-700"
-              >
-                <span
-                  className="italic"
-                  style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+              {/* In-ЖК variant: italic project name + verified pill +
+                  На карте link. Standalone variant: address line +
+                  small "Без ЖК" tag, no /zhk link. */}
+              {building ? (
+                <Link
+                  href={`/zhk/${building.slug}`}
+                  className="group inline-flex items-center gap-1 text-meta text-stone-700 transition-colors hover:text-terracotta-700"
                 >
-                  {building.name.ru}
+                  <span
+                    className="italic"
+                    style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+                  >
+                    {building.name.ru}
+                  </span>
+                  <span className="text-stone-500">· {district.name.ru}</span>
+                  <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
+                </Link>
+              ) : (
+                <span className="inline-flex flex-wrap items-center gap-1.5 text-meta text-stone-700">
+                  <span className="inline-flex items-center rounded-sm bg-stone-100 px-1.5 py-0.5 text-caption font-medium text-stone-500">
+                    Без ЖК
+                  </span>
+                  {listing.street_address ? (
+                    <span>{listing.street_address}</span>
+                  ) : null}
+                  <span className="text-stone-500">· {district.name.ru}</span>
                 </span>
-                <span className="text-stone-500">· {district.name.ru}</span>
-                <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
-              </Link>
-              {developer.is_verified ? (
+              )}
+              {developer?.is_verified ? (
                 <Link
                   href="/tsentr-pomoshchi#verified-developer"
                   className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 text-caption font-medium text-stone-700 hover:border-stone-300"
@@ -298,17 +347,19 @@ export default async function ListingDetailPage({
                   Проверенный
                 </Link>
               ) : null}
-              <Link
-                href={`/novostroyki?view=karta&focus=${building.slug}&from=kvartira&fromSlug=${slug}`}
-                className="group inline-flex items-center gap-1 text-caption font-medium text-stone-500 transition-colors hover:text-terracotta-700"
-                aria-label="Показать на карте"
-              >
-                <MapPin className="size-3" />
-                На карте
-                <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
-              </Link>
+              {building ? (
+                <Link
+                  href={`/novostroyki?view=karta&focus=${building.slug}&from=kvartira&fromSlug=${slug}`}
+                  className="group inline-flex items-center gap-1 text-caption font-medium text-stone-500 transition-colors hover:text-terracotta-700"
+                  aria-label="Показать на карте"
+                >
+                  <MapPin className="size-3" />
+                  На карте
+                  <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
+                </Link>
+              ) : null}
             </div>
-            {building.status === 'delivered' ? (
+            {building?.status === 'delivered' ? (
               <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-caption font-medium text-stone-700">
                 <span
                   className="size-1.5 rounded-full bg-[color:var(--color-fairness-great)]"
@@ -316,7 +367,7 @@ export default async function ListingDetailPage({
                 />
                 Готов к заселению
               </span>
-            ) : building.handover_estimated_quarter ? (
+            ) : building?.handover_estimated_quarter ? (
               <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-caption font-medium text-stone-700">
                 <Calendar className="size-3 text-stone-500" aria-hidden />
                 Сдача {building.handover_estimated_quarter}
@@ -369,7 +420,7 @@ export default async function ListingDetailPage({
                 ContactBarWithModal which renders inline on desktop
                 and pins to the mobile sticky bar on smaller widths. */}
             <ContactBarWithModal
-              listingTitle={`${listing.rooms_count}-комн в ${building.name.ru}`}
+              listingTitle={`${listing.rooms_count}-комн ${building ? `в ${building.name.ru}` : `на ${listing.street_address ?? '—'}`}`}
               sellerPhone={sellerPhone}
               isDiaspora={isDiaspora}
               priceFromDirams={listing.price_total_dirams}
@@ -458,7 +509,7 @@ export default async function ListingDetailPage({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={floorPlanUrl}
-                alt={`Планировка квартиры ${listing.rooms_count}-комн в ${building.name.ru}`}
+                alt={`Планировка квартиры ${listing.rooms_count}-комн ${building ? `в ${building.name.ru}` : `на ${listing.street_address ?? '—'}`}`}
                 className="block w-full cursor-zoom-in object-contain"
               />
             </a>
@@ -521,78 +572,138 @@ export default async function ListingDetailPage({
       ) : null}
 
       {/* ─── §8 О ДОМЕ ──────────────────────────────────────────── */}
-      {/* Building context card. Visual identity (cover photo) + key
-          facts (handover, floors, total units) + a primary escape to
-          the full unit list scoped to this building. The CTA includes
-          the live count so the buyer knows whether it's worth tapping. */}
-      <section className="border-t border-stone-200 py-6">
-        <AppContainer className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
-              Здание
-            </span>
-            <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>О доме</h2>
-          </div>
-          <AppCard>
-            <AppCardContent>
-              <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:gap-4">
-                <div
-                  className="relative aspect-[16/9] w-full overflow-hidden rounded-md bg-stone-100 md:aspect-[4/3] md:w-48 md:shrink-0"
-                  style={building.cover_photo_url ? undefined : { backgroundColor: building.cover_color }}
-                >
-                  {building.cover_photo_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={building.cover_photo_url}
-                      alt={building.name.ru}
-                      className="absolute inset-0 size-full object-cover"
-                    />
-                  ) : null}
-                </div>
-                <div className="flex flex-col gap-2 md:flex-1">
-                  <Link
-                    href={`/zhk/${building.slug}`}
-                    className="text-h3 font-semibold text-stone-900 hover:text-terracotta-700"
+      {/* Two visual variants:
+            - In a ЖК: existing card — cover photo + project name + key
+              facts + escape link to all units in this building.
+            - Standalone: lighter "Об этом доме" card — what we DO know
+              about the building (floors / лифт / year built) without
+              the project framing or developer link. */}
+      {building ? (
+        <section className="border-t border-stone-200 py-6">
+          <AppContainer className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                Здание
+              </span>
+              <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>О доме</h2>
+            </div>
+            <AppCard>
+              <AppCardContent>
+                <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:gap-4">
+                  <div
+                    className="relative aspect-[16/9] w-full overflow-hidden rounded-md bg-stone-100 md:aspect-[4/3] md:w-48 md:shrink-0"
+                    style={building.cover_photo_url ? undefined : { backgroundColor: building.cover_color }}
                   >
-                    {building.name.ru}
-                  </Link>
-                  <span className="text-meta text-stone-500">
-                    {district.name.ru} · {building.address.ru}
-                  </span>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-stone-700">
-                    <span className="inline-flex items-center gap-1">
-                      <Calendar className="size-3.5 text-stone-500" aria-hidden />
-                      {building.status === 'delivered'
-                        ? 'Сдан'
-                        : `Сдача ${building.handover_estimated_quarter ?? '—'}`}
-                    </span>
-                    {building.total_floors > 0 ? (
-                      <span className="inline-flex items-center gap-1">
-                        <Layers className="size-3.5 text-stone-500" aria-hidden />
-                        {building.total_floors} {pluralFloors(building.total_floors)}
-                      </span>
-                    ) : null}
-                    {building.total_units > 0 ? (
-                      <span className="inline-flex items-center gap-1">
-                        <Users className="size-3.5 text-stone-500" aria-hidden />
-                        {building.total_units} {pluralApartments(building.total_units)}
-                      </span>
+                    {building.cover_photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={building.cover_photo_url}
+                        alt={building.name.ru}
+                        className="absolute inset-0 size-full object-cover"
+                      />
                     ) : null}
                   </div>
-                  <Link
-                    href={`/kvartiry?building=${building.slug}`}
-                    className="mt-1 inline-flex w-fit items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
-                  >
-                    Все квартиры в этом доме
-                    {buildingUnitCount != null ? ` (${buildingUnitCount})` : ''}
-                    <ArrowUpRight className="size-3.5" aria-hidden />
-                  </Link>
+                  <div className="flex flex-col gap-2 md:flex-1">
+                    <Link
+                      href={`/zhk/${building.slug}`}
+                      className="text-h3 font-semibold text-stone-900 hover:text-terracotta-700"
+                    >
+                      {building.name.ru}
+                    </Link>
+                    <span className="text-meta text-stone-500">
+                      {district.name.ru} · {building.address.ru}
+                    </span>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-stone-700">
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar className="size-3.5 text-stone-500" aria-hidden />
+                        {building.status === 'delivered'
+                          ? 'Сдан'
+                          : `Сдача ${building.handover_estimated_quarter ?? '—'}`}
+                      </span>
+                      {building.total_floors > 0 ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Layers className="size-3.5 text-stone-500" aria-hidden />
+                          {building.total_floors} {pluralFloors(building.total_floors)}
+                        </span>
+                      ) : null}
+                      {building.total_units > 0 ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Users className="size-3.5 text-stone-500" aria-hidden />
+                          {building.total_units} {pluralApartments(building.total_units)}
+                        </span>
+                      ) : null}
+                    </div>
+                    <Link
+                      href={`/kvartiry?building=${building.slug}`}
+                      className="mt-1 inline-flex w-fit items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+                    >
+                      Все квартиры в этом доме
+                      {buildingUnitCount != null ? ` (${buildingUnitCount})` : ''}
+                      <ArrowUpRight className="size-3.5" aria-hidden />
+                    </Link>
+                  </div>
                 </div>
+              </AppCardContent>
+            </AppCard>
+          </AppContainer>
+        </section>
+      ) : (
+        // Standalone "Об этом доме" — render only when we have at
+        // least one fact to show. Address alone is meaningful.
+        (listing.street_address ||
+          listing.total_floors ||
+          listing.has_elevator != null ||
+          listing.year_built) ? (
+          <section className="border-t border-stone-200 py-6">
+            <AppContainer className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                  Здание
+                </span>
+                <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>Об этом доме</h2>
               </div>
-            </AppCardContent>
-          </AppCard>
-        </AppContainer>
-      </section>
+              <AppCard>
+                <AppCardContent>
+                  <div className="flex flex-col gap-2">
+                    {listing.street_address ? (
+                      <span className="text-meta text-stone-700">
+                        {listing.street_address}
+                        <span className="text-stone-500"> · {district.name.ru}</span>
+                      </span>
+                    ) : (
+                      <span className="text-meta text-stone-500">{district.name.ru}</span>
+                    )}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-stone-700">
+                      {listing.total_floors ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Layers className="size-3.5 text-stone-500" aria-hidden />
+                          {listing.total_floors} {pluralFloors(listing.total_floors)}
+                        </span>
+                      ) : null}
+                      {listing.has_elevator === true ? (
+                        <span className="inline-flex items-center gap-1">
+                          <ArrowUpRight className="size-3.5 text-stone-500" aria-hidden />
+                          Лифт есть
+                        </span>
+                      ) : listing.has_elevator === false ? (
+                        <span className="inline-flex items-center gap-1 text-stone-500">
+                          Без лифта
+                        </span>
+                      ) : null}
+                      {listing.year_built ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Calendar className="size-3.5 text-stone-500" aria-hidden />
+                          {listing.year_built} г.
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </AppCardContent>
+              </AppCard>
+            </AppContainer>
+          </section>
+        ) : null
+      )}
 
       {/* ─── §9 О ЗАСТРОЙЩИКЕ (only if dev has trust depth) ────── */}
       {/* A small card surfacing developer track record. /zhk has the
@@ -657,17 +768,16 @@ export default async function ListingDetailPage({
       ) : null}
 
       {/* ─── §10 ЧТО РЯДОМ (compact 4-POI preview + mini-map) ──── */}
-      {/* Tapping a chip drops a star on the map at that POI's location
-          and re-fits the camera. NearbyChips renders its own h3 "Что
-          рядом" heading internally, so we don't add another h2 here —
-          would have duplicated the section title. */}
-      {compactNearby.length > 0 ? (
+      {/* Coords come from the building when in a ЖК, else from the
+          listing itself for standalones. Hidden silently when neither
+          source has coords (rare — standalone seller skipped pin). */}
+      {compactNearby.length > 0 && effectiveLat != null && effectiveLng != null ? (
         <section className="border-t border-stone-200 py-6">
           <AppContainer>
             <NearbyChips
-              anchorLat={building.latitude}
-              anchorLng={building.longitude}
-              anchorLabel={building.name.ru}
+              anchorLat={effectiveLat}
+              anchorLng={effectiveLng}
+              anchorLabel={locationLabel || district.name.ru}
               items={compactNearby.map((c) => ({
                 cat: c.cat,
                 name: c.item!.name,
@@ -675,17 +785,23 @@ export default async function ListingDetailPage({
                 longitude: c.item!.lng,
                 distanceM: c.item!.distanceM,
               }))}
-              allNearbyHref={`/novostroyki?view=karta&focus=${building.slug}&from=kvartira&fromSlug=${listing.slug}`}
+              // Standalone listings don't have a /novostroyki?focus
+              // target — the link points to the listing's own
+              // detail-page anchor as a graceful fallback.
+              allNearbyHref={
+                building
+                  ? `/novostroyki?view=karta&focus=${building.slug}&from=kvartira&fromSlug=${listing.slug}`
+                  : `/kvartira/${listing.slug}#chto-ryadom`
+              }
             />
           </AppContainer>
         </section>
       ) : null}
 
       {/* ─── §11 ПОХОЖИЕ В ЭТОМ ЖК ──────────────────────────────── */}
-      {/* The "Все квартиры в ЖК →" header link is GONE — the same
-          escape lives in §8 above with the live count. Single source
-          of truth for that CTA. */}
-      {similar.length > 0 ? (
+      {/* Only relevant for in-ЖК listings — standalones have no
+          siblings to compare against. */}
+      {building && similar.length > 0 ? (
         <section className="border-t border-stone-200 bg-stone-50 py-6">
           <AppContainer className="flex flex-col gap-5">
             <div className="flex flex-col gap-1">
@@ -700,7 +816,7 @@ export default async function ListingDetailPage({
                   key={l.id}
                   listing={l}
                   building={building}
-                  developerVerified={developer.is_verified}
+                  developerVerified={developer?.is_verified ?? false}
                   currency={currency}
                   rates={rates}
                   hideBuildingName

@@ -68,7 +68,13 @@ export type MockBuilding = {
 export type MockListing = {
   id: string;
   slug: string;
-  building_id: string;
+  /**
+   * NULL = standalone listing (no parent ЖК). When NULL, the
+   * listing carries its own street_address / district_id / lat /
+   * lng / total_floors / has_elevator / year_built. Display code
+   * branches on this.
+   */
+  building_id: string | null;
   source_type: SourceType;
   status: ListingStatus;
   rooms_count: number;
@@ -111,6 +117,21 @@ export type MockListing = {
    * pre-disclosing this on the card is a real friction-saver.
    */
   has_technical_passport: boolean | null;
+  /**
+   * ─── Standalone-listing fields (populated only when
+   *     building_id is null) ────────────────────────────────
+   *
+   * For listings inside a ЖК these come from the parent building
+   * via mapper helpers; the columns on the listing itself stay
+   * null. `getEffectiveDistrict()` / `getEffectiveCoords()` /
+   * `getEffectiveAddress()` should be the only readers.
+   */
+  street_address: string | null;
+  district_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  has_elevator: boolean | null;
+  year_built: number | null;
   /** Free-text orientation. Sellers fill with anything short like
    *  "во двор", "на дорогу", "на юг" — not constrained to compass
    *  directions. Surfaces as a pill in §4 Об этой квартире when set. */
@@ -385,6 +406,12 @@ function mkListing(seed: {
     ceiling_height_cm: seed.ceiling ?? null,
     bathroom_separate: null,
     has_technical_passport: null,
+    street_address: null,
+    district_id: null,
+    latitude: null,
+    longitude: null,
+    has_elevator: null,
+    year_built: null,
     orientation: null,
     view_notes: null,
     floor_plan_photo_id: null,

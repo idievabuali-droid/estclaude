@@ -27,6 +27,14 @@ export interface ListingForFilter {
   price_total_dirams: bigint | string | number;
   finishing_type: string;
   source_type: string;
+  /**
+   * Standalone listings (no parent ЖК) carry coords directly. Both
+   * the radius filter and the building-scope filter consult these
+   * before falling back to building.* — listings inside a ЖК have
+   * coords on the building, standalones have them here.
+   */
+  latitude?: number | null;
+  longitude?: number | null;
   building?: {
     slug: string;
     /** Required for the LocationSearch radius filter (near_lat/near_lng).
@@ -84,18 +92,21 @@ export function matchesListingFilters(
   if (sizeTo != null && listing.size_m2 > sizeTo) return false;
 
   const buildingScopeSlug = (filters.building as string | undefined) ?? null;
+  // Building-scope filter never matches standalone listings — no
+  // building means there's no slug to match. Pass-through harmless
+  // for the listings-radius matcher.
   if (buildingScopeSlug && listing.building?.slug !== buildingScopeSlug) return false;
 
-  // LocationSearch radius filter — when the saved search was created
-  // with a POI selected, only listings whose parent building falls
-  // within the radius pass. Defaults to 1500m when radius is missing
-  // (matches the page-side default in /novostroyki + /kvartiry).
+  // LocationSearch radius filter — works for both ЖК listings (coords
+  // on the parent building) and standalones (coords on the listing
+  // itself). When neither has coords, the listing is silently
+  // excluded (no way to know if it falls in the radius).
   const nearLat = filters.near_lat ? parseFloat(filters.near_lat as string) : null;
   const nearLng = filters.near_lng ? parseFloat(filters.near_lng as string) : null;
   if (nearLat != null && nearLng != null) {
     const radius = filters.radius ? parseInt(filters.radius as string, 10) : 1500;
-    const blat = listing.building?.latitude;
-    const blng = listing.building?.longitude;
+    const blat = listing.building?.latitude ?? listing.latitude;
+    const blng = listing.building?.longitude ?? listing.longitude;
     if (blat == null || blng == null) return false;
     if (distanceMeters(nearLat, nearLng, Number(blat), Number(blng)) > radius) return false;
   }

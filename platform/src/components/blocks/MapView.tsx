@@ -9,6 +9,7 @@ import { Link } from '@/i18n/navigation';
 import { formatPriceNumber } from '@/lib/format';
 import type { MockBuilding } from '@/lib/mock';
 import { POI_LABELS, type PoiCategory, type PoiItem, type PoiResult } from '@/services/poi';
+import { MapStyleToggle, resolveMapStyle, type MapStyleId } from './MapStyleToggle';
 
 export interface MapViewProps {
   buildings: MockBuilding[];
@@ -247,6 +248,10 @@ export function MapView({
   // none (cleanest state — just the building dot, buyer asks for what
   // they want via the chip bar).
   const [activeCategory, setActiveCategory] = useState<PoiCategory | null>(null);
+  // Streets / Satellite toggle. State of the toggle button is the
+  // single source of truth; an effect below pushes setStyle() into
+  // maplibre when it flips.
+  const [mapStyle, setMapStyle] = useState<MapStyleId>('streets');
 
   // ?selected=<slug> deep-link from a card's address row (browse mode).
   const searchParams = useSearchParams();
@@ -366,6 +371,16 @@ export function MapView({
       mapRef.current = null;
     };
   }, []);
+
+  // Style swap (streets ↔ satellite). setStyle reloads the basemap
+  // tiles in place; markers are DOM overlays so they survive untouched.
+  // Layer-customization effects re-run automatically on the next style
+  // load via the existing source-load listeners they hooked up.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setStyle(resolveMapStyle(mapStyle));
+  }, [mapStyle]);
 
   // Sync markers when buildings / focus / active category change
   useEffect(() => {
@@ -670,6 +685,16 @@ export function MapView({
       style={{ height: mapHeight, minHeight: '32rem' }}
     >
       <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
+
+      {/* Streets / Satellite toggle. Top-left corner, clear of the
+          maplibre native zoom control (top-right) and the close
+          button (top-right too). Switching style preserves all
+          marker positions because they're DOM overlays. */}
+      <MapStyleToggle
+        current={mapStyle}
+        onChange={setMapStyle}
+        className="absolute left-3 top-3 z-50 md:left-4 md:top-4"
+      />
 
       {/* ALWAYS-VISIBLE close button overlay. Lives at the same DOM
           level as the maplibre canvas with a higher z-index, so even

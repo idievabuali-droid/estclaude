@@ -257,10 +257,16 @@ export default async function DiasporaPage({
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
               {recentRaw.map((l) => {
-                const building = recentBuildingMap.get(l.building_id);
-                if (!building) return null;
-                const dev = recentDeveloperMap.get(building.developer_id);
-                const benchmark = recentBenchmarkMap.get(building.district_id);
+                // Standalone listings (building_id null) render with
+                // building=null and pull district/coords from the
+                // listing itself; ListingCard handles both shapes.
+                const building = l.building_id
+                  ? recentBuildingMap.get(l.building_id) ?? null
+                  : null;
+                const dev = building ? recentDeveloperMap.get(building.developer_id) : null;
+                const benchmark = recentBenchmarkMap.get(
+                  building?.district_id ?? l.district_id ?? '',
+                );
                 return (
                   <ListingCard
                     key={l.id}

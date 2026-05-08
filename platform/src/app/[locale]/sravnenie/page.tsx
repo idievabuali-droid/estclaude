@@ -126,9 +126,19 @@ export default async function SravneniePage({
   }
   const buildingsForListings = new Map<string, MockBuilding>();
   if (type === 'listings' && listings.length > 0) {
-    const bIds = [...new Set(listings.map((l) => l.building_id))];
-    const bRows = await getBuildingsByIds(bIds);
-    for (const b of bRows) buildingsForListings.set(b.id, b);
+    // Standalone listings (building_id null) have no row to fetch —
+    // skip them in the batch lookup.
+    const bIds = [
+      ...new Set(
+        listings
+          .map((l) => l.building_id)
+          .filter((id): id is string => id != null),
+      ),
+    ];
+    if (bIds.length > 0) {
+      const bRows = await getBuildingsByIds(bIds);
+      for (const b of bRows) buildingsForListings.set(b.id, b);
+    }
   }
 
   const isEmpty = type === 'listings' ? listings.length === 0 : buildings.length === 0;
@@ -369,6 +379,11 @@ function ListingsCompare({
   toggleDiffHref: string;
 }) {
   const labelFor = (l: MockListing): string => {
+    // Standalone listings (no parent ЖК) use the street address as
+    // their compare-row anchor; ЖК listings use the project name.
+    if (!l.building_id) {
+      return `${l.street_address ?? 'Без ЖК'} · ${l.rooms_count}-комн`;
+    }
     const b = buildingMap.get(l.building_id);
     return `${b?.name.ru ?? '—'} · ${l.rooms_count}-комн`;
   };
@@ -521,7 +536,7 @@ function ListingsCompare({
       {/* MOBILE: stacked cards */}
       <div className="flex flex-col gap-4 md:hidden">
         {items.map((l) => {
-          const building = buildingMap.get(l.building_id);
+          const building = l.building_id ? buildingMap.get(l.building_id) : undefined;
           const isSold = l.status !== 'active';
           return (
             <AppCard key={l.id} className={isSold ? 'opacity-60' : ''}>
@@ -587,7 +602,7 @@ function ListingsCompare({
                 Параметр
               </th>
               {items.map((l) => {
-                const building = buildingMap.get(l.building_id);
+                const building = l.building_id ? buildingMap.get(l.building_id) : undefined;
                 const isSold = l.status !== 'active';
                 return (
                   <th

@@ -60,17 +60,21 @@ const TIER_RANK: Record<string, number> = {
 
 export async function listListings(filters: ListingFilters = {}): Promise<MockListing[]> {
   const supabase = await createClient();
-  // Inner-join to buildings so we can filter listings by parent city.
-  // The selected `buildings(city)` field is just for the join; we don't
-  // use it downstream (mapListing ignores it).
-  // Inner-join to buildings for the city filter, plus the cover_photo
-  // embed so card thumbnails render real uploads when present. The
-  // FK hint matches the named constraint in migration 0003.
+  // V1.1 update: city filter now respects standalone listings (those
+  // with `building_id IS NULL`). We resolve the city after the fetch
+  // by inspecting either the parent building's city OR — for standalones
+  // — the listing's own district's city. INNER JOIN no longer fits;
+  // we LEFT JOIN both in the same select and filter in code.
+  //
+  // The PostgREST `!left` hint forces a LEFT JOIN even when the FK is
+  // present on the listing. Result: standalone rows come back with
+  // `buildings: null`, ЖК rows come back with `buildings: { city }`.
   let q = supabase
     .from('listings')
-    .select(`*, buildings!inner(city), cover_photo:photos!listings_cover_photo_fk(storage_path)`)
-    .eq('status', 'active')
-    .eq('buildings.city', ACTIVE_CITY);
+    .select(
+      `*, buildings:buildings!left(city), district:districts!left(city), cover_photo:photos!listings_cover_photo_fk(storage_path)`,
+    )
+    .eq('status', 'active');
   if (filters.rooms?.length) q = q.in('rooms_count', filters.rooms);
   if (filters.source?.length) q = q.in('source_type', filters.source);
   if (filters.finishing?.length) q = q.in('finishing_type', filters.finishing);
@@ -85,63 +89,101 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
   }
   if (filters.buildingId) q = q.eq('building_id', filters.buildingId);
 
-  // Radius filter: pre-resolve which buildings are within the radius
-  // and constrain the listings query to those ids. Done before the
-  // main query so we don't fetch listings we'll throw away.
+  // Radius filter: pre-resolve which listings are within the radius.
+  // For ЖК listings the coords come from the parent building; for
+  // standalones they come from the listing itself. Two batched
+  // pre-queries keep this off the main query path.
   if (filters.nearLat != null && filters.nearLng != null && filters.nearRadiusM != null) {
-    const { data: buildingsForRadius } = await supabase
-      .from('buildings')
-      .select('id, latitude, longitude')
-      .eq('city', ACTIVE_CITY);
     const lat = filters.nearLat;
     const lng = filters.nearLng;
     const r = filters.nearRadiusM;
-    const inRadiusIds = (buildingsForRadius ?? [])
-      .filter((b) => {
-        const blat = Number(b.latitude);
-        const blng = Number(b.longitude);
-        // Inline haversine — same formula as services/buildings.ts.
-        const R = 6371000;
-        const toRad = (d: number) => (d * Math.PI) / 180;
-        const dLat = toRad(blat - lat);
-        const dLng = toRad(blng - lng);
-        const aa =
-          Math.sin(dLat / 2) ** 2 +
-          Math.cos(toRad(lat)) * Math.cos(toRad(blat)) * Math.sin(dLng / 2) ** 2;
-        const distM = 2 * R * Math.asin(Math.sqrt(aa));
-        return distM <= r;
-      })
+    const R = 6371000;
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const inRadius = (blat: number, blng: number) => {
+      const dLat = toRad(blat - lat);
+      const dLng = toRad(blng - lng);
+      const aa =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat)) * Math.cos(toRad(blat)) * Math.sin(dLng / 2) ** 2;
+      const distM = 2 * R * Math.asin(Math.sqrt(aa));
+      return distM <= r;
+    };
+    const [{ data: buildingsForRadius }, { data: standaloneListings }] =
+      await Promise.all([
+        supabase
+          .from('buildings')
+          .select('id, latitude, longitude')
+          .eq('city', ACTIVE_CITY),
+        supabase
+          .from('listings')
+          .select('id, latitude, longitude')
+          .is('building_id', null)
+          .not('latitude', 'is', null)
+          .not('longitude', 'is', null),
+      ]);
+    const buildingIdsInRadius = (buildingsForRadius ?? [])
+      .filter((b) => inRadius(Number(b.latitude), Number(b.longitude)))
       .map((b) => b.id as string);
-    if (inRadiusIds.length === 0) return [];
-    q = q.in('building_id', inRadiusIds);
+    const standaloneIdsInRadius = (standaloneListings ?? [])
+      .filter((l) => inRadius(Number(l.latitude), Number(l.longitude)))
+      .map((l) => l.id as string);
+    // PostgREST `or` filter: listings.building_id IN (...) OR
+    // listings.id IN (standalone_ids). Both arms can be empty —
+    // empty in() degrades to "no rows" so we have to short-circuit.
+    if (buildingIdsInRadius.length === 0 && standaloneIdsInRadius.length === 0) {
+      return [];
+    }
+    const orParts: string[] = [];
+    if (buildingIdsInRadius.length > 0) {
+      orParts.push(`building_id.in.(${buildingIdsInRadius.join(',')})`);
+    }
+    if (standaloneIdsInRadius.length > 0) {
+      orParts.push(`id.in.(${standaloneIdsInRadius.join(',')})`);
+    }
+    q = q.or(orParts.join(','));
   }
 
   const { data, error } = await q;
   if (error) throw error;
-  const listings = (data ?? []).map(mapListing);
 
-  // Effective trust tier needs the developer's verified status.
-  // Fetch all referenced buildings + developers in one batch.
-  const buildingIds = [...new Set(listings.map((l) => l.building_id))];
-  if (buildingIds.length === 0) return listings;
-  const { data: buildings } = await supabase
-    .from('buildings')
-    .select('id, developer_id')
-    .in('id', buildingIds);
-  const developerIds = [...new Set((buildings ?? []).map((b) => b.developer_id))];
-  const { data: developers } = await supabase
-    .from('developers')
-    .select('id, status, verified_at')
-    .in('id', developerIds);
+  // City filter applied in code so standalone listings can be kept
+  // (their city comes from the joined district, not the missing
+  // building). Drop rows that don't resolve to ACTIVE_CITY from
+  // either source.
+  const filtered = (data ?? []).filter((row: Record<string, unknown>) => {
+    const buildingCity = (row.buildings as { city?: string } | null)?.city;
+    const districtCity = (row.district as { city?: string } | null)?.city;
+    return (buildingCity ?? districtCity) === ACTIVE_CITY;
+  });
+  const listings = filtered.map(mapListing);
 
-  const buildingToDevId = new Map(
-    (buildings ?? []).map((b) => [b.id, b.developer_id as string]),
-  );
-  const verifiedDevs = new Set(
-    (developers ?? [])
-      .filter((d) => d.status === 'active' && d.verified_at != null)
-      .map((d) => d.id),
-  );
+  // Effective trust tier needs the developer's verified status — only
+  // for listings inside a ЖК. Standalone listings inherit their own
+  // verification_tier (no developer to vouch for them).
+  const buildingIds = [
+    ...new Set(listings.map((l) => l.building_id).filter((id): id is string => id != null)),
+  ];
+  let buildingToDevId = new Map<string, string>();
+  let verifiedDevs = new Set<string>();
+  if (buildingIds.length > 0) {
+    const { data: buildings } = await supabase
+      .from('buildings')
+      .select('id, developer_id')
+      .in('id', buildingIds);
+    const developerIds = [...new Set((buildings ?? []).map((b) => b.developer_id))];
+    const { data: developers } = await supabase
+      .from('developers')
+      .select('id, status, verified_at')
+      .in('id', developerIds);
+    buildingToDevId = new Map(
+      (buildings ?? []).map((b) => [b.id, b.developer_id as string]),
+    );
+    verifiedDevs = new Set(
+      (developers ?? [])
+        .filter((d) => d.status === 'active' && d.verified_at != null)
+        .map((d) => d.id),
+    );
+  }
 
   // Sort:
   //   - 'cheapest' / 'expensive' → strict price order (no trust tier)
@@ -163,10 +205,16 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
     );
   } else {
     sorted = [...listings].sort((a, b) => {
+      // Standalone listings (no building) can't claim developer
+      // verification — fall back to their own verification_tier.
       const aDevVer =
-        a.source_type === 'developer' && verifiedDevs.has(buildingToDevId.get(a.building_id) ?? '');
+        a.building_id != null &&
+        a.source_type === 'developer' &&
+        verifiedDevs.has(buildingToDevId.get(a.building_id) ?? '');
       const bDevVer =
-        b.source_type === 'developer' && verifiedDevs.has(buildingToDevId.get(b.building_id) ?? '');
+        b.building_id != null &&
+        b.source_type === 'developer' &&
+        verifiedDevs.has(buildingToDevId.get(b.building_id) ?? '');
       const aRank = aDevVer ? -1 : (TIER_RANK[a.verification_tier] ?? 99);
       const bRank = bDevVer ? -1 : (TIER_RANK[b.verification_tier] ?? 99);
       if (aRank !== bRank) return aRank - bRank;
@@ -182,8 +230,11 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
 
 export async function getListing(slug: string): Promise<{
   listing: MockListing;
-  building: MockBuilding;
-  developer: MockDeveloper;
+  /** NULL when the listing is standalone (no parent ЖК). Detail
+   *  page branches accordingly. */
+  building: MockBuilding | null;
+  /** NULL when standalone (no developer to vouch for). */
+  developer: MockDeveloper | null;
   district: MockDistrict;
   median: { median: number; sample: number } | null;
   similar: MockListing[];
@@ -201,38 +252,69 @@ export async function getListing(slug: string): Promise<{
   if (!lRow) return null;
   const listing = mapListing(lRow);
 
-  const { data: bRow, error: bErr } = await supabase
-    .from('buildings')
-    .select(BUILDING_SELECT)
-    .eq('id', listing.building_id)
-    .single();
-  if (bErr) throw bErr;
+  // Resolve parent ЖК if any. For standalone listings we skip the
+  // building fetch and rely on listing-level fields. The district
+  // FK is always set (one or the other per the
+  // listings_standalone_or_in_building check constraint).
+  let building: MockBuilding | null = null;
+  let developer: MockDeveloper | null = null;
+  let districtId: string;
 
-  const [devRes, distRes, similarRes, sellerRes] = await Promise.all([
-    supabase.from('developers').select('*').eq('id', bRow.developer_id).single(),
-    supabase.from('districts').select('*').eq('id', bRow.district_id).single(),
-    supabase
-      .from('listings')
-      .select(LISTING_SELECT)
-      .eq('building_id', listing.building_id)
-      .eq('status', 'active')
-      .neq('id', listing.id)
-      .limit(3),
+  if (listing.building_id) {
+    const { data: bRow, error: bErr } = await supabase
+      .from('buildings')
+      .select(BUILDING_SELECT)
+      .eq('id', listing.building_id)
+      .single();
+    if (bErr) throw bErr;
+    building = rowToBuilding(bRow as BuildingRowWithJoins);
+    districtId = bRow.district_id as string;
+
+    const { data: devRow } = await supabase
+      .from('developers')
+      .select('*')
+      .eq('id', bRow.developer_id)
+      .single();
+    if (devRow) {
+      developer = {
+        id: devRow.id,
+        name: devRow.name,
+        display_name: devRow.display_name,
+        is_verified: devRow.status === 'active' && devRow.verified_at != null,
+        verified_at: devRow.verified_at,
+        has_female_agent: devRow.has_female_agent,
+        years_active: devRow.years_active,
+        projects_completed_count: devRow.projects_completed_count,
+      };
+    }
+  } else {
+    if (!listing.district_id) {
+      // Should be unreachable per the check constraint, but if a
+      // future migration relaxes it, fail loudly so the bug is
+      // visible rather than silently 404-ing.
+      throw new Error(
+        `Standalone listing ${listing.id} has no district — db constraint violated`,
+      );
+    }
+    districtId = listing.district_id;
+  }
+
+  // Sibling listings + seller phone fetched in parallel. Sibling
+  // listings only meaningful for ЖК listings (apartments in same
+  // building). Standalone has no siblings — empty array.
+  const [distRes, similarRes, sellerRes] = await Promise.all([
+    supabase.from('districts').select('*').eq('id', districtId).single(),
+    listing.building_id
+      ? supabase
+          .from('listings')
+          .select(LISTING_SELECT)
+          .eq('building_id', listing.building_id)
+          .eq('status', 'active')
+          .neq('id', listing.id)
+          .limit(3)
+      : Promise.resolve({ data: null }),
     supabase.from('users').select('phone').eq('id', lRow.seller_user_id).maybeSingle(),
   ]);
-
-  const building: MockBuilding = rowToBuilding(bRow as BuildingRowWithJoins);
-
-  const developer: MockDeveloper = {
-    id: devRes.data!.id,
-    name: devRes.data!.name,
-    display_name: devRes.data!.display_name,
-    is_verified: devRes.data!.status === 'active' && devRes.data!.verified_at != null,
-    verified_at: devRes.data!.verified_at,
-    has_female_agent: devRes.data!.has_female_agent,
-    years_active: devRes.data!.years_active,
-    projects_completed_count: devRes.data!.projects_completed_count,
-  };
 
   const district: MockDistrict = {
     id: distRes.data!.id,
@@ -305,7 +387,21 @@ export async function submitContactRequest(input: {
 // ─── Listing creation (V1 founder + moderation flow) ────────
 
 export interface CreateListingInput {
-  buildingId: string;
+  /** Set when the listing belongs to a known ЖК. Mutually exclusive
+   *  with `standalone`. */
+  buildingId?: string;
+  /** Set when the listing is standalone (no parent ЖК). Carries
+   *  address + district + structural facts that would otherwise live
+   *  on the parent building. Migration 0019. */
+  standalone?: {
+    streetAddress: string;
+    districtId: string;
+    latitude?: number;
+    longitude?: number;
+    totalFloors?: number;
+    hasElevator?: boolean;
+    yearBuilt?: number;
+  };
   /** UUID of the user creating the listing — set seller_user_id. */
   sellerUserId: string;
   /** Drives the source_type column. Founder posting on behalf of a
@@ -363,19 +459,33 @@ export async function createListing(
 ): Promise<{ id: string; slug: string }> {
   const supabase = createAdminClient();
 
-  // Need building's slug + total_floors to derive defaults.
-  const { data: building, error: bErr } = await supabase
-    .from('buildings')
-    .select('slug, total_floors')
-    .eq('id', input.buildingId)
-    .single();
-  if (bErr || !building) {
-    throw bErr ?? new Error(`Building ${input.buildingId} not found`);
+  if (!input.buildingId && !input.standalone) {
+    throw new Error('createListing requires either buildingId or standalone');
   }
 
-  // Slug pattern: <building>-<rooms>k-<floor>f-<sizeRound>m2[-<rand>].
-  // Round size to int for slug brevity; full decimal stays in DB.
-  const baseSlug = `${building.slug}-${input.roomsCount}k-${input.floorNumber}f-${Math.round(input.sizeM2)}m2`;
+  // Slug derivation differs by mode:
+  //   in-ЖК:      <building.slug>-<rooms>k-<floor>f-<sizeM2>m2
+  //   standalone: vahdat-<rooms>k-<floor>f-<sizeM2>m2-<rand>
+  // Building lookup only happens for in-ЖК mode (saves a round-trip
+  // for standalone listings; we have everything we need on the input).
+  let buildingSlug: string | null = null;
+  let buildingDefaultFloors: number | null = null;
+  if (input.buildingId) {
+    const { data: building, error: bErr } = await supabase
+      .from('buildings')
+      .select('slug, total_floors')
+      .eq('id', input.buildingId)
+      .single();
+    if (bErr || !building) {
+      throw bErr ?? new Error(`Building ${input.buildingId} not found`);
+    }
+    buildingSlug = building.slug as string;
+    buildingDefaultFloors = building.total_floors as number;
+  }
+
+  const baseSlug = buildingSlug
+    ? `${buildingSlug}-${input.roomsCount}k-${input.floorNumber}f-${Math.round(input.sizeM2)}m2`
+    : `vahdat-${input.roomsCount}k-${input.floorNumber}f-${Math.round(input.sizeM2)}m2`;
   let slug = baseSlug;
   for (let attempt = 0; attempt < 5; attempt++) {
     const { data: existing } = await supabase
@@ -394,14 +504,17 @@ export async function createListing(
     .from('listings')
     .insert({
       slug,
-      building_id: input.buildingId,
+      // building_id is null for standalone listings; the standalone
+      // fields below carry the equivalent location information.
+      building_id: input.buildingId ?? null,
       seller_user_id: input.sellerUserId,
       source_type: input.sourceType,
       status: input.initialStatus,
       rooms_count: input.roomsCount,
       size_m2: input.sizeM2,
       floor_number: input.floorNumber,
-      total_floors: input.totalFloors ?? building.total_floors,
+      total_floors:
+        input.totalFloors ?? buildingDefaultFloors ?? input.standalone?.totalFloors ?? null,
       price_total_dirams: input.priceTotalDirams.toString(),
       // price_per_m2_dirams is generated-always-as in the schema, so
       // we never set it explicitly.
@@ -416,6 +529,16 @@ export async function createListing(
       installment_term_months: installmentEnabled ? input.installment!.termMonths : null,
       bathroom_separate: input.bathroomSeparate ?? null,
       has_technical_passport: input.hasTechnicalPassport ?? null,
+      // Standalone-listing columns (migration 0019). NULL for in-ЖК
+      // listings — those fields live on the parent building. Setting
+      // them only when input.standalone is provided keeps the
+      // listings_standalone_or_in_building check happy.
+      street_address: input.standalone?.streetAddress ?? null,
+      district_id: input.standalone?.districtId ?? null,
+      latitude: input.standalone?.latitude ?? null,
+      longitude: input.standalone?.longitude ?? null,
+      has_elevator: input.standalone?.hasElevator ?? null,
+      year_built: input.standalone?.yearBuilt ?? null,
       unit_description: input.description
         ? { ru: input.description, tg: input.description }
         : null,

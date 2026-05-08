@@ -69,7 +69,7 @@ export interface PostFlowProps {
   benchmarksByDistrict: Record<string, number>;
 }
 
-type Mode = 'choose' | 'new-building' | 'existing-building';
+type Mode = 'choose' | 'new-building' | 'existing-building' | 'standalone';
 
 interface ApartmentDraft {
   // Per-card local id so React keys stay stable across reorders / removes.
@@ -266,13 +266,29 @@ export function PostFlow({
     existingBuildings[0]?.id ?? '',
   );
 
+  // Standalone-mode state (mode === 'standalone'). Captures the
+  // structural facts we'd otherwise read from a parent ЖК — schema
+  // columns added in migration 0019.
+  const [standalone, setStandalone] = useState({
+    street_address: '',
+    district_id: districts[0]?.id ?? '',
+    total_floors: '' as number | '',
+    has_elevator: '' as '' | 'yes' | 'no',
+    year_built: '' as number | '',
+  });
+
   // Resolves the district whose benchmark applies to the current
-  // apartments. New-building mode uses the seller-picked district;
-  // existing-building mode uses the chosen building's district.
+  // apartments. Order: new-building → seller-picked district;
+  // existing-building → chosen building's district; standalone →
+  // seller-picked district on the standalone form.
   const activeDistrictId =
     mode === 'new-building'
       ? b.district_id || undefined
-      : existingBuildings.find((bld) => bld.id === existingBuildingId)?.district_id;
+      : mode === 'existing-building'
+        ? existingBuildings.find((bld) => bld.id === existingBuildingId)?.district_id
+        : mode === 'standalone'
+          ? standalone.district_id || undefined
+          : undefined;
 
   // Apartments list — start with one card.
   const [apartments, setApartments] = useState<ApartmentDraft[]>([makeApartmentDraft()]);
@@ -422,6 +438,17 @@ export function PostFlow({
       if (!b.total_units) nextErrors['b.total_units'] = 'Укажите количество квартир';
     } else if (mode === 'existing-building') {
       if (!existingBuildingId) nextErrors['existing.id'] = 'Выберите ЖК';
+    } else if (mode === 'standalone') {
+      // Standalone listings: address + district required (the listings
+      // table check constraint also enforces district presence). Other
+      // structural fields (total_floors / has_elevator / year_built)
+      // are deliberately optional — sellers often don't know.
+      if (!standalone.street_address.trim()) {
+        nextErrors['s.street_address'] = 'Укажите адрес';
+      }
+      if (!standalone.district_id) {
+        nextErrors['s.district_id'] = 'Выберите район';
+      }
     } else {
       return;
     }
@@ -462,26 +489,12 @@ export function PostFlow({
     setConfirmOpen(false);
     setPartialFailures([]);
     setSubmitting(true);
-    const body = {
-      building:
-        mode === 'existing-building'
-          ? { id: existingBuildingId }
-          : {
-              name: b.name.trim(),
-              address: b.address.trim(),
-              landmark: b.landmark.trim() || undefined,
-              district_id: b.district_id,
-              developer_id: b.developer_id,
-              status: b.status,
-              total_floors: Number(b.total_floors),
-              total_units: Number(b.total_units),
-              handover_quarter: b.handover_quarter.trim() || undefined,
-              description: b.description.trim() || undefined,
-              amenities: b.amenities,
-              latitude: coords?.lat,
-              longitude: coords?.lng,
-              pendingPhotos: buildingPhotos,
-            },
+    // Body shape varies by mode:
+    //   - 'existing-building': { building: { id }, apartments: [...] }
+    //   - 'new-building':      { building: { ...new ЖК }, apartments: [...] }
+    //   - 'standalone':        { standalone: { address, district_id, ... }, apartments: [...] }
+    // The API branches on whether `body.standalone` is set.
+    const body: Record<string, unknown> = {
       apartments: apartments.map((a) => ({
         rooms_count: Number(a.rooms_count),
         size_m2: Number(a.size_m2),
@@ -516,6 +529,46 @@ export function PostFlow({
         pendingPhotos: a.photos,
       })),
     };
+
+    // Attach the parent — building (existing or new ЖК) OR a standalone
+    // location block. Exactly one of the three is set per mode.
+    if (mode === 'existing-building') {
+      body.building = { id: existingBuildingId };
+    } else if (mode === 'new-building') {
+      body.building = {
+        name: b.name.trim(),
+        address: b.address.trim(),
+        landmark: b.landmark.trim() || undefined,
+        district_id: b.district_id,
+        developer_id: b.developer_id,
+        status: b.status,
+        total_floors: Number(b.total_floors),
+        total_units: Number(b.total_units),
+        handover_quarter: b.handover_quarter.trim() || undefined,
+        description: b.description.trim() || undefined,
+        amenities: b.amenities,
+        latitude: coords?.lat,
+        longitude: coords?.lng,
+        pendingPhotos: buildingPhotos,
+      };
+    } else if (mode === 'standalone') {
+      body.standalone = {
+        street_address: standalone.street_address.trim(),
+        district_id: standalone.district_id,
+        latitude: coords?.lat,
+        longitude: coords?.lng,
+        total_floors:
+          typeof standalone.total_floors === 'number' ? standalone.total_floors : undefined,
+        has_elevator:
+          standalone.has_elevator === 'yes'
+            ? true
+            : standalone.has_elevator === 'no'
+              ? false
+              : undefined,
+        year_built:
+          typeof standalone.year_built === 'number' ? standalone.year_built : undefined,
+      };
+    }
 
     try {
       const res = await fetch('/api/inventory/create', {
@@ -652,7 +705,11 @@ export function PostFlow({
     return (
       <div className="flex flex-col gap-4">
         {draftBanner}
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
+        {/* Three modes — wide grid on desktop, stack on mobile.
+            "Просто квартира" covers the older-stock / second-hand /
+            unknown-developer case from migration 0019; the seller
+            doesn't need to know which "ЖК" (or whether one exists). */}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4">
           <ModePickButton
             icon={<Building2 className="size-6 text-terracotta-700" />}
             title="Новый ЖК с квартирами"
@@ -665,6 +722,13 @@ export function PostFlow({
             title="Квартира в существующем ЖК"
             description="Выберите ЖК из списка и добавьте одну квартиру"
             onClick={() => setMode('existing-building')}
+            accent="stone"
+          />
+          <ModePickButton
+            icon={<Home className="size-6 text-stone-700" />}
+            title="Просто квартира (без ЖК)"
+            description="Дом построен давно или вы не знаете застройщика — это нормально"
+            onClick={() => setMode('standalone')}
             accent="stone"
           />
         </div>
@@ -865,7 +929,7 @@ export function PostFlow({
             </div>
           </AppCardContent>
         </AppCard>
-      ) : (
+      ) : mode === 'existing-building' ? (
         <AppCard>
           <AppCardContent>
             <div className="flex flex-col gap-3">
@@ -892,6 +956,94 @@ export function PostFlow({
                   В системе пока нет ЖК. Создайте новый через «Новый ЖК с квартирами».
                 </p>
               )}
+            </div>
+          </AppCardContent>
+        </AppCard>
+      ) : (
+        // ─── STANDALONE — apartment without a parent ЖК ───────────
+        // Address + district required. Floors / лифт / year built
+        // are optional structural facts that buyers care about — same
+        // info we'd otherwise read off the parent building.
+        <AppCard>
+          <AppCardContent>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-h2 font-semibold text-stone-900">Где находится квартира</h2>
+                <p className="text-meta text-stone-500">
+                  Дом построен давно или не входит в известный ЖК — это нормально. Заполните то,
+                  что знаете.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div data-field-key="s.street_address" className="md:col-span-2">
+                  <AppInput
+                    label="Адрес"
+                    value={standalone.street_address}
+                    onChange={(e) => {
+                      setStandalone((s) => ({ ...s, street_address: e.target.value }));
+                      clearError('s.street_address');
+                    }}
+                    required
+                    placeholder="ул. Айни, дом 14"
+                    helperText="Улица и номер дома. Можно добавить ориентир после запятой."
+                    errorText={errors['s.street_address']}
+                  />
+                </div>
+                <div data-field-key="s.district_id">
+                  <AppSelect
+                    label="Район"
+                    value={standalone.district_id}
+                    onChange={(e) => {
+                      setStandalone((s) => ({ ...s, district_id: e.target.value }));
+                      clearError('s.district_id');
+                    }}
+                    required
+                    options={districts.map((d) => ({ value: d.id, label: d.name }))}
+                    errorText={errors['s.district_id']}
+                  />
+                </div>
+                <NumberField
+                  label="Этажей в доме (необязательно)"
+                  value={standalone.total_floors}
+                  onChange={(v) => setStandalone((s) => ({ ...s, total_floors: v }))}
+                  placeholder="5"
+                />
+                <AppSelect
+                  label="Лифт"
+                  value={standalone.has_elevator}
+                  onChange={(e) =>
+                    setStandalone((s) => ({
+                      ...s,
+                      has_elevator: e.target.value as '' | 'yes' | 'no',
+                    }))
+                  }
+                  placeholder="—"
+                  options={[
+                    { value: 'yes', label: 'Есть' },
+                    { value: 'no', label: 'Нет' },
+                  ]}
+                />
+                <NumberField
+                  label="Год постройки (необязательно)"
+                  value={standalone.year_built}
+                  onChange={(v) => setStandalone((s) => ({ ...s, year_built: v }))}
+                  placeholder="2003"
+                />
+              </div>
+              {/* Map pin — same district-centred LocationPicker as the
+                  new-building flow, sets coords for the listing row.
+                  Skipping the pin is allowed — the listing still posts
+                  with district + address, just without map-precise
+                  location. */}
+              {districts.find((d) => d.id === standalone.district_id) ? (
+                <LocationPicker
+                  centerLat={districts.find((d) => d.id === standalone.district_id)!.center_lat}
+                  centerLng={districts.find((d) => d.id === standalone.district_id)!.center_lng}
+                  centerKey={standalone.district_id}
+                  value={coords}
+                  onChange={setCoords}
+                />
+              ) : null}
             </div>
           </AppCardContent>
         </AppCard>

@@ -593,12 +593,25 @@ function mapListing(r: {
   ceiling_height_cm: number | null;
   bathroom_separate?: boolean | null;
   has_technical_passport?: boolean | null;
+  // Standalone-listing fields (migration 0019). Populated only when
+  // building_id is null; otherwise read from the parent building.
+  street_address?: string | null;
+  district_id?: string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  has_elevator?: boolean | null;
+  year_built?: number | null;
   orientation?: string | null;
   view_notes?: { ru: string; tg?: string } | null;
   floor_plan_photo_id?: string | null;
   updated_at?: string | null;
   cover_photo?: { storage_path: string } | { storage_path: string }[] | null;
 }): MockListing {
+  // Standalone listings (building_id null) carry their own coords.
+  // Numeric columns come back as strings/numbers from PostgREST so
+  // we coerce defensively.
+  const ownLat = r.latitude == null ? null : Number(r.latitude);
+  const ownLng = r.longitude == null ? null : Number(r.longitude);
   return {
     id: r.id,
     slug: r.slug,
@@ -633,6 +646,12 @@ function mapListing(r: {
     ceiling_height_cm: r.ceiling_height_cm,
     bathroom_separate: r.bathroom_separate ?? null,
     has_technical_passport: r.has_technical_passport ?? null,
+    street_address: r.street_address ?? null,
+    district_id: r.district_id ?? null,
+    latitude: ownLat,
+    longitude: ownLng,
+    has_elevator: r.has_elevator ?? null,
+    year_built: r.year_built ?? null,
     orientation: r.orientation ?? null,
     view_notes: r.view_notes ?? null,
     floor_plan_photo_id: r.floor_plan_photo_id ?? null,

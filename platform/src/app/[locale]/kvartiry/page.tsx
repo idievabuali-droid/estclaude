@@ -107,12 +107,23 @@ export default async function KvartiryPage({
     sort: sp.sort,
   });
 
-  // Pre-fetch building + developer + benchmark for each card
-  const buildingIds = [...new Set(filtered.map((l) => l.building_id))];
+  // Pre-fetch building + developer + benchmark for each card. Standalone
+  // listings (building_id === null) are skipped here — their cards read
+  // district from listing.district_id directly via getEffectiveDistrictId.
+  const buildingIds = [
+    ...new Set(filtered.map((l) => l.building_id).filter((id): id is string => id != null)),
+  ];
   const allBuildings = await listBuildings({});
   const buildingMap = new Map(allBuildings.filter((b) => buildingIds.includes(b.id)).map((b) => [b.id, b]));
   const developerIds = [...new Set([...buildingMap.values()].map((b) => b.developer_id))];
-  const districtIds = [...new Set([...buildingMap.values()].map((b) => b.district_id))];
+  // District ids come from EITHER the parent building OR the standalone
+  // listing's own district_id. Benchmark map needs both.
+  const districtIdsFromBuildings = [...buildingMap.values()].map((b) => b.district_id);
+  const districtIdsFromStandalone = filtered
+    .filter((l) => l.building_id == null)
+    .map((l) => l.district_id)
+    .filter((id): id is string => id != null);
+  const districtIds = [...new Set([...districtIdsFromBuildings, ...districtIdsFromStandalone])];
   // Currency cookie + rates flow through to ListingCard so a diaspora
   // visitor sees prices in their own currency on this list too. Local
   // buyers (cookie unset or TJS) see no extra noise — PriceConversion
@@ -270,10 +281,16 @@ export default async function KvartiryPage({
               ) : (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
                   {filtered.map((l) => {
-                    const building = buildingMap.get(l.building_id);
-                    if (!building) return null;
-                    const dev = developerMap.get(building.developer_id);
-                    const benchmark = benchmarkMap.get(building.district_id);
+                    // Two cases: (1) listing has a parent ЖК — resolve
+                    // building/dev/benchmark from buildingMap. (2) standalone
+                    // listing — building is null, no developer; benchmark
+                    // resolves directly from listing.district_id.
+                    const building = l.building_id ? buildingMap.get(l.building_id) ?? null : null;
+                    const dev = building ? developerMap.get(building.developer_id) : null;
+                    const benchmarkDistrictId = building?.district_id ?? l.district_id ?? null;
+                    const benchmark = benchmarkDistrictId
+                      ? benchmarkMap.get(benchmarkDistrictId)
+                      : null;
                     return (
                       <ListingCard
                         key={l.id}

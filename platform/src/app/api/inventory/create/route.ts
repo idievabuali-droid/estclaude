@@ -60,8 +60,22 @@ interface ApartmentInput {
   pendingPhotos?: PendingPhoto[];
 }
 
+/** Standalone-listing payload (migration 0019). When the seller picked
+ *  "Просто квартира (без ЖК)" mode, the body has `standalone: {...}`
+ *  instead of `building`. Fields land directly on the listings row;
+ *  no parent building is created. */
+interface StandaloneInput {
+  street_address: string;
+  district_id: string;
+  latitude?: number;
+  longitude?: number;
+  total_floors?: number;
+  has_elevator?: boolean;
+  year_built?: number;
+}
+
 interface CreateInventoryBody {
-  building:
+  building?:
     | {
         id: string; // Existing building.
       }
@@ -86,6 +100,9 @@ interface CreateInventoryBody {
         /** Building cover photos (already uploaded to Storage). */
         pendingPhotos?: PendingPhoto[];
       };
+  /** Set instead of `building` when the seller is posting a standalone
+   *  apartment. Exactly one of `building` / `standalone` is expected. */
+  standalone?: StandaloneInput;
   apartments: ApartmentInput[];
 }
 
@@ -172,12 +189,26 @@ export async function POST(req: NextRequest) {
   const resolveSourceType = (finishing: FinishingType): SourceType =>
     finishing === 'owner_renovated' ? 'owner' : baseSourceType;
 
-  // Resolve building — either create new or use existing id.
-  let buildingId: string;
+  // Resolve parent — three paths:
+  //   1. body.building.id   → existing ЖК
+  //   2. body.building.{...} → new ЖК being created in this request
+  //   3. body.standalone     → no ЖК; address + district carried on
+  //                            the listings row directly (migration 0019)
+  let buildingId: string | null = null;
   let buildingSlug: string | null = null;
-  if ('id' in body.building) {
+  let standaloneInput: StandaloneInput | null = null;
+
+  if (body.standalone) {
+    if (!body.standalone.street_address?.trim() || !body.standalone.district_id) {
+      return NextResponse.json(
+        { error: 'standalone listing requires street_address and district_id' },
+        { status: 400 },
+      );
+    }
+    standaloneInput = body.standalone;
+  } else if (body.building && 'id' in body.building) {
     buildingId = body.building.id;
-  } else {
+  } else if (body.building) {
     const b = body.building;
     // Minimal validation. The DB will reject malformed enum values
     // and missing FKs (district_id, developer_id) with helpful errors.
@@ -235,6 +266,11 @@ export async function POST(req: NextRequest) {
         { status: 500 },
       );
     }
+  } else {
+    return NextResponse.json(
+      { error: 'either building or standalone is required' },
+      { status: 400 },
+    );
   }
 
   // Create apartments sequentially (low volume; <10 per submission).
@@ -256,7 +292,18 @@ export async function POST(req: NextRequest) {
     }
     try {
       const c = await createListing({
-        buildingId,
+        buildingId: buildingId ?? undefined,
+        standalone: standaloneInput
+          ? {
+              streetAddress: standaloneInput.street_address.trim(),
+              districtId: standaloneInput.district_id,
+              latitude: standaloneInput.latitude,
+              longitude: standaloneInput.longitude,
+              totalFloors: standaloneInput.total_floors,
+              hasElevator: standaloneInput.has_elevator,
+              yearBuilt: standaloneInput.year_built,
+            }
+          : undefined,
         sellerUserId: user.id,
         sourceType: resolveSourceType(apt.finishing_type),
         roomsCount: apt.rooms_count,
