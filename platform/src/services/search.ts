@@ -28,6 +28,11 @@ export type SearchHit =
       id: string;
       name: string;
       slug: string;
+      /** Centroid lat/lng. Used by /post AddressAutocomplete to drop
+       *  the map pin when the seller picks a district from the
+       *  dropdown. Null when the seed row didn't carry centroid coords. */
+      latitude: number | null;
+      longitude: number | null;
     }
   | {
       sourceKind: 'building';
@@ -36,6 +41,13 @@ export type SearchHit =
       slug: string;
       /** District name for the secondary line in the dropdown row. */
       districtName: string | null;
+      /** District id — surfaced so /post can auto-set the listing's
+       *  district to match the picked building's district. */
+      districtId: string | null;
+      /** Building lat/lng. Drives the auto-pin behaviour on /post when
+       *  the seller picks an existing ЖК from the autocomplete. */
+      latitude: number | null;
+      longitude: number | null;
     }
   | {
       sourceKind: 'developer';
@@ -63,14 +75,16 @@ export async function searchAll(query: string, limit = 10): Promise<SearchResult
   const [districtsRes, buildingsRes, developersRes, pois] = await Promise.all([
     supabase
       .from('districts')
-      .select('id, slug, name')
+      .select('id, slug, name, center_latitude, center_longitude')
       .eq('city', ACTIVE_CITY)
       .ilike('name->>ru', `%${q}%`)
       .order('name->>ru')
       .limit(4),
     supabase
       .from('buildings')
-      .select('id, slug, name, district_id, districts(id, name)')
+      .select(
+        'id, slug, name, district_id, latitude, longitude, districts(id, name)',
+      )
       .eq('city', ACTIVE_CITY)
       .eq('is_published', true)
       .ilike('name->>ru', `%${q}%`)
@@ -93,6 +107,8 @@ export async function searchAll(query: string, limit = 10): Promise<SearchResult
       id: d.id as string,
       name: (d.name as { ru: string }).ru,
       slug: d.slug as string,
+      latitude: (d.center_latitude as number | null) ?? null,
+      longitude: (d.center_longitude as number | null) ?? null,
     });
   }
 
@@ -107,6 +123,9 @@ export async function searchAll(query: string, limit = 10): Promise<SearchResult
       name: (b.name as { ru: string }).ru,
       slug: b.slug as string,
       districtName: district?.name?.ru ?? null,
+      districtId: (b.district_id as string | null) ?? null,
+      latitude: (b.latitude as number | null) ?? null,
+      longitude: (b.longitude as number | null) ?? null,
     });
   }
 

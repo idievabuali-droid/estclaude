@@ -14,9 +14,9 @@ import {
 } from '@/components/primitives';
 import { toast } from '@/components/primitives/AppToast';
 import { PhotoPicker, type PendingPhoto } from './PhotoPicker';
-import { LocationPicker } from './LocationPicker';
 import { NewDeveloperModal } from './NewDeveloperModal';
 import { NumberField } from './NumberField';
+import { LocationSection } from './LocationSection';
 import {
   saveDraft,
   loadDraft,
@@ -258,8 +258,6 @@ export function PostFlow({
   // Becomes the building's hero image + the cover_photo_id reference
   // on /zhk pages and building cards.
   const [buildingPhotos, setBuildingPhotos] = useState<PendingPhoto[]>([]);
-
-  const selectedDistrict = districts.find((d) => d.id === b.district_id);
 
   // Existing-building selection.
   const [existingBuildingId, setExistingBuildingId] = useState(
@@ -750,10 +748,42 @@ export function PostFlow({
 
       {/* Building section (new or pick existing) */}
       {mode === 'new-building' ? (
-        <AppCard>
+        <>
+          {/* "Где находится" lifted to the TOP of the form so the
+              seller's first interaction is the one thing they always
+              know — the location. Address autocomplete + map + auto-
+              derived district are all bundled here. Picking an
+              existing ЖК from the autocomplete flips mode and pre-
+              selects that building (no duplicates). */}
+          <LocationSection
+            title="Где находится ЖК"
+            subtitle="Введите адрес или название — подскажем известные ЖК и ориентиры."
+            address={b.address}
+            onAddressChange={(next) => {
+              setB((s) => ({ ...s, address: next }));
+              clearError('b.address');
+            }}
+            addressFieldKey="b.address"
+            addressError={errors['b.address']}
+            districts={districts}
+            districtId={b.district_id}
+            onDistrictChange={(id) => {
+              setB((s) => ({ ...s, district_id: id }));
+              clearError('b.district_id');
+            }}
+            districtFieldKey="b.district_id"
+            districtError={errors['b.district_id']}
+            coords={coords}
+            onCoordsChange={setCoords}
+            onPickExistingBuilding={(buildingId) => {
+              setExistingBuildingId(buildingId);
+              setMode('existing-building');
+            }}
+          />
+          <AppCard>
           <AppCardContent>
             <div className="flex flex-col gap-4">
-              <h2 className="text-h2 font-semibold text-stone-900">ЖК</h2>
+              <h2 className="text-h2 font-semibold text-stone-900">О ЖК</h2>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div data-field-key="b.name">
                   <AppInput
@@ -766,32 +796,6 @@ export function PostFlow({
                     required
                     placeholder="ЖК Гулистон Резиденс"
                     errorText={errors['b.name']}
-                  />
-                </div>
-                <div data-field-key="b.address">
-                  <AppInput
-                    label="Адрес"
-                    value={b.address}
-                    onChange={(e) => {
-                      setB((s) => ({ ...s, address: e.target.value }));
-                      clearError('b.address');
-                    }}
-                    required
-                    placeholder="ул. Гагарина, 12"
-                    errorText={errors['b.address']}
-                  />
-                </div>
-                <div data-field-key="b.district_id">
-                  <AppSelect
-                    label="Район"
-                    value={b.district_id}
-                    onChange={(e) => {
-                      setB((s) => ({ ...s, district_id: e.target.value }));
-                      clearError('b.district_id');
-                    }}
-                    required
-                    options={districts.map((d) => ({ value: d.id, label: d.name }))}
-                    errorText={errors['b.district_id']}
                   />
                 </div>
                 <div data-field-key="b.developer_id">
@@ -863,22 +867,11 @@ export function PostFlow({
                   />
                 </div>
               </div>
-              <AppInput
-                label="Ориентир (необязательно)"
-                value={b.landmark}
-                onChange={(e) => setB((s) => ({ ...s, landmark: e.target.value }))}
-                placeholder="напротив парка Дусти / рядом с базаром"
-                helperText="Если адреса нет на табличке — то, как место знают местные."
-              />
-              {selectedDistrict ? (
-                <LocationPicker
-                  centerLat={selectedDistrict.center_lat}
-                  centerLng={selectedDistrict.center_lng}
-                  centerKey={selectedDistrict.id}
-                  value={coords}
-                  onChange={setCoords}
-                />
-              ) : null}
+              {/* Адрес / Район / карта живут в LocationSection выше.
+                  «Ориентир» как отдельное поле убран — местный
+                  ориентир вписывается прямо в строку адреса
+                  («ул. Айни 14, напротив парка»). Описание ниже всё
+                  равно остаётся доступным для расширенной информации. */}
               <AppTextarea
                 label="Описание"
                 value={b.description}
@@ -929,6 +922,7 @@ export function PostFlow({
             </div>
           </AppCardContent>
         </AppCard>
+        </>
       ) : mode === 'existing-building' ? (
         <AppCard>
           <AppCardContent>
@@ -961,92 +955,77 @@ export function PostFlow({
         </AppCard>
       ) : (
         // ─── STANDALONE — apartment without a parent ЖК ───────────
-        // Address + district required. Floors / лифт / year built
-        // are optional structural facts that buyers care about — same
-        // info we'd otherwise read off the parent building.
-        <AppCard>
-          <AppCardContent>
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1">
-                <h2 className="text-h2 font-semibold text-stone-900">Где находится квартира</h2>
-                <p className="text-meta text-stone-500">
-                  Дом построен давно или не входит в известный ЖК — это нормально. Заполните то,
-                  что знаете.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div data-field-key="s.street_address" className="md:col-span-2">
-                  <AppInput
-                    label="Адрес"
-                    value={standalone.street_address}
-                    onChange={(e) => {
-                      setStandalone((s) => ({ ...s, street_address: e.target.value }));
-                      clearError('s.street_address');
-                    }}
-                    required
-                    placeholder="ул. Айни, дом 14"
-                    helperText="Улица и номер дома. Можно добавить ориентир после запятой."
-                    errorText={errors['s.street_address']}
+        // "Где находится" lifted out into the shared LocationSection
+        // (same component the new-building flow uses); the rest of
+        // this card carries optional structural facts about the
+        // building (floors / лифт / year built) that buyers care
+        // about even when no ЖК is associated.
+        <>
+          <LocationSection
+            title="Где находится квартира"
+            subtitle="Дом построен давно или не входит в известный ЖК — это нормально. Введите адрес или ориентир."
+            address={standalone.street_address}
+            onAddressChange={(next) => {
+              setStandalone((s) => ({ ...s, street_address: next }));
+              clearError('s.street_address');
+            }}
+            addressFieldKey="s.street_address"
+            addressError={errors['s.street_address']}
+            districts={districts}
+            districtId={standalone.district_id}
+            onDistrictChange={(id) => {
+              setStandalone((s) => ({ ...s, district_id: id }));
+              clearError('s.district_id');
+            }}
+            districtFieldKey="s.district_id"
+            districtError={errors['s.district_id']}
+            coords={coords}
+            onCoordsChange={setCoords}
+            onPickExistingBuilding={(buildingId) => {
+              // Picked an existing ЖК from autocomplete while in
+              // standalone mode → flip to existing-building. Saves the
+              // seller from re-discovering the picker.
+              setExistingBuildingId(buildingId);
+              setMode('existing-building');
+            }}
+          />
+          <AppCard>
+            <AppCardContent>
+              <div className="flex flex-col gap-4">
+                <h2 className="text-h2 font-semibold text-stone-900">О доме (необязательно)</h2>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <NumberField
+                    label="Этажей в доме"
+                    value={standalone.total_floors}
+                    onChange={(v) => setStandalone((s) => ({ ...s, total_floors: v }))}
+                    placeholder="5"
                   />
-                </div>
-                <div data-field-key="s.district_id">
                   <AppSelect
-                    label="Район"
-                    value={standalone.district_id}
-                    onChange={(e) => {
-                      setStandalone((s) => ({ ...s, district_id: e.target.value }));
-                      clearError('s.district_id');
-                    }}
-                    required
-                    options={districts.map((d) => ({ value: d.id, label: d.name }))}
-                    errorText={errors['s.district_id']}
+                    label="Лифт"
+                    value={standalone.has_elevator}
+                    onChange={(e) =>
+                      setStandalone((s) => ({
+                        ...s,
+                        has_elevator: e.target.value as '' | 'yes' | 'no',
+                      }))
+                    }
+                    placeholder="—"
+                    options={[
+                      { value: 'yes', label: 'Есть' },
+                      { value: 'no', label: 'Нет' },
+                    ]}
+                  />
+                  <NumberField
+                    label="Год постройки"
+                    value={standalone.year_built}
+                    onChange={(v) => setStandalone((s) => ({ ...s, year_built: v }))}
+                    placeholder="2003"
                   />
                 </div>
-                <NumberField
-                  label="Этажей в доме (необязательно)"
-                  value={standalone.total_floors}
-                  onChange={(v) => setStandalone((s) => ({ ...s, total_floors: v }))}
-                  placeholder="5"
-                />
-                <AppSelect
-                  label="Лифт"
-                  value={standalone.has_elevator}
-                  onChange={(e) =>
-                    setStandalone((s) => ({
-                      ...s,
-                      has_elevator: e.target.value as '' | 'yes' | 'no',
-                    }))
-                  }
-                  placeholder="—"
-                  options={[
-                    { value: 'yes', label: 'Есть' },
-                    { value: 'no', label: 'Нет' },
-                  ]}
-                />
-                <NumberField
-                  label="Год постройки (необязательно)"
-                  value={standalone.year_built}
-                  onChange={(v) => setStandalone((s) => ({ ...s, year_built: v }))}
-                  placeholder="2003"
-                />
               </div>
-              {/* Map pin — same district-centred LocationPicker as the
-                  new-building flow, sets coords for the listing row.
-                  Skipping the pin is allowed — the listing still posts
-                  with district + address, just without map-precise
-                  location. */}
-              {districts.find((d) => d.id === standalone.district_id) ? (
-                <LocationPicker
-                  centerLat={districts.find((d) => d.id === standalone.district_id)!.center_lat}
-                  centerLng={districts.find((d) => d.id === standalone.district_id)!.center_lng}
-                  centerKey={standalone.district_id}
-                  value={coords}
-                  onChange={setCoords}
-                />
-              ) : null}
-            </div>
-          </AppCardContent>
-        </AppCard>
+            </AppCardContent>
+          </AppCard>
+        </>
       )}
 
       {/* Apartments list */}

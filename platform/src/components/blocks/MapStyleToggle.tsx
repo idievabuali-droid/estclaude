@@ -8,12 +8,19 @@ import { cn } from '@/lib/utils';
  *  else. Free, no API key, OSM-based. */
 export const STREETS_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 
-/** Esri World Imagery — free satellite raster tiles, OSM-compatible.
- *  Wrapped in a minimal MapLibre style spec rather than a hosted JSON
- *  so we don't depend on a 3rd-party style URL that could disappear.
+/** Hybrid satellite — Esri World Imagery (raster) with the Esri
+ *  reference-overlay raster on top, so street + neighbourhood + POI
+ *  labels remain readable on satellite imagery. Two raster sources
+ *  stacked; both free and OSM-compatible.
  *
- *  Attribution required per Esri's terms — surfaced as a copyright
- *  control on the map itself by maplibre-gl. */
+ *  Without the labels overlay, sellers complained that "Спутник" mode
+ *  was great for spotting buildings visually but useless for figuring
+ *  out which street they were looking at — the labels overlay is what
+ *  makes a satellite map actually navigable. Standard pattern from
+ *  Google Maps "Hybrid" view, Mapbox Satellite Streets, etc.
+ *
+ *  Attribution required per Esri's terms — both sources surface their
+ *  © strings via maplibre's attribution control. */
 export const SATELLITE_STYLE: StyleSpecification = {
   version: 8,
   sources: {
@@ -26,12 +33,29 @@ export const SATELLITE_STYLE: StyleSpecification = {
       maxzoom: 19,
       attribution: '© Esri, Maxar, Earthstar Geographics',
     },
+    'esri-reference': {
+      type: 'raster',
+      tiles: [
+        'https://services.arcgisonline.com/arcgis/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+      ],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: '© Esri',
+    },
   },
   layers: [
     {
       id: 'esri-imagery-layer',
       type: 'raster',
       source: 'esri-imagery',
+    },
+    {
+      id: 'esri-reference-layer',
+      type: 'raster',
+      source: 'esri-reference',
+      // Slight transparency so the imagery underneath stays
+      // recognisable around dense label clusters.
+      paint: { 'raster-opacity': 0.85 },
     },
   ],
 };
