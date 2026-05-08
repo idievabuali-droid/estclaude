@@ -63,16 +63,25 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
   // V1.1 update: city filter now respects standalone listings (those
   // with `building_id IS NULL`). We resolve the city after the fetch
   // by inspecting either the parent building's city OR — for standalones
-  // — the listing's own district's city. INNER JOIN no longer fits;
-  // we LEFT JOIN both in the same select and filter in code.
+  // — the listing's own district's city.
   //
-  // The PostgREST `!left` hint forces a LEFT JOIN even when the FK is
-  // present on the listing. Result: standalone rows come back with
-  // `buildings: null`, ЖК rows come back with `buildings: { city }`.
+  // We do NOT embed the districts FK directly (`district:districts!left(city)`)
+  // because that requires the listings.district_id FK to exist in
+  // PostgREST's schema cache — fragile across deploy / migration
+  // ordering. Instead we pre-fetch the active-city district id set
+  // and filter standalones in code below. Same end result, no schema
+  // dependency.
+  const [activeDistrictsRes] = await Promise.all([
+    supabase.from('districts').select('id').eq('city', ACTIVE_CITY),
+  ]);
+  const activeDistrictIds = new Set(
+    (activeDistrictsRes.data ?? []).map((d) => d.id as string),
+  );
+
   let q = supabase
     .from('listings')
     .select(
-      `*, buildings:buildings!left(city), district:districts!left(city), cover_photo:photos!listings_cover_photo_fk(storage_path)`,
+      `*, buildings:buildings!left(city), cover_photo:photos!listings_cover_photo_fk(storage_path)`,
     )
     .eq('status', 'active');
   if (filters.rooms?.length) q = q.in('rooms_count', filters.rooms);
@@ -108,19 +117,31 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
       const distM = 2 * R * Math.asin(Math.sqrt(aa));
       return distM <= r;
     };
-    const [{ data: buildingsForRadius }, { data: standaloneListings }] =
-      await Promise.all([
-        supabase
-          .from('buildings')
-          .select('id, latitude, longitude')
-          .eq('city', ACTIVE_CITY),
-        supabase
-          .from('listings')
-          .select('id, latitude, longitude')
-          .is('building_id', null)
-          .not('latitude', 'is', null)
-          .not('longitude', 'is', null),
-      ]);
+    // The standalone pre-query reads listings.latitude / .longitude —
+    // columns that only exist post-migration 0019. If those columns
+    // aren't there (mid-migration deploy), the query 4xx's; we treat
+    // that as "no standalone listings exist yet" and fall back to []
+    // so radius search keeps working for the existing ЖК stock.
+    const [{ data: buildingsForRadius }, standaloneRes] = await Promise.all([
+      supabase
+        .from('buildings')
+        .select('id, latitude, longitude')
+        .eq('city', ACTIVE_CITY),
+      supabase
+        .from('listings')
+        .select('id, latitude, longitude')
+        .is('building_id', null)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null),
+    ]);
+    const standaloneListings =
+      standaloneRes.error
+        ? (console.error(
+            'standalone radius pre-query failed (non-fatal):',
+            standaloneRes.error,
+          ),
+          [] as { id: string; latitude: unknown; longitude: unknown }[])
+        : standaloneRes.data ?? [];
     const buildingIdsInRadius = (buildingsForRadius ?? [])
       .filter((b) => inRadius(Number(b.latitude), Number(b.longitude)))
       .map((b) => b.id as string);
@@ -144,16 +165,26 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
   }
 
   const { data, error } = await q;
-  if (error) throw error;
+  if (error) {
+    // Defensive: the homepage / /kvartiry / /izbrannoe all call this.
+    // If a schema migration is mid-rollout (or hasn't been applied
+    // yet) and a join breaks, we'd rather show "no listings yet" than
+    // a 500 the buyer can't recover from. Logged so the issue stays
+    // visible to the operator.
+    console.error('listListings query failed — returning empty list:', error);
+    return [];
+  }
 
-  // City filter applied in code so standalone listings can be kept
-  // (their city comes from the joined district, not the missing
-  // building). Drop rows that don't resolve to ACTIVE_CITY from
-  // either source.
+  // City filter applied in code so standalone listings can be kept.
+  // ЖК listing → use the joined building.city.
+  // Standalone listing → use listing.district_id ∈ active-city
+  // districts (we don't embed the districts FK because it's a fragile
+  // dependency on migration timing — see top of function).
   const filtered = (data ?? []).filter((row: Record<string, unknown>) => {
     const buildingCity = (row.buildings as { city?: string } | null)?.city;
-    const districtCity = (row.district as { city?: string } | null)?.city;
-    return (buildingCity ?? districtCity) === ACTIVE_CITY;
+    if (buildingCity) return buildingCity === ACTIVE_CITY;
+    const districtId = row.district_id as string | null | undefined;
+    return districtId != null && activeDistrictIds.has(districtId);
   });
   const listings = filtered.map(mapListing);
 
