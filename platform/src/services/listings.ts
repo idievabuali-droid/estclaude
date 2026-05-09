@@ -330,20 +330,39 @@ export async function getListing(slug: string): Promise<{
     districtId = listing.district_id;
   }
 
-  // Sibling listings + seller phone fetched in parallel. Sibling
-  // listings only meaningful for ЖК listings (apartments in same
-  // building). Standalone has no siblings — empty array.
+  // Sibling listings + seller phone fetched in parallel.
+  //
+  // For ЖК listings: "siblings" = other apartments in the same
+  // building → drives the "Похожие в этом ЖК" section on the detail
+  // page (alternatives the buyer can compare without leaving).
+  //
+  // For standalone listings: there are no building siblings, so
+  // fallback is "other apartments in the same district with similar
+  // rooms_count (±1)". Without this the standalone detail page used
+  // to dead-end abruptly after the small "Об этом доме" card with no
+  // alternatives — a real UX gap that founder flagged pre-launch.
+  // Same query shape so the page can render either variant uniformly.
+  const similarQuery = listing.building_id
+    ? supabase
+        .from('listings')
+        .select(LISTING_SELECT)
+        .eq('building_id', listing.building_id)
+        .eq('status', 'active')
+        .neq('id', listing.id)
+        .limit(3)
+    : supabase
+        .from('listings')
+        .select(LISTING_SELECT)
+        .eq('district_id', districtId)
+        .eq('status', 'active')
+        .gte('rooms_count', Math.max(1, listing.rooms_count - 1))
+        .lte('rooms_count', listing.rooms_count + 1)
+        .neq('id', listing.id)
+        .limit(3);
+
   const [distRes, similarRes, sellerRes] = await Promise.all([
     supabase.from('districts').select('*').eq('id', districtId).single(),
-    listing.building_id
-      ? supabase
-          .from('listings')
-          .select(LISTING_SELECT)
-          .eq('building_id', listing.building_id)
-          .eq('status', 'active')
-          .neq('id', listing.id)
-          .limit(3)
-      : Promise.resolve({ data: null }),
+    similarQuery,
     supabase.from('users').select('phone').eq('id', lRow.seller_user_id).maybeSingle(),
   ]);
 
