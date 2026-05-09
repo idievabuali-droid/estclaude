@@ -189,6 +189,17 @@ export async function listBuildings(filters: BuildingFilters = {}): Promise<Mock
     q = q.in('district_id', ids);
   }
 
+  // Default sort divergence (intentional, V1):
+  //   - listBuildings → featured_rank (manual curator picks). Each ЖК
+  //     is a high-stakes commitment (10–50 units, multi-month deal),
+  //     warrants founder review before promotion.
+  //   - listListings → trust-tier cascade (algorithmic). Apartment
+  //     volume scales beyond manual review; we surface by
+  //     verification + recency. See `services/listings.ts`.
+  // Both are user-overridable via SortChip on /novostroyki and
+  // /kvartiry — defaults reflect what the founder thinks "best"
+  // means in each context. Don't unify these without revisiting that
+  // call.
   const { data, error } = await q.order('featured_rank', {
     ascending: true,
     nullsFirst: false,

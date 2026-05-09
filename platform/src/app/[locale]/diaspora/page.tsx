@@ -1,8 +1,15 @@
-import { ArrowRight, ArrowUpRight, MessageCircle } from 'lucide-react';
+import { ArrowUpRight, MessageCircle, Globe2, Home, Building2 } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer } from '@/components/primitives';
-import { BuildingCard, ListingCard, CurrencyPicker } from '@/components/blocks';
+import {
+  BuildingCard,
+  CurrencyPicker,
+  FeaturedListingsRow,
+  HomeSubscribeButton,
+  type FeaturedListingsRowItem,
+} from '@/components/blocks';
+import { HeroSearchRow } from '../HeroSearchRow';
 import {
   IllustrationVideoCall,
   IllustrationDocuments,
@@ -24,13 +31,20 @@ import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
 /**
  * /diaspora — landing page for buyers living abroad.
  *
- * Design pass: brought into the home page's editorial-luxury voice.
- * Hero now matches: pill + Lora serif H1 with italic accent + subhead
- * + two action buttons. Trust block: 3 icon-tile cards (Видеотур /
- * Проверка документов / Часовой пояс). Dark band before footer
- * surfaces WhatsApp/Telegram contact (the action this surface is
- * actually for). Same BuildingCard / ListingCard rhythm as the home
- * page so a diaspora visitor sees a coherent product, not an outlier.
+ * Design pass: this surface is "home + diaspora-specific overlays",
+ * NOT a parallel platform. We pull in home's hero search row, nav
+ * pill chips (with "Я за границей" in active state since we're on
+ * that page), `HomeSubscribeButton`, and the shared
+ * `<FeaturedListingsRow>` so the visual grammar matches what a buyer
+ * sees on `/`. The diaspora-specific blocks woven in are:
+ *
+ *   - "Как мы помогаем" trust copy (video tour / docs / timezone),
+ *   - currency picker (TJS shown in the buyer's home currency),
+ *   - dark-band contact CTA at the bottom (WhatsApp + Telegram for
+ *     "talk to a human now" — sits next to the lighter
+ *     `HomeSubscribeButton` retention pill higher up which serves the
+ *     "alert me passively" intent; mature portals like Cian / Bayut
+ *     ship both because they answer different jobs).
  *
  * Honest copy: "Готовы помочь" (no fabricated counts) — the platform
  * is pre-launch; claiming "помогли N families" would burn trust the
@@ -67,11 +81,14 @@ export default async function DiasporaPage({
     }),
   );
 
-  // Recent listings — same logic as home page. ListingCard handles
-  // currency display when given the cookie + rates.
+  // Recent listings — same logic as home page. Output is shaped into
+  // `FeaturedListingsRowItem[]` so the shared `<FeaturedListingsRow>`
+  // can render it identically here and on `/`.
   const recentRaw = (await listListings({})).slice(0, 3);
-  const recentBuildingIds = [...new Set(recentRaw.map((l) => l.building_id))];
-  const allBuildings = await listBuildings({});
+  const recentBuildingIds = [
+    ...new Set(recentRaw.map((l) => l.building_id).filter(Boolean) as string[]),
+  ];
+  const allBuildings = recentBuildingIds.length > 0 ? await listBuildings({}) : [];
   const recentBuildingMap = new Map(
     allBuildings.filter((b) => recentBuildingIds.includes(b.id)).map((b) => [b.id, b]),
   );
@@ -79,7 +96,10 @@ export default async function DiasporaPage({
     ...new Set([...recentBuildingMap.values()].map((b) => b.developer_id)),
   ];
   const recentDistrictIds = [
-    ...new Set([...recentBuildingMap.values()].map((b) => b.district_id)),
+    ...new Set([
+      ...[...recentBuildingMap.values()].map((b) => b.district_id),
+      ...(recentRaw.map((l) => l.district_id ?? null).filter(Boolean) as string[]),
+    ]),
   ];
   const [recentDeveloperEntries, recentBenchmarkMap] = await Promise.all([
     Promise.all(
@@ -88,6 +108,18 @@ export default async function DiasporaPage({
     getDistrictBenchmarks(recentDistrictIds),
   ]);
   const recentDeveloperMap = new Map(recentDeveloperEntries);
+  const recentItems: FeaturedListingsRowItem[] = recentRaw.map((l) => {
+    const building = l.building_id ? recentBuildingMap.get(l.building_id) ?? null : null;
+    const dev = building ? recentDeveloperMap.get(building.developer_id) : null;
+    const benchmark = recentBenchmarkMap.get(building?.district_id ?? l.district_id ?? '');
+    return {
+      listing: l,
+      building,
+      developerVerified: dev?.is_verified ?? false,
+      districtMedianPerM2: benchmark ? Number(benchmark.median_per_m2_dirams) : null,
+      districtSampleSize: benchmark?.sample_size ?? 0,
+    };
+  });
 
   // Prefilled WhatsApp message — buyer lands in chat with the founder
   // already knowing they're abroad and what they're asking for.
@@ -132,27 +164,58 @@ export default async function DiasporaPage({
             поездки в Таджикистан. Цены сразу в вашей валюте.
           </p>
 
-          {/* Two action buttons — primary terracotta + neutral
-              secondary. Same hierarchy as home's "Найти" + sparkle
-              link. Primary opens WhatsApp with prefilled context;
-              secondary browses inventory. */}
-          <div className="flex w-full max-w-md flex-col gap-2 sm:flex-row sm:items-stretch sm:justify-center">
-            <a
-              href={whatsappHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-stone-900 px-6 text-meta font-semibold text-white transition-colors hover:bg-stone-800"
+          {/* Search row — same `<HeroSearchRow>` as the home page.
+              The diaspora buyer searches by district / school / budget
+              too; removing the search bar here was the biggest "feels
+              like a different product" complaint. The component is
+              already a client island so importing it from `../HeroSearchRow`
+              works inside this server component. */}
+          <HeroSearchRow />
+
+          {/* Diaspora-specific primary action — keep the WhatsApp
+              "Запросить видеообзор" CTA in the hero because it's the
+              one job this page exists to do. Dark-band contact lower
+              on the page is the secondary "talk to a human now"
+              entry; this hero CTA is the headline action. */}
+          <a
+            href={whatsappHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-stone-900 px-5 text-meta font-semibold text-white transition-colors hover:bg-stone-800"
+          >
+            <MessageCircle className="size-4" aria-hidden />
+            Запросить видеообзор
+          </a>
+
+          {/* Quiet nav pill chips — same outlined-pill row as home.
+              "Я за границей" is the active surface so it gets a quiet
+              filled state (`bg-stone-100 text-stone-900`) so visitors
+              know where they are without stripping the affordance. The
+              other two chips deep-link to /kvartiry and /novostroyki,
+              same destinations as the home version. flex-wrap so the
+              row stacks at 375px without horizontal overflow. */}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Link
+              href="/kvartiry"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 text-meta font-medium text-stone-700 transition-colors hover:border-terracotta-400 hover:bg-terracotta-50 hover:text-terracotta-700"
             >
-              <MessageCircle className="size-4" aria-hidden />
-              Запросить видеообзор
-            </a>
+              <Home className="size-3.5" aria-hidden />
+              Все {tNav('apartments').toLowerCase()}
+            </Link>
             <Link
               href="/novostroyki"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-6 text-meta font-semibold text-stone-900 transition-colors hover:border-stone-400 hover:bg-stone-100"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 text-meta font-medium text-stone-700 transition-colors hover:border-terracotta-400 hover:bg-terracotta-50 hover:text-terracotta-700"
             >
-              Смотреть {tNav('buildings').toLowerCase()}
-              <ArrowRight className="size-3.5" aria-hidden />
+              <Building2 className="size-3.5" aria-hidden />
+              Все {tNav('buildings').toLowerCase()}
             </Link>
+            <span
+              aria-current="page"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-stone-300 bg-stone-100 px-4 text-meta font-medium text-stone-900"
+            >
+              <Globe2 className="size-3.5" aria-hidden />
+              {tNav('diaspora')}
+            </span>
           </div>
         </AppContainer>
       </section>
@@ -239,53 +302,46 @@ export default async function DiasporaPage({
         </section>
       ) : null}
 
-      {/* ─── Свежие квартиры — same surface as home page ────── */}
-      {recentRaw.length > 0 ? (
-        <section className="border-t border-stone-200 bg-stone-50 py-16 md:py-24">
-          <AppContainer className="flex flex-col gap-5">
-            <div className="flex items-end justify-between gap-3">
+      {/* ─── Свежие квартиры — shared rail with home page ───────
+          Single source of truth via `<FeaturedListingsRow>`. The
+          `currency` + `rates` props let each card show TJS in the
+          buyer's home currency on this surface. */}
+      <FeaturedListingsRow
+        title="Свежие квартиры"
+        linkHref="/kvartiry"
+        linkLabel={`Все ${tNav('apartments').toLowerCase()} →`}
+        items={recentItems}
+        currency={currency}
+        rates={rates}
+        sectionClassName="border-t border-stone-200 bg-stone-50"
+      />
+
+      {/* ─── RETENTION — same Telegram subscribe pill as home ───
+          Diaspora buyers want passive alerts too. Sits above the dark
+          contact band so a buyer who's already read the page picks
+          their lane: subscribe (passive, "ping me later") OR contact
+          (active, "talk now"). Mature portals (Cian, Bayut) ship both
+          because they answer different jobs. */}
+      <section className="border-t border-stone-200 bg-stone-50 py-12 md:py-16">
+        <AppContainer>
+          <div className="flex flex-col items-start gap-3 rounded-md border border-stone-200 bg-white p-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-1">
               <h2
-                className="text-h2 font-semibold text-stone-900"
+                className="text-h3 font-semibold text-stone-900"
                 style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
-              >Свежие квартиры</h2>
-              <Link
-                href="/kvartiry"
-                className="shrink-0 text-meta font-medium text-terracotta-600 hover:text-terracotta-700"
               >
-                Все {tNav('apartments').toLowerCase()} →
-              </Link>
+                {recentRaw.length > 0 ? 'Не нашли подходящую?' : 'Узнаете первыми'}
+              </h2>
+              <p className="text-meta text-stone-700">
+                {recentRaw.length > 0
+                  ? 'Получайте новые квартиры в Вахдате в Telegram. Без спама — только новые объявления.'
+                  : 'Объявления появляются регулярно. Подпишитесь и узнаете первыми, когда появится подходящее.'}
+              </p>
             </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
-              {recentRaw.map((l) => {
-                // Standalone listings (building_id null) render with
-                // building=null and pull district/coords from the
-                // listing itself; ListingCard handles both shapes.
-                const building = l.building_id
-                  ? recentBuildingMap.get(l.building_id) ?? null
-                  : null;
-                const dev = building ? recentDeveloperMap.get(building.developer_id) : null;
-                const benchmark = recentBenchmarkMap.get(
-                  building?.district_id ?? l.district_id ?? '',
-                );
-                return (
-                  <ListingCard
-                    key={l.id}
-                    listing={l}
-                    building={building}
-                    developerVerified={dev?.is_verified ?? false}
-                    districtMedianPerM2={
-                      benchmark ? Number(benchmark.median_per_m2_dirams) : null
-                    }
-                    districtSampleSize={benchmark?.sample_size ?? 0}
-                    currency={currency}
-                    rates={rates}
-                  />
-                );
-              })}
-            </div>
-          </AppContainer>
-        </section>
-      ) : null}
+            <HomeSubscribeButton />
+          </div>
+        </AppContainer>
+      </section>
 
       {/* ─── DARK BAND — direct contact CTA ──────────────────────
           Mirrors home's diaspora dark band, adapted for this surface:

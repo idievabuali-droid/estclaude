@@ -1,7 +1,12 @@
 import { Sparkles, ArrowUpRight, Globe2, Home, Building2 } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { AppContainer } from '@/components/primitives';
-import { BuildingCard, HomeSubscribeButton } from '@/components/blocks';
+import {
+  BuildingCard,
+  HomeSubscribeButton,
+  FeaturedListingsRow,
+  type FeaturedListingsRowItem,
+} from '@/components/blocks';
 import { HeroSearchRow } from './HeroSearchRow';
 import {
   IllustrationBuilding,
@@ -11,11 +16,13 @@ import {
 import { Link } from '@/i18n/navigation';
 import {
   listFeaturedBuildings,
+  listBuildings,
   getDeveloperById,
   getDistrictById,
   getListingsForBuildingId,
 } from '@/services/buildings';
 import { listListings } from '@/services/listings';
+import { getDistrictBenchmarks } from '@/services/benchmarks';
 
 /**
  * Home page (V1, mockup-aligned redesign).
@@ -26,8 +33,16 @@ import { listListings } from '@/services/listings';
  *   2. Trust block — "Почему Vafo.tj" eyebrow + H2 statement + 3 icon
  *      cards (verified visits / real photos / 2-min match)
  *   3. Featured ЖК — 3 BuildingCards (curated by featured_rank)
- *   4. Retention — one-tap Vahdat-wide Telegram subscribe
- *   5. Diaspora dark band — service framing for overseas buyers
+ *   4. Featured apartments — 3 ListingCards (trust-tier cascade) via
+ *      shared <FeaturedListingsRow> (single source of truth between
+ *      home and /diaspora). Mirrors Cian / Avito / Bayut, where the
+ *      home stacks projects above units. Ordering note: ЖК are curated
+ *      by founder (`featured_rank`), apartments are surfaced by
+ *      trust-tier (verified-developer first → tier-3 → recency) — the
+ *      mental-model divergence is intentional for V1 (see service
+ *      doc-comments in `services/buildings.ts` + `services/listings.ts`).
+ *   5. Retention — one-tap Vahdat-wide Telegram subscribe
+ *   6. Diaspora dark band — service framing for overseas buyers
  *
  * Editorial-luxury typography pattern: Lora serif (regular + italic)
  * for H1 + the accent clause "проверенные вручную"; Inter sans for
@@ -65,9 +80,52 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     }),
   );
 
-  // Listings count drives the retention strip's loaded vs empty copy.
+  // Listings drive two surfaces:
+  //   1. Retention strip copy (loaded vs empty).
+  //   2. The new "Свежие квартиры" rail (top 3 in trust-tier order).
+  // Single fetch, sliced for the rail. `listListings({})` defaults to
+  // sort='recommended' — the trust-tier cascade documented in
+  // `services/listings.ts`.
   const allListings = await listListings({});
   const hasListings = allListings.length > 0;
+  const recentRaw = allListings.slice(0, 3);
+
+  // Resolve building / developer / district-benchmark for each card
+  // the rail will render. Mirrors the same join pattern /diaspora
+  // already uses, so the shared component sees identical data shape.
+  const recentBuildingIds = [...new Set(recentRaw.map((l) => l.building_id).filter(Boolean) as string[])];
+  const allBuildings = recentBuildingIds.length > 0 ? await listBuildings({}) : [];
+  const recentBuildingMap = new Map(
+    allBuildings.filter((b) => recentBuildingIds.includes(b.id)).map((b) => [b.id, b]),
+  );
+  const recentDeveloperIds = [
+    ...new Set([...recentBuildingMap.values()].map((b) => b.developer_id)),
+  ];
+  const recentDistrictIds = [
+    ...new Set([
+      ...[...recentBuildingMap.values()].map((b) => b.district_id),
+      ...recentRaw.map((l) => l.district_id ?? null).filter(Boolean) as string[],
+    ]),
+  ];
+  const [recentDeveloperEntries, recentBenchmarkMap] = await Promise.all([
+    Promise.all(
+      recentDeveloperIds.map(async (id) => [id, await getDeveloperById(id)] as const),
+    ),
+    getDistrictBenchmarks(recentDistrictIds),
+  ]);
+  const recentDeveloperMap = new Map(recentDeveloperEntries);
+  const recentItems: FeaturedListingsRowItem[] = recentRaw.map((l) => {
+    const building = l.building_id ? recentBuildingMap.get(l.building_id) ?? null : null;
+    const dev = building ? recentDeveloperMap.get(building.developer_id) : null;
+    const benchmark = recentBenchmarkMap.get(building?.district_id ?? l.district_id ?? '');
+    return {
+      listing: l,
+      building,
+      developerVerified: dev?.is_verified ?? false,
+      districtMedianPerM2: benchmark ? Number(benchmark.median_per_m2_dirams) : null,
+      districtSampleSize: benchmark?.sample_size ?? 0,
+    };
+  });
 
   return (
     <>
@@ -241,6 +299,30 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           </AppContainer>
         </section>
       ) : null}
+
+      {/* ─── FEATURED APARTMENTS ──────────────────────────────────
+          Companion rail to "Рекомендуемые проекты" above. Mirrors what
+          Cian / Avito / Bayut do — home stacks projects above units so
+          buyers who care about "which building" and buyers who care
+          about "which apartment" both find an entry within one scroll.
+          Defaults to the trust-tier cascade (verified-developer first
+          → tier-3 → recency); copy reads "Свежие квартиры" rather than
+          "Рекомендуемые квартиры" because nothing is hand-picked yet —
+          we don't claim curation we don't perform. Hidden when there's
+          nothing to show (no orphan header). */}
+      {/* `border-t` only — no stone-50 background, because the
+          Retention strip below already provides the next stone-50
+          break and stacking two stone sections would merge them
+          visually into one long zone. The hairline keeps the Featured
+          ЖК / Featured apartments seam readable without changing the
+          paper colour. */}
+      <FeaturedListingsRow
+        title="Свежие квартиры"
+        linkHref="/kvartiry"
+        linkLabel={`Все ${tNav('apartments').toLowerCase()} →`}
+        items={recentItems}
+        sectionClassName="border-t border-stone-200"
+      />
 
       {/* ─── RETENTION ────────────────────────────────────────────
           One-tap Telegram subscribe. Always renders — empty inventory

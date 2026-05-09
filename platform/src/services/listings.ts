@@ -258,6 +258,19 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
   //   - 'cheapest' / 'expensive' → strict price order (no trust tier)
   //   - 'newest' → published_at descending
   //   - default 'recommended' → trust tier first, then newest
+  //
+  // Default sort divergence (intentional, V1):
+  //   - listListings → trust-tier cascade (algorithmic). Apartment
+  //     volume scales beyond manual review; we surface by
+  //     verification + recency.
+  //   - listBuildings → featured_rank (manual curator picks). Each ЖК
+  //     is a high-stakes commitment (10–50 units, multi-month deal),
+  //     warrants founder review before promotion. See `services/buildings.ts`.
+  // Both are user-overridable via SortChip on /novostroyki and
+  // /kvartiry — defaults reflect what the founder thinks "best"
+  // means in each context. V2 candidate: add `is_featured` +
+  // `featured_rank` to listings if/when manual apartment curation
+  // becomes meaningful at scale.
   const sortMode = filters.sort ?? 'recommended';
   let sorted: MockListing[];
   if (sortMode === 'cheapest') {

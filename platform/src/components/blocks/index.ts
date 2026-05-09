@@ -76,6 +76,11 @@ export type { MessagingPopoverButtonProps } from './MessagingPopoverButton';
 export { RoomTypeFilter } from './RoomTypeFilter';
 export type { RoomTypeFilterProps } from './RoomTypeFilter';
 export { HomeSubscribeButton } from './HomeSubscribeButton';
+export { FeaturedListingsRow } from './FeaturedListingsRow';
+export type {
+  FeaturedListingsRowProps,
+  FeaturedListingsRowItem,
+} from './FeaturedListingsRow';
 export { FilterGroup } from './FilterGroup';
 export { FeedbackButton } from './FeedbackButton';
 export { RetrySaveOnReturn } from './RetrySaveOnReturn';
