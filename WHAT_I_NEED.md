@@ -48,7 +48,7 @@ Everything that can be built without external accounts is built. To make the pla
 ### 4. Domain name — ~5 min and ~$10/year
 **Why:** users need a real URL, not `localhost:3000`.
 
-**What to do:** Register a domain at [Porkbun](https://porkbun.com) (~$10/year for a `.com`) or buy `.tj` from a Tajik registrar. Suggested: `zhk.tj`, `kvartiry.tj`, or similar.
+**What to do:** Register `vafo.tj` at a Tajik registrar (the brand name decided in DECISIONS.md 2026-05-09). Optional adds: `вафо.tj` (Cyrillic IDN) and `vafo.com` defensive. ~$30-100/year for a `.tj`.
 
 **Then tell me the domain** — I'll configure it in the deployment step.
 
