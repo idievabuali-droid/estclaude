@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { LocationSearch } from '@/components/blocks';
 import { parseQuery, hasStructuralFilter, type ParsedQuery } from '@/lib/search/parse-query';
+import { pushRecent } from '@/lib/search/recent-searches';
 
 /**
  * Client wrapper around the home hero search row — owns the query
@@ -42,6 +43,12 @@ export function HeroSearchRow() {
       router.push('/novostroyki');
       return;
     }
+    // Persist the query in scope='all' recent-searches so the next visit
+    // surfaces it on focus. LocationSearch's own submitFreeText also
+    // pushes — but the Найти BUTTON click goes through this path
+    // directly (LocationSearch's onSubmit prop), so we mirror the push
+    // here too. pushRecent dedupes, so calling both paths is harmless.
+    pushRecent('all', trimmed);
     // Param names match what the destination pages already accept —
     // /kvartiry's SearchParams uses `rooms`, `price_from`, `price_to`,
     // `finishing`. We add `q` (new — soft text filter) on top. Avoids
