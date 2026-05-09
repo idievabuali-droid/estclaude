@@ -24,10 +24,13 @@ export const STREETS_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
  *  (each seller loads ~10-20 tiles per /post session — well below any
  *  threshold). Attribution surfaces via maplibre's attribution control.
  *
- *  Opacity 0.55: empirically the balance where street labels stay
- *  legible AND the satellite imagery underneath remains recognizable
- *  enough that sellers can spot their building from above. Same
- *  opacity Mapbox Satellite Streets uses by default. */
+ *  Opacity 0.75: bumped from 0.55 after seller roleplay feedback —
+ *  "you don't see almost any names of any places". OSM coverage in
+ *  Vahdat is sparse enough that the few labels we DO get need to be
+ *  crisp. Imagery underneath is still readable at 0.75; the white
+ *  label halos OSM bakes into its raster tiles cut through. (Curated
+ *  POIs + ЖК pins ride on top of this as labelled markers from
+ *  LocationPicker / MapView for the names that matter most.) */
 export const SATELLITE_STYLE: StyleSpecification = {
   version: 8,
   sources: {
@@ -62,7 +65,7 @@ export const SATELLITE_STYLE: StyleSpecification = {
       id: 'osm-streets-overlay',
       type: 'raster',
       source: 'osm-streets',
-      paint: { 'raster-opacity': 0.55 },
+      paint: { 'raster-opacity': 0.75 },
     },
   ],
 };

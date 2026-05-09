@@ -10,6 +10,22 @@ import {
   type MapStyleId,
 } from '@/components/blocks/MapStyleToggle';
 
+/** Curated landmark rendered on the map as a labelled pill so sellers
+ *  can orient by places they know — Vahdat OSM coverage is too sparse
+ *  for the base map alone to do that. The list is built server-side by
+ *  /post page (POIs from the `pois` table + every published ЖК with
+ *  coords); shown on both streets and satellite styles. */
+export interface LocationLandmark {
+  id: string;
+  lat: number;
+  lng: number;
+  name: string;
+  kind: 'poi' | 'building';
+  /** POI subkind (`mosque`, `school`, `supermarket`, …) — drives the
+   *  emoji icon in the marker pill. Ignored for buildings. */
+  poiKind?: string;
+}
+
 export interface LocationPickerProps {
   /** Map's initial center — usually the selected district's centroid,
    *  with a Vahdat-town fallback when the district has no centroid. */
@@ -20,6 +36,66 @@ export interface LocationPickerProps {
   centerKey: string;
   value: { lat: number; lng: number } | null;
   onChange: (coords: { lat: number; lng: number }) => void;
+  /** Optional: POIs + existing ЖК coords rendered as labelled pills
+   *  on the map. Stable list, expected to be loaded once at mount. */
+  landmarks?: LocationLandmark[];
+}
+
+/** Emoji per POI kind. Mirrors the icon set used in services/poi.ts so
+ *  the seller-side picker speaks the same visual language as the buyer-
+ *  side "Что рядом" panel. Falls back to a generic pin for unknowns. */
+const LANDMARK_EMOJI: Record<string, string> = {
+  mosque: '🕌',
+  school: '🏫',
+  kindergarten: '👶',
+  hospital: '🏥',
+  pharmacy: '💊',
+  supermarket: '🛒',
+  transit: '🚌',
+  park: '🌳',
+  square: '⭐',
+  street: '🛣️',
+};
+
+/**
+ * Builds the inline-styled pill we attach as a maplibregl marker for
+ * each landmark. Styles are inline (not Tailwind) because maplibre
+ * appends the marker into its own DOM container outside any React
+ * tree, so utility classes from the page wouldn't apply. Visuals:
+ *
+ *  - White-ish background with stone border so labels stay legible
+ *    on both streets and satellite imagery.
+ *  - `pointer-events: none` so clicking *through* the pill drops the
+ *    seller's pin on the ground beneath it (the seller wants to drop
+ *    near a landmark, not pick the landmark itself).
+ *  - Buildings get a different border tint to set them apart from
+ *    POIs at a glance.
+ */
+function makeLandmarkElement(landmark: LocationLandmark): HTMLDivElement {
+  const root = document.createElement('div');
+  const isBuilding = landmark.kind === 'building';
+  root.style.cssText =
+    'pointer-events:none;display:inline-flex;align-items:center;gap:4px;' +
+    'padding:2px 7px 2px 5px;border-radius:9999px;' +
+    `background:${isBuilding ? 'rgba(253,244,240,0.95)' : 'rgba(255,255,255,0.95)'};` +
+    `border:1px solid ${isBuilding ? '#c2410c' : '#a8a29e'};` +
+    `color:${isBuilding ? '#9a3412' : '#1c1917'};` +
+    'box-shadow:0 1px 3px rgba(0,0,0,0.18);font-size:11px;line-height:1.15;' +
+    'font-weight:500;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis;' +
+    'transform:translateY(-50%);'; // anchor the bottom of the pill at the coord
+
+  const icon = document.createElement('span');
+  icon.setAttribute('aria-hidden', 'true');
+  icon.style.cssText = 'font-size:11px;line-height:1;flex-shrink:0;';
+  icon.textContent = isBuilding ? '🏢' : LANDMARK_EMOJI[landmark.poiKind ?? ''] ?? '📍';
+
+  const label = document.createElement('span');
+  label.style.cssText = 'overflow:hidden;text-overflow:ellipsis;';
+  label.textContent = landmark.name;
+
+  root.appendChild(icon);
+  root.appendChild(label);
+  return root;
 }
 
 /**
@@ -50,10 +126,21 @@ export function LocationPicker({
   centerKey,
   value,
   onChange,
+  landmarks,
 }: LocationPickerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
+  // Landmark markers — kept in a ref so the cleanup phase can remove
+  // them on unmount. Built once after map init and never mutated; the
+  // list is stable per session (server-fetched on /post page load).
+  const landmarkMarkersRef = useRef<Marker[]>([]);
+  // Stash landmarks so the (mount-once) effect captures the latest
+  // value without forcing a re-render of the whole picker.
+  const landmarksRef = useRef(landmarks);
+  useEffect(() => {
+    landmarksRef.current = landmarks;
+  }, [landmarks]);
   // Stash latest onChange so the marker drag handler doesn't capture
   // a stale closure when the parent re-renders.
   const onChangeRef = useRef(onChange);
@@ -97,6 +184,18 @@ export function LocationPicker({
     mapRef.current = map;
     markerRef.current = marker;
 
+    // Render labelled landmarks (POIs + existing ЖК) as map markers.
+    // Done once on mount — the list is stable for the session. Each
+    // marker is `pointer-events: none` so clicks pass through to the
+    // canvas (the seller can drop a pin near or on top of a landmark
+    // they recognise without the pill swallowing the click).
+    const ls = landmarksRef.current ?? [];
+    landmarkMarkersRef.current = ls.map((l) =>
+      new maplibregl.Marker({ element: makeLandmarkElement(l), anchor: 'bottom' })
+        .setLngLat([l.lng, l.lat])
+        .addTo(map),
+    );
+
     // Proactively register the centroid as the chosen point if the
     // form had nothing — saves the user from having to drag if the
     // centroid is already correct.
@@ -106,6 +205,8 @@ export function LocationPicker({
 
     return () => {
       marker.remove();
+      for (const m of landmarkMarkersRef.current) m.remove();
+      landmarkMarkersRef.current = [];
       map.remove();
       mapRef.current = null;
       markerRef.current = null;

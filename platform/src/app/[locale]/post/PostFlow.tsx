@@ -46,6 +46,19 @@ interface DeveloperOption {
   display_name_ru: string;
 }
 
+/** Curated POIs + existing buildings rendered as labelled markers on
+ *  the LocationPicker map. Sellers in Vahdat orient by landmarks they
+ *  already know (рынок Гулистон, школа №1, ЖК Резиденс) — base-map
+ *  OSM coverage is too sparse to do that on its own. */
+export interface LandmarkOption {
+  id: string;
+  lat: number;
+  lng: number;
+  name: string;
+  kind: 'poi' | 'building';
+  poiKind?: string;
+}
+
 /** Synthetic dropdown value that opens the new-developer modal
  *  instead of selecting an existing one. UUIDs never look like this. */
 const ADD_DEVELOPER_VALUE = '__add_new__';
@@ -67,6 +80,9 @@ export interface PostFlowProps {
    *  Empty when no district has sample_size>=5 — hint silently degrades
    *  to just "≈ X TJS/м²" without the comparison. (A2.) */
   benchmarksByDistrict: Record<string, number>;
+  /** POIs + existing ЖК coords to render as labelled markers on the
+   *  map picker (helps sellers orient when OSM coverage is sparse). */
+  landmarks: LandmarkOption[];
 }
 
 type Mode = 'choose' | 'new-building' | 'existing-building' | 'standalone';
@@ -199,6 +215,7 @@ export function PostFlow({
   userPhone,
   userId,
   benchmarksByDistrict,
+  landmarks,
 }: PostFlowProps) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('choose');
@@ -783,6 +800,7 @@ export function PostFlow({
             districtError={errors['b.district_id']}
             coords={coords}
             onCoordsChange={setCoords}
+            landmarks={landmarks}
             onPickExistingBuilding={(buildingId) => {
               setExistingBuildingId(buildingId);
               setMode('existing-building');
@@ -989,6 +1007,7 @@ export function PostFlow({
             districtError={errors['s.district_id']}
             coords={coords}
             onCoordsChange={setCoords}
+            landmarks={landmarks}
             onPickExistingBuilding={(buildingId) => {
               // Picked an existing ЖК from autocomplete while in
               // standalone mode → flip to existing-building. Saves the

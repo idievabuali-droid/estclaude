@@ -67,10 +67,15 @@ export default async function PostPage({
   // Pre-fetch reference data the form needs (small lists in V1; loading
   // eagerly is simpler than search-as-you-type).
   //  - districts (with centroid coords) → dropdown + map pre-centering
-  //  - existing buildings → dropdown for "apartment in existing"
+  //  - existing buildings → dropdown for "apartment in existing" + map
+  //    landmark layer (sellers orient by "I'm near ЖК Гулистон Резиденс")
   //  - developers → dropdown for new buildings
+  //  - pois → map landmark layer. OSM coverage in Vahdat is sparse, so
+  //    the base style barely shows any names. Rendering OUR curated POIs
+  //    (рынок, школы, мечети…) directly on the map gives the seller the
+  //    landmarks they actually use to orient when picking a location.
   const supabase = createAdminClient();
-  const [districtsRes, allBuildings, developersRes] = await Promise.all([
+  const [districtsRes, allBuildings, developersRes, poisRes] = await Promise.all([
     supabase
       .from('districts')
       .select('id, name, slug, center_latitude, center_longitude')
@@ -78,6 +83,12 @@ export default async function PostPage({
       .order('display_order', { ascending: true }),
     listBuildings({}),
     supabase.from('developers').select('id, name, display_name').order('name'),
+    supabase
+      .from('pois')
+      .select('id, name, kind, latitude, longitude, popularity')
+      .eq('city', 'vahdat')
+      .order('popularity', { ascending: false })
+      .limit(120),
   ]);
   const districts = (districtsRes.data ?? []).map((d) => {
     const slug = d.slug as string;
@@ -96,6 +107,39 @@ export default async function PostPage({
     name: d.name as string,
     display_name_ru: (d.display_name as { ru: string }).ru,
   }));
+
+  // Map landmarks — POIs from our curated table + every published ЖК
+  // with coords. Combined into one list so LocationPicker doesn't need
+  // to know about both shapes; the `kind` discriminator drives the
+  // marker style (icon + colour).
+  const landmarks: Array<{
+    id: string;
+    lat: number;
+    lng: number;
+    name: string;
+    kind: 'poi' | 'building';
+    poiKind?: string;
+  }> = [
+    ...(poisRes.data ?? [])
+      .filter((p) => Number(p.latitude) !== 0 && Number(p.longitude) !== 0)
+      .map((p) => ({
+        id: `poi-${p.id as string}`,
+        lat: Number(p.latitude),
+        lng: Number(p.longitude),
+        name: (p.name as { ru: string }).ru,
+        kind: 'poi' as const,
+        poiKind: p.kind as string,
+      })),
+    ...allBuildings
+      .filter((b) => b.latitude != null && b.longitude != null)
+      .map((b) => ({
+        id: `building-${b.id}`,
+        lat: b.latitude as number,
+        lng: b.longitude as number,
+        name: b.name.ru,
+        kind: 'building' as const,
+      })),
+  ];
 
   // District-level price benchmarks (TJS/m²). Pre-converted from the
   // dirams source so the form can compare without re-doing the math.
@@ -146,6 +190,7 @@ export default async function PostPage({
             userPhone={user.phone}
             userId={user.id}
             benchmarksByDistrict={benchmarksByDistrict}
+            landmarks={landmarks}
           />
         </AppContainer>
       </section>

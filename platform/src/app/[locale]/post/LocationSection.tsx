@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AppCard, AppCardContent, AppSelect } from '@/components/primitives';
 import { AddressAutocomplete, type AddressPick } from './AddressAutocomplete';
-import { LocationPicker } from './LocationPicker';
+import { LocationPicker, type LocationLandmark } from './LocationPicker';
 import { nearestDistrictId } from '@/lib/listings/nearest-district';
 
 interface DistrictOption {
@@ -40,6 +40,9 @@ export interface LocationSectionProps {
   // ─── Map pin ──────────────────────────────────────────
   coords: { lat: number; lng: number } | null;
   onCoordsChange: (next: { lat: number; lng: number }) => void;
+
+  // ─── Map landmark layer ────────────────────────────────
+  landmarks?: LocationLandmark[];
 
   // ─── Optional: building pick fires this so PostFlow can
   //               auto-switch to existing-building mode. ──────
@@ -83,6 +86,7 @@ export function LocationSection({
   districtError,
   coords,
   onCoordsChange,
+  landmarks,
   onPickExistingBuilding,
 }: LocationSectionProps) {
   // The point the map should fly to + use as the chosen marker
@@ -206,6 +210,7 @@ export function LocationSection({
             centerKey={target.key}
             value={coords}
             onChange={handleCoordsChange}
+            landmarks={landmarks}
           />
         </div>
       </AppCardContent>
