@@ -28,7 +28,7 @@ import { getDistrictBenchmark } from '@/services/benchmarks';
 import { getNearbyPOIs } from '@/services/poi';
 import { getBuildingProgress } from '@/services/progress';
 import { supabasePublicUrl } from '@/services/photos';
-import { formatPriceNumber, pluralRu } from '@/lib/format';
+import { formatPriceNumber, pluralRu, formatHandoverQuarter } from '@/lib/format';
 import { STAGE_INFO } from '@/lib/building-stages';
 
 /** Max apartment cards rendered inline on the building detail page.
@@ -440,7 +440,7 @@ export default async function BuildingDetailPage({
             <Stat
               icon={<Calendar className="size-4 text-stone-500" />}
               label="Сдача"
-              value={building.handover_estimated_quarter ?? 'Сдан'}
+              value={formatHandoverQuarter(building.handover_estimated_quarter) ?? 'Сдан'}
             />
           </div>
         </AppContainer>

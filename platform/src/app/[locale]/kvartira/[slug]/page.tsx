@@ -7,7 +7,7 @@ import { AppContainer, AppChip, AppCard, AppCardContent } from '@/components/pri
 import { ListingCard, ListingTrustSignals, CallbackWidget, SaveToggle, ShareButton, NearbyChips, PhotoGallery } from '@/components/blocks';
 import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
-import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo } from '@/lib/format';
+import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo, formatHandoverQuarter } from '@/lib/format';
 import { getListing } from '@/services/listings';
 import { getNearbyPOIs, type PoiCategory } from '@/services/poi';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
@@ -374,7 +374,7 @@ export default async function ListingDetailPage({
             ) : building?.handover_estimated_quarter ? (
               <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-caption font-medium text-stone-700">
                 <Calendar className="size-3 text-stone-500" aria-hidden />
-                Сдача {building.handover_estimated_quarter}
+                Сдача {formatHandoverQuarter(building.handover_estimated_quarter)}
               </span>
             ) : null}
           </div>
@@ -606,7 +606,7 @@ export default async function ListingDetailPage({
                         <Calendar className="size-3.5 text-stone-500" aria-hidden />
                         {building.status === 'delivered'
                           ? 'Сдан'
-                          : `Сдача ${building.handover_estimated_quarter ?? '—'}`}
+                          : `Сдача ${formatHandoverQuarter(building.handover_estimated_quarter) ?? '—'}`}
                       </span>
                       {building.total_floors > 0 ? (
                         <span className="inline-flex items-center gap-1">

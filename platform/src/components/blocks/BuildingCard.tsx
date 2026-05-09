@@ -4,7 +4,7 @@ import { MapPin, Building, ArrowUpRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
-import { formatPriceNumber, pluralRu } from '@/lib/format';
+import { formatPriceNumber, pluralRu, formatHandoverQuarter } from '@/lib/format';
 import { STAGE_INFO } from '@/lib/building-stages';
 import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
@@ -130,7 +130,9 @@ export function BuildingCard({
           {building.handover_estimated_quarter ? (
             <>
               <span className="text-stone-400" aria-hidden>·</span>
-              <span className="tabular-nums">{building.handover_estimated_quarter}</span>
+              <span className="tabular-nums">
+                {formatHandoverQuarter(building.handover_estimated_quarter)}
+              </span>
             </>
           ) : null}
           <StageInfoPopover status={building.status} stopParentClick />

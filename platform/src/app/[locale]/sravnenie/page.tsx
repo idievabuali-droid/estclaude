@@ -12,7 +12,7 @@ import {
   getDistrictById,
 } from '@/services/buildings';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
-import { formatPriceNumber, formatM2, formatFloor } from '@/lib/format';
+import { formatPriceNumber, formatM2, formatFloor, formatHandoverQuarter } from '@/lib/format';
 import { getCurrentUser } from '@/lib/auth/session';
 import { FEATURES } from '@/lib/feature-flags';
 
@@ -804,7 +804,7 @@ function BuildingsCompare({
       keyOf: (b) => b.handover_estimated_quarter ?? '',
       render: (b) => (
         <span className="text-meta tabular-nums text-stone-700">
-          {b.handover_estimated_quarter ?? 'Сдан'}
+          {formatHandoverQuarter(b.handover_estimated_quarter) ?? 'Сдан'}
         </span>
       ),
     },

@@ -32,6 +32,24 @@ export function formatFloor(floor: number, totalFloors: number | null): string {
 }
 
 /**
+ * Localize the handover-quarter string for display only — DB stores
+ * the canonical Latin form (`YYYY-Q[1-4]`, e.g. "2026-Q4") so parsers
+ * in `lib/building-stages.ts`, `services/buildings.ts`, and
+ * `lib/filters/buildings.ts` keep working untouched. This function
+ * substitutes the Latin "Q" with Cyrillic "К" for Russian-speaking
+ * buyers ("2026-К4"), matching the rest of the platform's typography.
+ *
+ * Pass-through behaviour for null / unrecognised values so callers
+ * can use it inline next to fallbacks like `?? '—'`.
+ */
+export function formatHandoverQuarter(quarter: string | null | undefined): string | null {
+  if (!quarter) return null;
+  // Match canonical YYYY-Q[1-4]; anything else passes through unchanged
+  // so a one-off legacy value doesn't crash a card render.
+  return quarter.replace(/^(\d{4})-Q([1-4])$/, '$1-К$2');
+}
+
+/**
  * Russian noun pluralization for counts (1 квартира / 2 квартиры / 5 квартир).
  * Pass an array of three forms: [singular, few (2-4), many (5+)].
  */
