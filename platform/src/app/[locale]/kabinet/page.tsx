@@ -138,19 +138,26 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
                 Кабинет
               </h1>
             </div>
-            <div className="flex items-center gap-2">
+            {/* Button row — wraps so it never causes horizontal page
+                overflow at 375px (was a real-iPhone bug pre-launch:
+                three buttons in a single nowrap row pushed the
+                viewport wider than the screen, clipping the left
+                edge of every other element on the page). On mobile
+                each button takes the row's full width via flex-1; on
+                md+ they sit side-by-side. */}
+            <div className="flex w-full flex-wrap items-stretch gap-2 md:w-auto md:items-center">
               {/* Founder-only quick links to operator surfaces — kept
                   next to the post CTA so the operator dashboard is a
                   single click away from the kabinet landing. */}
               {founder ? (
-                <Link href="/kabinet/analytics">
-                  <AppButton variant="secondary" size="md">
+                <Link href="/kabinet/analytics" className="flex-1 md:flex-none">
+                  <AppButton variant="secondary" size="md" className="w-full md:w-auto">
                     Аналитика
                   </AppButton>
                 </Link>
               ) : null}
-              <Link href="/kabinet/saved-searches">
-                <AppButton variant="secondary" size="md">
+              <Link href="/kabinet/saved-searches" className="flex-1 md:flex-none">
+                <AppButton variant="secondary" size="md" className="w-full md:w-auto">
                   Сохранённые поиски
                 </AppButton>
               </Link>
@@ -162,8 +169,8 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
                   below carries the entry point so the header doesn't
                   shout at brand-new buyers who landed here by accident. */}
               {isSeller ? (
-                <Link href="/post">
-                  <AppButton variant="primary" size="md">
+                <Link href="/post" className="flex-1 md:flex-none">
+                  <AppButton variant="primary" size="md" className="w-full md:w-auto">
                     <Plus className="size-4" />
                     Новое объявление
                   </AppButton>
