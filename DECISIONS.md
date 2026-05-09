@@ -8,6 +8,14 @@ Newest at top.
 
 ---
 
+## 2026-05-07 · `/post` location-pick correctness pass
+
+**Locked:** LocationSection now tracks an explicit `target` (lat/lng/key) — POI picks set target to the POI's own coords; LocationPicker flies to / re-emits whatever the parent passes (no more centroid overwrite). `nearestDistrictId` skips districts whose centroid matches the Vahdat-fallback (was always returning districts[0] = Центр when all five rows had NULL centroids). PostFlow redirect after submit branches on mode + uses `data.created[0].slug` for standalone / single-apartment posts (was hitting /novostroyki). AddressAutocomplete dropdown shows Russian POI kind + district labels. Migration 0020 backfills the five Vahdat district centroids with rough approximations.
+**Why:** Prod roleplay caught the bugs end-to-end — POI picks saved Vahdat-center coords, district stuck on Центр, standalone post landed on /novostroyki, dropdown rows read "supermarket · gulistan."
+**Affects:** `src/app/[locale]/post/{LocationSection,LocationPicker,AddressAutocomplete,PostFlow}.tsx`, `src/lib/listings/nearest-district.ts`, `supabase/migrations/0020_district_centroids.sql`.
+
+---
+
 ## 2026-05-07 · Seller self-serve `/post` with founder moderation + verification call
 
 **Locked:** Pivoted off the V1 "founder-only publishing" lock. Any phone-verified user (Telegram bot login captures `users.phone`) sees PostFlow at `/post`; non-founder submissions land in `status='pending_review'` and surface in the founder's `/kabinet` ModerationList. Founder reviews each row, calls/visits the seller using the captured phone, then approves via `/api/listings/moderate` — approval flips status, auto-publishes the parent building, fires saved-search match-on-publish, sends seller a Telegram DM. Founder gets a Telegram DM via `notifyPendingListing()` the moment a non-founder submits. Anonymous /post → redirect to /voyti?redirect=/post. Form gained: required-field markers + inline error highlighting (A1), per-m² hint with district benchmark (A2), localStorage autosave with 24h restore banner (A3), confirm-before-publish modal (A4), partial-failure inline block (A5), photo-first nudge for sellers (A6).
