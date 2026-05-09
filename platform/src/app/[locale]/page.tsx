@@ -1,4 +1,4 @@
-import { Sparkles, ArrowUpRight, Globe2 } from 'lucide-react';
+import { Sparkles, ArrowUpRight, Globe2, Home, Building2 } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { AppContainer } from '@/components/primitives';
 import { BuildingCard, LocationSearch, HomeSubscribeButton } from '@/components/blocks';
@@ -133,34 +133,43 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             или подобрать за 2 минуты
           </Link>
 
-          {/* Quiet nav strip — preserves 1-tap mobile access to
-              /kvartiry, /novostroyki, /diaspora. Mobile bottom nav
-              doesn't yet carry these (separate pass), so we keep this
-              row for navigation coverage. Stone-700 default, terracotta
-              on hover. */}
-          <p className="text-caption text-stone-500">
-            <span className="text-stone-400">или:</span>{' '}
+          {/* Quiet nav strip — three browse entry points (all
+              apartments / all new builds / diaspora) for visitors who
+              want to skip the search box and look directly. Was inline
+              text links separated by middle dots — read like fine
+              print, founder said "people may not even read them." Now
+              outlined pill chips matching the established design
+              language: same rounded-full + border-stone-200 + bg-white
+              + terracotta hover pattern as the eyebrow pill above the
+              H1 and the FilterRail filter chips on /novostroyki and
+              /kvartiry. Each gets a small leading icon for instant
+              recognition. flex-wrap so on a 375px viewport the three
+              chips stack to two rows instead of forcing horizontal
+              overflow. justify-center keeps the visual centre line of
+              the hero stack. */}
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Link
               href="/kvartiry"
-              className="font-medium text-stone-700 hover:text-terracotta-700 hover:underline"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 text-meta font-medium text-stone-700 transition-colors hover:border-terracotta-400 hover:bg-terracotta-50 hover:text-terracotta-700"
             >
+              <Home className="size-3.5" aria-hidden />
               Все квартиры
             </Link>
-            <span className="text-stone-400" aria-hidden> · </span>
             <Link
               href="/novostroyki"
-              className="font-medium text-stone-700 hover:text-terracotta-700 hover:underline"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 text-meta font-medium text-stone-700 transition-colors hover:border-terracotta-400 hover:bg-terracotta-50 hover:text-terracotta-700"
             >
+              <Building2 className="size-3.5" aria-hidden />
               Все новостройки
             </Link>
-            <span className="text-stone-400" aria-hidden> · </span>
             <Link
               href="/diaspora"
-              className="font-medium text-stone-700 hover:text-terracotta-700 hover:underline"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 text-meta font-medium text-stone-700 transition-colors hover:border-terracotta-400 hover:bg-terracotta-50 hover:text-terracotta-700"
             >
+              <Globe2 className="size-3.5" aria-hidden />
               {tNav('diaspora')}
             </Link>
-          </p>
+          </div>
         </AppContainer>
       </section>
 
