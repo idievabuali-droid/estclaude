@@ -70,7 +70,7 @@ export default async function VoytiPage({
             className="text-h2 font-semibold text-terracotta-700 tracking-[0.005em]"
             style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
           >
-            Вафо
+            Vafo.tj
           </span>
         </div>
 

@@ -15,7 +15,7 @@ import { ImageResponse } from 'next/og';
  * Vercel's own marketing pages use.
  */
 export const runtime = 'edge';
-export const alt = 'Вафо — квартиры и новостройки в Таджикистане';
+export const alt = 'Vafo.tj — квартиры и новостройки в Таджикистане';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -52,10 +52,13 @@ export default async function OpengraphImage() {
           Квартиры в Таджикистане
         </div>
 
-        {/* Primary wordmark — Вафо, large, terracotta-700, serif */}
+        {/* Primary wordmark — Vafo.tj, large, terracotta-700, serif.
+            Sized at 180px so the 7-character wordmark fits comfortably
+            with margin on a 1200px canvas (200+ overflows when the .tj
+            suffix is included). */}
         <div
           style={{
-            fontSize: 220,
+            fontSize: 180,
             color: '#9a3412',
             fontWeight: 600,
             letterSpacing: '0.005em',
@@ -63,7 +66,7 @@ export default async function OpengraphImage() {
             marginBottom: 28,
           }}
         >
-          Вафо
+          Vafo.tj
         </div>
 
         {/* Thin underline accent — terracotta, narrow */}

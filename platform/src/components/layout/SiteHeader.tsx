@@ -30,7 +30,7 @@ export async function SiteHeader() {
           <span
             className="text-h3 tracking-[0.005em]"
             style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
-          >Вафо</span>
+          >Vafo.tj</span>
         </Link>
 
         <nav className="hidden items-center gap-5 text-meta font-medium text-stone-700 md:flex">

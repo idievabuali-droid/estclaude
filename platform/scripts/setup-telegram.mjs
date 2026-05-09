@@ -78,7 +78,7 @@ console.log('  ✓ Webhook set');
 console.log('→ Setting bot commands');
 await call('setMyCommands', {
   commands: [
-    { command: 'start', description: 'Войти на Вафо' },
+    { command: 'start', description: 'Войти на Vafo.tj' },
   ],
 });
 console.log('  ✓ Commands set');

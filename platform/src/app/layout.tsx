@@ -34,8 +34,8 @@ const SITE_URL = 'https://vafo.tj';
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Вафо — квартиры и новостройки в Таджикистане',
-    template: '%s — Вафо',
+    default: 'Vafo.tj — квартиры и новостройки в Таджикистане',
+    template: '%s — Vafo.tj',
   },
   description:
     'Квартиры и новостройки по Таджикистану — продавцы проверены вручную, реальные фото со стройки и ремонта.',
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
-    siteName: 'Вафо',
+    siteName: 'Vafo.tj',
     locale: 'ru_RU',
     url: SITE_URL,
   },

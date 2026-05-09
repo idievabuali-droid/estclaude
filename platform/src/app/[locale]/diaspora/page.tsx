@@ -158,7 +158,7 @@ export default async function DiasporaPage({
       </section>
 
       {/* ─── TRUST BLOCK — 3 icon-tile cards ─────────────────────
-          Mirrors home's "Почему Вафо" pattern. Eyebrow + serif H2
+          Mirrors home's "Почему Vafo.tj" pattern. Eyebrow + serif H2
           + 3 cards. Diaspora-specific jobs: video tour, document
           check, time-zone flexibility. Replaces the prior bespoke
           inline content list. */}

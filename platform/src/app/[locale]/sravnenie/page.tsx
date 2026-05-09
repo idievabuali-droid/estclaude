@@ -173,7 +173,7 @@ export default async function SravneniePage({
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {!isEmpty ? <ShareButton url={shareUrl} title="Сравнение на Вафо" /> : null}
+              {!isEmpty ? <ShareButton url={shareUrl} title="Сравнение на Vafo.tj" /> : null}
               <div className="inline-flex items-center rounded-md border border-stone-200 bg-white p-1">
                 <Link
                   href="/sravnenie?type=listings"

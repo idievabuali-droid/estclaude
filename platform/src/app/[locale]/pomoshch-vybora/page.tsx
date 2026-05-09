@@ -37,7 +37,7 @@ export default async function PomoshchVyboraPage({
             className="text-h3 font-semibold tracking-[0.005em] text-terracotta-700"
             style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
           >
-            Вафо
+            Vafo.tj
           </Link>
           <Link
             href="/izbrannoe"
