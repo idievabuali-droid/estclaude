@@ -73,24 +73,35 @@ export function MessagingPopoverButton({
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
+  // Safe-in-Link click handling: when this popover lives inside a
+  // parent `<Link>` (BuildingCard wraps the entire card), a bare
+  // `setOpen(...)` would let the click bubble up and trigger the
+  // Link's navigation. preventDefault + stopPropagation neutralises
+  // both. Always-on; no harm when the popover ISN'T nested.
+  const onTriggerClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setOpen((v) => !v);
+  };
+
   const trigger = (() => {
     if (variant === 'primary-lg') {
       return (
-        <AppButton variant="primary" size="lg" onClick={() => setOpen((v) => !v)}>
+        <AppButton variant="primary" size="lg" className="w-full" onClick={onTriggerClick}>
           <TriggerIcon className="size-4" /> {triggerLabel}
         </AppButton>
       );
     }
     if (variant === 'secondary-lg') {
       return (
-        <AppButton variant="secondary" size="lg" className="w-full" onClick={() => setOpen((v) => !v)}>
+        <AppButton variant="secondary" size="lg" className="w-full" onClick={onTriggerClick}>
           <TriggerIcon className="size-4" /> {triggerLabel}
         </AppButton>
       );
     }
     if (variant === 'primary-mobile') {
       return (
-        <AppButton variant="primary" size="md" onClick={() => setOpen((v) => !v)}>
+        <AppButton variant="primary" size="md" onClick={onTriggerClick}>
           <TriggerIcon className="size-4" /> {triggerLabel}
         </AppButton>
       );
@@ -98,7 +109,7 @@ export function MessagingPopoverButton({
     // icon-stack — used in the mobile sticky bar's secondary slots when
     // the bar prefers a denser layout. Not currently default.
     return (
-      <AppButton variant="secondary" size="md" className="h-12 px-2 py-1" onClick={() => setOpen((v) => !v)}>
+      <AppButton variant="secondary" size="md" className="h-12 px-2 py-1" onClick={onTriggerClick}>
         <span className="flex flex-col items-center justify-center gap-0.5 leading-none">
           <MessageSquare className="size-4" aria-hidden />
           <span className="text-[10px] font-medium">Сообщ.</span>
@@ -129,7 +140,12 @@ export function MessagingPopoverButton({
             target="_blank"
             rel="noopener noreferrer"
             role="menuitem"
-            onClick={() => {
+            onClick={(e) => {
+              // stopPropagation so a parent `<Link>` (BuildingCard
+              // wraps the card in one) doesn't intercept; default
+              // behaviour (open href in new tab) is preserved because
+              // we don't preventDefault.
+              e.stopPropagation();
               // Capture intent at the moment of handoff. The user is
               // about to leave for WhatsApp where we lose visibility;
               // this event lets the founder reconcile WhatsApp DMs to
@@ -149,7 +165,8 @@ export function MessagingPopoverButton({
             target="_blank"
             rel="noopener noreferrer"
             role="menuitem"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               track('contact_button_click', { channel: 'telegram', source: 'popover' });
               setOpen(false);
             }}
@@ -166,7 +183,8 @@ export function MessagingPopoverButton({
               target="_blank"
               rel="noopener noreferrer"
               role="menuitem"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 track('contact_button_click', { channel: 'imo', source: 'popover' });
                 setOpen(false);
               }}

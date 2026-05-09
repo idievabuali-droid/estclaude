@@ -1,13 +1,12 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { MapPin, Calendar, Layers, Users, Camera, ArrowUpRight, MessageCircle } from 'lucide-react';
+import { MapPin, Calendar, Layers, Users, Camera, ArrowUpRight } from 'lucide-react';
 import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
 import { buildContactLinks } from '@/lib/contact-links';
 import { setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import {
   AppContainer,
-  AppButton,
   AppChip,
   AppCard,
   AppCardContent,
@@ -20,6 +19,7 @@ import {
   SaveToggle,
   BuildingStickyContact,
   RoomTypeFilter,
+  MessagingPopoverButton,
 } from '@/components/blocks';
 import type { PoiCategory } from '@/services/poi';
 import { getBuilding, getDeveloperById, getDeveloperStats, listBuildings } from '@/services/buildings';
@@ -337,24 +337,26 @@ export default async function BuildingDetailPage({
                   </a>
                 ) : null}
               </div>
+              {/* Single contact CTA — was a stack of two before:
+                  "Связаться с застройщиком" (WhatsApp-only) +
+                  "Запросить визит" (broken anchor scrolling to #units,
+                  no real visit-request flow). Founder critique
+                  2026-05-09: "shows too many places to contact …
+                  Запросить визит is taking today wrong place." Now one
+                  button → popover with all 3 channels (WhatsApp /
+                  Telegram / IMO) so the buyer picks their preferred
+                  app on tap. Mobile sticky bar below already does the
+                  same. */}
               <div className="flex flex-col gap-2">
-                <a
-                  href={`${FOUNDER_CONTACTS.whatsappLink}?text=${encodeURIComponent(
+                <MessagingPopoverButton
+                  variant="primary-lg"
+                  label="Связаться с застройщиком"
+                  whatsappHref={`${FOUNDER_CONTACTS.whatsappLink}?text=${encodeURIComponent(
                     `Здравствуйте! Интересует ЖК ${building.name.ru}. Можете подсказать?`,
                   )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-stone-900 px-4 text-meta font-semibold text-white transition-colors hover:bg-stone-800 active:bg-stone-700"
-                >
-                  <MessageCircle className="size-4" />
-                  Связаться с застройщиком
-                </a>
-                <a
-                  href="#units"
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-4 text-meta font-semibold text-stone-900 transition-colors hover:border-stone-400 hover:bg-stone-100"
-                >
-                  Запросить визит
-                </a>
+                  telegramHref={FOUNDER_CONTACTS.telegramLink}
+                  imoHref={buildContactLinks(FOUNDER_CONTACTS.phone).imo}
+                />
               </div>
             </div>
           ) : null}
@@ -706,22 +708,23 @@ export default async function BuildingDetailPage({
                   </div>
                 ) : null}
 
-                {/* Single CTA — primary "Связаться". The "Все проекты
-                    застройщика" link demoted to a quiet text-link
+                {/* Single CTA — primary "Связаться". Tapping opens
+                    a popover with all 3 channels (WhatsApp / Telegram
+                    / IMO) so the buyer picks the app they actually
+                    use; matches the pattern in the price card above
+                    and the mobile sticky bar below. The "Все проекты
+                    застройщика" link is demoted to a quiet text-link
                     below the stats grid (still discoverable but not
                     competing for click weight with the action). */}
-                <a
-                  href={`${FOUNDER_CONTACTS.whatsappLink}?text=${encodeURIComponent(
+                <MessagingPopoverButton
+                  variant="primary-lg"
+                  label="Связаться с застройщиком"
+                  whatsappHref={`${FOUNDER_CONTACTS.whatsappLink}?text=${encodeURIComponent(
                     `Здравствуйте! Интересует ЖК ${building.name.ru} от ${developer.display_name.ru}. Можете подсказать?`,
                   )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full"
-                >
-                  <AppButton variant="primary" className="w-full">
-                    <MessageCircle className="size-4" /> Связаться с застройщиком
-                  </AppButton>
-                </a>
+                  telegramHref={FOUNDER_CONTACTS.telegramLink}
+                  imoHref={buildContactLinks(FOUNDER_CONTACTS.phone).imo}
+                />
 
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
                   <DevStat label="Всего проектов" value={devStats.total} />
