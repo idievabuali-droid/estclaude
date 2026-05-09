@@ -16,7 +16,6 @@ import {
   BuildingCard,
   NearbyChips,
   BuildingStageProgress,
-  PriceConversion,
   ShareButton,
   SaveToggle,
   BuildingStickyContact,
@@ -29,8 +28,6 @@ import { getDistrictBenchmark } from '@/services/benchmarks';
 import { getNearbyPOIs } from '@/services/poi';
 import { getBuildingProgress } from '@/services/progress';
 import { supabasePublicUrl } from '@/services/photos';
-import { getExchangeRates } from '@/services/currency';
-import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { formatPriceNumber, pluralRu } from '@/lib/format';
 import { STAGE_INFO } from '@/lib/building-stages';
 
@@ -188,12 +185,11 @@ export default async function BuildingDetailPage({
   for (const d of similarDevs) {
     if (d != null) similarDevsMap.set(d.id, d);
   }
-  // Currency conversion for diaspora visitors. Skip the rates fetch
-  // entirely for local buyers (cookie unset or TJS) so we don't pay
-  // for an HTTP roundtrip nobody will see.
-  const currency = await readCurrencyCookie();
-  const isDiaspora = currency != null && currency !== 'TJS';
-  const rates = isDiaspora ? await getExchangeRates() : null;
+  // Currency conversion is intentionally /diaspora-only — this detail
+  // page used to read the cookie + show TJS ≈ £ inline + pass through
+  // to similar BuildingCards, which diluted /diaspora's distinctive
+  // value (founder roleplay critique 2026-05-09). Cookie itself
+  // persists for the next /diaspora visit.
 
   return (
     <>
@@ -341,7 +337,7 @@ export default async function BuildingDetailPage({
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-terracotta-600 px-4 text-meta font-semibold text-white transition-colors hover:bg-terracotta-700"
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-stone-900 px-4 text-meta font-semibold text-white transition-colors hover:bg-stone-800 active:bg-stone-700"
                 >
                   <MessageCircle className="size-4" />
                   Связаться с застройщиком
@@ -472,21 +468,10 @@ export default async function BuildingDetailPage({
             {building.price_per_m2_from_dirams ? (
               <div className="flex flex-col items-end">
                 <span className="text-caption text-stone-500">от</span>
-                {/* Inline pair: TJS price + foreign-currency
-                    conversion on the same baseline, right-aligned to
-                    match the parent column's alignment. */}
                 <div className="flex flex-wrap items-baseline justify-end gap-x-2">
                   <span className="text-h3 font-semibold tabular-nums text-stone-900">
                     {formatPriceNumber(building.price_per_m2_from_dirams)} TJS / м²
                   </span>
-                  {isDiaspora && rates ? (
-                    <PriceConversion
-                      priceDirams={building.price_per_m2_from_dirams}
-                      target={currency}
-                      rates={rates}
-                      perM2
-                    />
-                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -508,8 +493,6 @@ export default async function BuildingDetailPage({
                 developer={developer}
                 districtMedianPerM2={median?.median ?? null}
                 districtSampleSize={median?.sample ?? 0}
-                currency={currency}
-                rates={rates}
               />
               {listings.length > APARTMENTS_PREVIEW_LIMIT ? (
                 <Link
@@ -808,8 +791,6 @@ export default async function BuildingDetailPage({
                   building={b}
                   developer={similarDevsMap.get(b.developer_id) ?? developer}
                   district={district}
-                  currency={currency}
-                  rates={rates}
                 />
               ))}
             </div>

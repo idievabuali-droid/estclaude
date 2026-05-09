@@ -13,8 +13,11 @@ export interface RoomTypeFilterProps {
    *  Null when there's no benchmark for this district yet. */
   districtMedianPerM2: number | null;
   districtSampleSize: number;
-  currency: SupportedCurrency | null;
-  rates: ExchangeRates | null;
+  /** Diaspora currency (cookie-driven). Optional — when set together
+   *  with `rates`, each card shows the foreign-currency equivalent.
+   *  Both are now /diaspora-only; non-/diaspora callers omit them. */
+  currency?: SupportedCurrency | null;
+  rates?: ExchangeRates | null;
 }
 
 /**

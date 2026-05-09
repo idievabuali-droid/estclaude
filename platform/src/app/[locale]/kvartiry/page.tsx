@@ -4,8 +4,6 @@ import { Link } from '@/i18n/navigation';
 import { AppContainer, AppButton } from '@/components/primitives';
 import { ListingCard, LocationSearch, SearchTracker, SaveSearchPrompt, FilterRelaxSuggestion, SortChip, type SortMode } from '@/components/blocks';
 import { displayNameFromFilters } from '@/lib/saved-searches/format';
-import { readCurrencyCookie } from '@/lib/currency-cookie-server';
-import { getExchangeRates } from '@/services/currency';
 import { listListings } from '@/services/listings';
 import { listBuildings, getDeveloperById, getBuildingBySlug } from '@/services/buildings';
 import { getDistrictBenchmarks } from '@/services/benchmarks';
@@ -135,16 +133,14 @@ export default async function KvartiryPage({
     .map((l) => l.district_id)
     .filter((id): id is string => id != null);
   const districtIds = [...new Set([...districtIdsFromBuildings, ...districtIdsFromStandalone])];
-  // Currency cookie + rates flow through to ListingCard so a diaspora
-  // visitor sees prices in their own currency on this list too. Local
-  // buyers (cookie unset or TJS) see no extra noise — PriceConversion
-  // returns null for TJS or missing rate.
-  const currency = await readCurrencyCookie();
-  const isDiaspora = currency != null && currency !== 'TJS';
-  const [developerEntries, benchmarkMap, rates] = await Promise.all([
+  // Currency conversion is intentionally /diaspora-only — this list
+  // page used to read the cookie + show TJS ≈ £ everywhere, which
+  // diluted /diaspora's distinctive value proposition (founder roleplay
+  // critique 2026-05-09). Cookie itself still persists for the next
+  // /diaspora visit.
+  const [developerEntries, benchmarkMap] = await Promise.all([
     Promise.all(developerIds.map(async (id) => [id, await getDeveloperById(id)] as const)),
     getDistrictBenchmarks(districtIds),
-    isDiaspora ? getExchangeRates() : Promise.resolve(null),
   ]);
   const developerMap = new Map(developerEntries);
 
@@ -339,8 +335,6 @@ export default async function KvartiryPage({
                         listing={l}
                         building={building}
                         developerVerified={dev?.is_verified ?? false}
-                        currency={currency}
-                        rates={rates}
                         districtMedianPerM2={benchmark ? Number(benchmark.median_per_m2_dirams) : null}
                         districtSampleSize={benchmark?.sample_size ?? 0}
                       />

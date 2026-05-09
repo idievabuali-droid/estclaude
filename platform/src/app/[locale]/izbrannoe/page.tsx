@@ -12,8 +12,6 @@ import { IllustrationHouseHeart } from '@/components/illustrations';
 import { getMySavedItems, type SavedChangeBadge } from '@/services/saved';
 import { getDistrictBenchmarks } from '@/services/benchmarks';
 import { getCurrentUser } from '@/lib/auth/session';
-import { readCurrencyCookie } from '@/lib/currency-cookie-server';
-import { getExchangeRates } from '@/services/currency';
 import { formatPostedAgo } from '@/lib/format';
 
 /**
@@ -98,13 +96,12 @@ export default async function IzbrannoePage({
     );
   }
 
-  // Logged in — fetch saves + benchmarks + currency in parallel.
-  const currency = await readCurrencyCookie();
-  const isDiaspora = currency != null && currency !== 'TJS';
-  const [{ listings: savedListings, buildings: savedBuildings }, rates] = await Promise.all([
-    getMySavedItems(user.id),
-    isDiaspora ? getExchangeRates() : Promise.resolve(null),
-  ]);
+  // Logged in — fetch saves + benchmarks. Currency conversion is
+  // intentionally /diaspora-only: the picker on /diaspora writes a
+  // domain-scoped cookie, but we no longer READ it here. Other pages
+  // showing TJS ≈ £ diluted /diaspora's distinctive value proposition
+  // (the founder's roleplay critique on 2026-05-09 caught this).
+  const { listings: savedListings, buildings: savedBuildings } = await getMySavedItems(user.id);
 
   // District ids — pulled from EITHER the parent ЖК (in-ЖК listings)
   // or the listing's own district_id (standalones, building=null).
@@ -193,8 +190,6 @@ export default async function IzbrannoePage({
                         listing={s.listing}
                         building={s.building}
                         developerVerified={s.developer?.is_verified ?? false}
-                        currency={currency}
-                        rates={rates}
                         districtMedianPerM2={
                           benchmark ? Number(benchmark.median_per_m2_dirams) : null
                         }
@@ -223,8 +218,6 @@ export default async function IzbrannoePage({
                       developer={s.developer}
                       district={s.district}
                       matchingUnits={s.matchingUnits}
-                      currency={currency}
-                      rates={rates}
                     />
                   </SavedCardWrapper>
                 );

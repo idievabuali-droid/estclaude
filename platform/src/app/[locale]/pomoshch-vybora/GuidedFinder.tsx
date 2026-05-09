@@ -509,11 +509,13 @@ export function GuidedFinder() {
                 size="lg"
                 disabled={!canAdvance}
                 onClick={next}
-                // Terracotta override — wizard primary keeps the
-                // brand-warm color (deliberate exception to the
-                // platform's stone-900 default, same as /voyti's
-                // Telegram primary). The wizard is a brand moment.
-                className="bg-terracotta-600 hover:bg-terracotta-700 active:bg-terracotta-800 sm:flex-[2]"
+                // Stone-900 primary — matches the platform's editorial-
+                // luxury default. Earlier terracotta override was
+                // justified as a "brand moment", but it read as a
+                // bright off-brand pop on a 375px screen (founder
+                // critique 2026-05-09). Warmth is carried by the
+                // wizard's H1 + step copy, not the button background.
+                className="sm:flex-[2]"
               >
                 {isLast ? 'Показать подходящие варианты' : 'Далее'}
               </AppButton>

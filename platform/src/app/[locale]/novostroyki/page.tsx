@@ -18,8 +18,6 @@ import { buildQuery, type FilterParams } from './filter-state';
 import { PriceChip } from './PriceChip';
 import { MultiSelectChip, type PoiIconKey } from './MultiSelectChip';
 import { NovostroykiFilterRail } from './FilterRail';
-import { readCurrencyCookie } from '@/lib/currency-cookie-server';
-import { getExchangeRates } from '@/services/currency';
 
 const STATUS_FILTERS: Array<{ value: BuildingStatus; label: string }> = [
   // Labels mirror STAGE_INFO from @/lib/building-stages — first stage
@@ -196,13 +194,11 @@ export default async function NovostroykiPage({
     }),
   );
 
-  // Currency cookie + rates flow into BuildingCard so a diaspora
-  // visitor sees per-m² prices in their own currency on the browse
-  // list. Rates fetch is skipped for local buyers — fail-soft for
-  // the diaspora case (cookie set but rates unavailable).
-  const currency = await readCurrencyCookie();
-  const isDiaspora = currency != null && currency !== 'TJS';
-  const rates = isDiaspora ? await getExchangeRates() : null;
+  // Currency conversion is intentionally /diaspora-only — this list
+  // page used to read the cookie + show TJS ≈ £ on every BuildingCard,
+  // which diluted /diaspora's distinctive value proposition (founder
+  // roleplay critique 2026-05-09). Cookie itself still persists for
+  // the next /diaspora visit.
 
   return (
     <>
@@ -419,8 +415,6 @@ export default async function NovostroykiPage({
                           district={dist}
                           matchingUnits={units}
                           activeListingsCount={unitsTotal}
-                          currency={currency}
-                          rates={rates}
                         />
                       );
                     })}

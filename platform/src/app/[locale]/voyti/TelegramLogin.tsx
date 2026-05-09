@@ -132,18 +132,19 @@ export function TelegramLogin({ redirect }: { redirect: string }) {
 
       {state === 'intro' || state === 'starting' ? (
         <div className="flex flex-col gap-3">
-          {/* Brand-warm primary — deliberate exception to the
-              platform's stone-900 default. Login is the moment trust
-              starts; the terracotta-filled button reads as the
-              warmest action on the platform, matching the prescription
-              ("Telegram button as the primary, full-width, terracotta
-              — with the Telegram icon on the left"). */}
+          {/* Stone-900 primary — matches the platform's editorial-
+              luxury default ("Найти" on home, "Запросить видеообзор"
+              on /diaspora). The earlier terracotta-filled treatment
+              read as a bright off-brand pop next to the otherwise
+              calm palette (founder critique 2026-05-09). Telegram-
+              warmth is conveyed through the icon + label, not button
+              colour. */}
           <AppButton
             variant="primary"
             size="lg"
             onClick={startLogin}
             loading={state === 'starting'}
-            className="w-full bg-terracotta-600 hover:bg-terracotta-700 active:bg-terracotta-800"
+            className="w-full"
           >
             <MessageCircle className="size-4" /> Войти через Telegram
           </AppButton>
@@ -161,7 +162,7 @@ export function TelegramLogin({ redirect }: { redirect: string }) {
                   another device, so the link is the dominant CTA. */}
               <a
                 href={session.tgDeepLink}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-terracotta-600 px-4 text-meta font-semibold text-white hover:bg-terracotta-700 md:hidden"
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-stone-900 px-4 text-meta font-semibold text-white transition-colors hover:bg-stone-800 active:bg-stone-700 md:hidden"
               >
                 <MessageCircle className="size-4" /> Открыть в Telegram
               </a>
@@ -214,7 +215,7 @@ export function TelegramLogin({ redirect }: { redirect: string }) {
           variant="primary"
           size="lg"
           onClick={startLogin}
-          className="w-full bg-terracotta-600 hover:bg-terracotta-700 active:bg-terracotta-800"
+          className="w-full"
         >
           Попробовать снова
         </AppButton>

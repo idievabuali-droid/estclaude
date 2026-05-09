@@ -4,14 +4,13 @@ import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppChip, AppCard, AppCardContent } from '@/components/primitives';
-import { ListingCard, ListingTrustSignals, PriceConversion, CallbackWidget, SaveToggle, ShareButton, NearbyChips, PhotoGallery } from '@/components/blocks';
+import { ListingCard, ListingTrustSignals, CallbackWidget, SaveToggle, ShareButton, NearbyChips, PhotoGallery } from '@/components/blocks';
 import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo } from '@/lib/format';
 import { getListing } from '@/services/listings';
 import { getNearbyPOIs, type PoiCategory } from '@/services/poi';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
-import { getExchangeRates } from '@/services/currency';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { supabasePublicUrl } from '@/services/photos';
 import { ContactBarWithModal } from './ContactBarWithModal';
@@ -122,6 +121,12 @@ export default async function ListingDetailPage({
   const data = await getListing(slug);
   if (!data) notFound();
   const { listing, building, developer, district, similar, sellerPhone } = data;
+  // We still read the cookie to know "did this visitor pick a non-TJS
+  // currency on /diaspora?" — that flag toggles the contact bar's
+  // "Запросить онлайн-показ" vs "Запросить визит" label (an
+  // accessibility affordance for buyers who can't physically visit
+  // Vahdat). We no longer USE the rates here for inline price
+  // conversion — that's /diaspora-only now (founder critique 2026-05-09).
   const currency = await readCurrencyCookie();
   const isDiaspora = currency != null && currency !== 'TJS';
 
@@ -136,9 +141,8 @@ export default async function ListingDetailPage({
   // Parallelise the rest. Was sequential before — the slowest single
   // call (getNearbyPOIs hits Overpass live, ~1-3s) blocked everything
   // after it, multiplying perceived latency on Tajik mobile networks.
-  const [visitor, rates, pois, stats] = await Promise.all([
+  const [visitor, pois, stats] = await Promise.all([
     getCurrentUser(),
-    isDiaspora ? getExchangeRates() : Promise.resolve(null),
     // Skip POI fetch when we have no coords (standalone seller didn't
     // drop the pin). The compact-nearby section silently hides below.
     effectiveLat != null && effectiveLng != null
@@ -383,26 +387,10 @@ export default async function ListingDetailPage({
                   {formatPriceNumber(listing.price_total_dirams)} TJS
                 </span>
               </div>
-              {isDiaspora && rates ? (
-                <PriceConversion
-                  priceDirams={listing.price_total_dirams}
-                  target={currency}
-                  rates={rates}
-                  variant="block"
-                />
-              ) : null}
               <div className="flex flex-wrap items-baseline gap-x-2">
                 <span className="text-caption text-stone-500 tabular-nums">
                   {formatPriceNumber(listing.price_per_m2_dirams)} TJS / м²
                 </span>
-                {isDiaspora && rates ? (
-                  <PriceConversion
-                    priceDirams={listing.price_per_m2_dirams}
-                    target={currency}
-                    rates={rates}
-                    perM2
-                  />
-                ) : null}
               </div>
               {/* Soft terracotta rassrochka pill — anchors to §7
                   Условия (the 3-metric card section). Reads as a
@@ -847,8 +835,6 @@ export default async function ListingDetailPage({
                   // variant with district + street_address.
                   building={building && building.id === l.building_id ? building : null}
                   developerVerified={(building && developer?.is_verified) ?? false}
-                  currency={currency}
-                  rates={rates}
                   hideBuildingName={!!building}
                 />
               ))}

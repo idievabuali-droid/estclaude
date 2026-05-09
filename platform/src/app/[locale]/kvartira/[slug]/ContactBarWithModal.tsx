@@ -83,7 +83,7 @@ export function ContactBarWithModal({
           variant="primary"
           size="lg"
           onClick={() => setOpen(true)}
-          className="w-full bg-terracotta-600 hover:bg-terracotta-700"
+          className="w-full"
         >
           <IntentIcon className="size-4" /> {intentLabel}
         </AppButton>

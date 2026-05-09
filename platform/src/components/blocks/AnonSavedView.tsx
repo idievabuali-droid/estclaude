@@ -159,11 +159,7 @@ export function AnonSavedView({ tab }: { tab: 'buildings' | 'listings' }) {
                 </p>
               </div>
               <Link href="/voyti?redirect=/izbrannoe">
-                <AppButton
-                  variant="primary"
-                  size="lg"
-                  className="bg-terracotta-600 hover:bg-terracotta-700 active:bg-terracotta-800"
-                >
+                <AppButton variant="primary" size="lg">
                   <MessageCircle className="size-4" /> Войти через Telegram
                 </AppButton>
               </Link>

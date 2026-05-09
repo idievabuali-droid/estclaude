@@ -1,4 +1,4 @@
-import { ArrowUpRight, MessageCircle, Globe2, Home, Building2 } from 'lucide-react';
+import { ArrowUpRight, MessageCircle, Home, Building2 } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer } from '@/components/primitives';
@@ -187,13 +187,16 @@ export default async function DiasporaPage({
             Запросить видеообзор
           </a>
 
-          {/* Quiet nav pill chips — same outlined-pill row as home.
-              "Я за границей" is the active surface so it gets a quiet
-              filled state (`bg-stone-100 text-stone-900`) so visitors
-              know where they are without stripping the affordance. The
-              other two chips deep-link to /kvartiry and /novostroyki,
-              same destinations as the home version. flex-wrap so the
-              row stacks at 375px without horizontal overflow. */}
+          {/* Quiet nav pill chips — same outlined-pill style as the
+              home hero, but only the TWO chips that actually navigate
+              somewhere from here: "Все квартиры" and "Все новостройки".
+              The home version has a third "Я за границей" chip that
+              deep-links here; on /diaspora itself we drop it because
+              the visitor already self-identified by being on this page
+              — a chip labelled "I'm abroad" without a destination is
+              identity, not navigation, and reads as a dead button.
+              flex-wrap so the row stacks at 375px without horizontal
+              overflow. */}
           <div className="flex flex-wrap items-center justify-center gap-2">
             <Link
               href="/kvartiry"
@@ -209,13 +212,6 @@ export default async function DiasporaPage({
               <Building2 className="size-3.5" aria-hidden />
               Все {tNav('buildings').toLowerCase()}
             </Link>
-            <span
-              aria-current="page"
-              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-stone-300 bg-stone-100 px-4 text-meta font-medium text-stone-900"
-            >
-              <Globe2 className="size-3.5" aria-hidden />
-              {tNav('diaspora')}
-            </span>
           </div>
         </AppContainer>
       </section>

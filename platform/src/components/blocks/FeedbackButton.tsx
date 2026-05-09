@@ -286,7 +286,7 @@ export function FeedbackButton() {
                   <AppButton
                     variant="primary"
                     size="md"
-                    className="flex-1 bg-terracotta-600 hover:bg-terracotta-700 active:bg-terracotta-800"
+                    className="flex-1"
                     onClick={submit}
                     loading={submitting}
                     disabled={!category || !text.trim()}
