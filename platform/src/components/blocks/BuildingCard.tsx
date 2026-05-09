@@ -12,7 +12,6 @@ import { CardPhotoCarousel } from './CardPhotoCarousel';
 import { BuildingContactButton } from './BuildingContactButton';
 import { FEATURES } from '@/lib/feature-flags';
 import { PriceConversion } from './PriceConversion';
-import { StageInfoPopover } from './StageInfoPopover';
 import { track } from '@/lib/analytics/track';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
 import type { ExchangeRates, SupportedCurrency } from '@/services/currency';
@@ -135,22 +134,24 @@ export function BuildingCard({
               </span>
             </>
           ) : null}
-          <StageInfoPopover status={building.status} stopParentClick />
+          {/* StageInfoPopover removed from the card cover (founder
+              critique 2026-05-09: opening it covered the photo).
+              The same "what does Строится mean?" explainer still
+              lives on the building detail page via BuildingStageProgress
+              — buyers who want the deeper read tap the card to get
+              there. Card-level scanning just needs the label. */}
         </div>
         <div className="absolute right-3 top-3 flex flex-col gap-2">
           <SaveToggle type="building" id={building.id} />
-          {/* Связаться: WhatsApp tap with prefilled context. The pill
-              funnels to the founder (no per-developer phone in V1) but
-              the WhatsApp message carries the building name so context
-              lands in chat. */}
-          <BuildingContactButton
-            buildingName={building.name.ru}
-            buildingAddress={`${district.name.ru} · ${building.address.ru}`}
-          />
           {/* Compare hidden in V1 — see lib/feature-flags.ts. */}
           {FEATURES.compare ? (
             <CompareToggle type="buildings" id={building.id} />
           ) : null}
+          {/* Связаться moved off the photo overlay into the card body
+              footer — buyers see the listing first (photo, name, price,
+              units), then the contact affordance. Founder critique
+              2026-05-09: an icon button on the photo competed with the
+              listing's primary content. */}
         </div>
       </CardPhotoCarousel>
 
@@ -273,6 +274,18 @@ export function BuildingCard({
             ) : null}
           </div>
         ) : null}
+
+        {/* Inline contact button — outlined, full-width. Lives at the
+            card-body footer so buyers see what the listing IS first,
+            then have an explicit "Связаться" affordance without the
+            photo-overlay icon competing for attention (founder critique
+            2026-05-09). The button stops propagation so the parent
+            <Link> wrapping the card doesn't fire. */}
+        <BuildingContactButton
+          variant="inline"
+          buildingName={building.name.ru}
+          buildingAddress={`${district.name.ru} · ${building.address.ru}`}
+        />
       </div>
     </Link>
   );
