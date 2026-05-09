@@ -283,9 +283,16 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
           ) : (
             <div className="flex flex-col gap-3">
               {myListings.map((l) => {
+                // V1.2: standalone listings (no parent ЖК — building_id null
+                // after migration 0019) USED to be silently filtered out here
+                // with `if (!building) return null;`, which made "Мои
+                // объявления" appear empty for sellers whose only listings
+                // were standalones — even though the count above said 34.
+                // Found in pre-launch roleplay; render address from
+                // `street_address` instead and tone the supporting badges
+                // down for the no-building case.
                 const building = l.building;
-                if (!building) return null;
-                const dev = developerMap.get(building.developer_id);
+                const dev = building ? developerMap.get(building.developer_id) : undefined;
                 const status = STATUS_BADGE[l.status];
 
                 return (
@@ -311,7 +318,9 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
                           </div>
 
                           <span className="text-meta text-stone-500">
-                            {building.name.ru} · {building.address.ru}
+                            {building
+                              ? `${building.name.ru} · ${building.address.ru}`
+                              : `Без ЖК · ${l.street_address ?? 'Адрес не указан'}`}
                           </span>
 
                           <div className="flex flex-wrap items-center gap-2">
@@ -319,7 +328,9 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
                             <VerificationBadge
                               tier={l.verification_tier}
                               developerVerified={
-                                l.source_type === 'developer' && (dev?.is_verified ?? false)
+                                !!building &&
+                                l.source_type === 'developer' &&
+                                (dev?.is_verified ?? false)
                               }
                             />
                           </div>

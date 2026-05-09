@@ -169,8 +169,16 @@ export default async function PostPage({
   return (
     <>
       <section className="border-b border-stone-200 bg-white">
-        <AppContainer className="flex flex-col gap-2 py-5">
-          <h1 className="text-h1 font-semibold text-stone-900">{headerTitle}</h1>
+        <AppContainer className="flex flex-col gap-1.5 py-8 md:py-10">
+          <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+            {founder ? 'Публикация' : 'Новое объявление'}
+          </span>
+          <h1
+            className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900"
+            style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+          >
+            {headerTitle}
+          </h1>
           <p className="text-meta text-stone-500">{headerSubtitle}</p>
         </AppContainer>
       </section>
