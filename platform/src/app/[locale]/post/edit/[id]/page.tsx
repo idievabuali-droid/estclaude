@@ -40,7 +40,7 @@ export default async function EditListingPage({
   const { data: listing } = await supabase
     .from('listings')
     .select(
-      'id, slug, building_id, seller_user_id, status, rooms_count, size_m2, floor_number, price_total_dirams, finishing_type, bathroom_separate, has_technical_passport, unit_description, installment_available, installment_monthly_amount_dirams, installment_first_payment_percent, installment_term_months',
+      'id, slug, building_id, seller_user_id, status, rooms_count, size_m2, floor_number, price_total_dirams, finishing_type, bathroom_separate, has_technical_passport, unit_description, installment_available, installment_monthly_amount_dirams, installment_first_payment_percent, installment_term_months, street_address',
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -100,9 +100,18 @@ export default async function EditListingPage({
     installment_term_months: (listing.installment_term_months as number | null) ?? null,
   };
 
-  const buildingName =
-    (building?.name as { ru: string } | undefined)?.ru ?? '—';
+  // For standalone listings (no parent ЖК post-migration 0019) we don't
+  // have a building name; fall through to street_address + "Без ЖК" so
+  // the subtitle reads as a recognisable address rather than just "—".
+  // `buildingName` stays a string for the form prop's type contract;
+  // `subtitleLocation` is the friendlier display variant.
+  const buildingNameRaw =
+    (building?.name as { ru: string } | undefined)?.ru ?? null;
   const buildingSlug = (building?.slug as string | undefined) ?? null;
+  const standaloneAddress = (listing.street_address as string | null) ?? null;
+  const buildingName = buildingNameRaw ?? '—';
+  const subtitleLocation =
+    buildingNameRaw ?? (standaloneAddress ? `Без ЖК · ${standaloneAddress}` : 'Без ЖК');
 
   return (
     <>
@@ -118,7 +127,7 @@ export default async function EditListingPage({
             Редактировать квартиру
           </h1>
           <p className="text-meta text-stone-500">
-            {buildingName} · {listing.rooms_count}-комн
+            {subtitleLocation} · {listing.rooms_count}-комн
           </p>
           {!founder ? (
             <p className="text-caption text-stone-500">
