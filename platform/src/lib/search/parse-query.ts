@@ -64,8 +64,13 @@ const ROOMS_WORDS: Record<string, number> = {
 // "до 200к" / "до 200 тыс" / "до 200 тысяч" / "до 200000"
 // Captures the number group + an optional thousand-suffix. If the
 // suffix is present, multiply by 1000.
-const PRICE_MAX_RE = /\bдо\s+(\d+(?:[\s,.]?\d{3})*)\s*(к|тыс[а-я]*)?\b/iu;
-const PRICE_MIN_RE = /\bот\s+(\d+(?:[\s,.]?\d{3})*)\s*(к|тыс[а-я]*)?\b/iu;
+//
+// Why `(?:^|\s)` instead of `\b`: JavaScript regex `\b` is ASCII-only
+// (the `u` flag does NOT extend it), so `\bдо` between a space and
+// the Cyrillic "д" never matches — both sides count as non-word.
+// Explicit start-or-whitespace works regardless of script.
+const PRICE_MAX_RE = /(?:^|\s)до\s+(\d+(?:[\s,.]?\d{3})*)\s*(к|тыс[а-я]*)?(?=\s|$|[.,;!?])/iu;
+const PRICE_MIN_RE = /(?:^|\s)от\s+(\d+(?:[\s,.]?\d{3})*)\s*(к|тыс[а-я]*)?(?=\s|$|[.,;!?])/iu;
 // Sanity bounds for prices in TJS (the platform's primary currency).
 // Below 1 000 TJS is almost certainly a parse error; above 10 000 000
 // TJS isn't a Vahdat-residential price, also a parse error. Both
@@ -77,11 +82,13 @@ const PRICE_MAX_BOUND = 10_000_000;
 // "с ремонтом" → full_finish (typical seller phrasing)
 // "без ремонта" → no_finish
 // "под ключ" → full_finish (synonym, common in TJ market)
+// Same `\b` → `(?:^|\s)` swap as price regexes for Cyrillic-aware
+// left-boundary matching.
 const FINISHING_PATTERNS: Array<[RegExp, ParsedQuery['finishing']]> = [
-  [/\bбез\s+ремонт[а-я]*/iu, 'no_finish'],
-  [/\bс\s+ремонт[а-я]*/iu, 'full_finish'],
-  [/\bпод\s+ключ\b/iu, 'full_finish'],
-  [/\bпредчистов[а-я]*/iu, 'pre_finish'],
+  [/(?:^|\s)без\s+ремонт[а-я]*/iu, 'no_finish'],
+  [/(?:^|\s)с\s+ремонт[а-я]*/iu, 'full_finish'],
+  [/(?:^|\s)под\s+ключ(?=\s|$|[.,;!?])/iu, 'full_finish'],
+  [/(?:^|\s)предчистов[а-я]*/iu, 'pre_finish'],
 ];
 
 /** Parse a free-text query. Always returns an object — empty fields
