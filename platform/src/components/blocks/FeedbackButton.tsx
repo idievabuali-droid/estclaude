@@ -13,27 +13,27 @@ import { track } from '@/lib/analytics/track';
  *
  *  1. Operator surfaces — founder doesn't need to report bugs to
  *     herself: /kabinet, /post, /post/edit.
- *  2. Pages with their own sticky bottom-bar contact CTA. /zhk and
- *     /kvartira already have a "Связаться" sticky bar in the same
- *     bottom-right region. A second floating contact-shaped pill
- *     visually clashes with the listing CTA — verified at 375px,
- *     both buttons stack on top of each other and the icons read
- *     as the same thing. Hiding the feedback button here keeps the
- *     listing CTA as the single bottom-right action; the buyer can
- *     still report problems from the home/listing-list pages and
- *     the after-contact-completion confirmation pages.
- *  3. Wizard — Typeform-style focused experience; no floating CTA. */
+ *  2. Wizard — Typeform-style focused experience; floating CTAs
+ *     break the one-question-at-a-time flow.
+ *
+ *  Detail pages (/zhk/<slug>, /kvartira/<slug>) USED to be in this
+ *  list under "don't compete with the listing sticky-bar CTA" — but
+ *  back then the feedback button was bottom-RIGHT and stacked with
+ *  the contact CTA at 375px. With the button now at bottom-LEFT
+ *  (opposite corner) there's no overlap, AND those detail pages are
+ *  exactly where buyers face the most friction (broken photos,
+ *  missing info, contact-button quirks). Hiding feedback there
+ *  meant the buyer couldn't report a problem on the only surface
+ *  where the problem actually mattered. Pre-launch fix: show the
+ *  feedback button on detail pages so we hear about real friction
+ *  while the buyer is still on the page that frustrated them. */
 function shouldHideOnPath(pathname: string): boolean {
   // Strip locale prefix (e.g. "/ru/kabinet/..." → "/kabinet/...")
   const stripped = pathname.replace(/^\/[a-z]{2}(?=\/|$)/, '');
   return (
     stripped.startsWith('/kabinet') ||
     stripped.startsWith('/post') ||
-    stripped.startsWith('/pomoshch-vybora') ||
-    // Detail pages with sticky bottom contact bar — don't compete
-    // with the conversion CTA.
-    /^\/zhk\/[^/]+$/.test(stripped) ||
-    /^\/kvartira\/[^/]+$/.test(stripped)
+    stripped.startsWith('/pomoshch-vybora')
   );
 }
 
