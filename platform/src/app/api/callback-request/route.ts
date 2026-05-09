@@ -16,7 +16,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
 import { readAnonIdServer } from '@/lib/analytics/anon-id';
-import { sendMessage } from '@/lib/telegram/bot';
+import { notifyFounder } from '@/lib/analytics/founder-notify';
 
 interface CallbackBody {
   listing_id: string;
@@ -79,29 +79,15 @@ export async function POST(req: NextRequest) {
   }
 
   // Ping the founder right away so they can WhatsApp the buyer while
-  // the listing is fresh in their head. Best-effort, looked up by
-  // user_roles admin → tg_chat_id; if the lookup fails the request
-  // still succeeded (it's in contact_requests for the dashboard).
-  try {
-    const { data: founderRow } = await supabase
-      .from('user_roles')
-      .select('user_id, users:users!inner(tg_chat_id)')
-      .eq('role', 'admin')
-      .order('user_id', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    const tgChatId =
-      ((founderRow?.users as unknown as { tg_chat_id?: number | null } | null) ?? null)
-        ?.tg_chat_id ?? null;
-    if (tgChatId) {
-      await sendMessage(
-        tgChatId,
-        `📞 Запрос обратной связи\n${body.phone.trim()}${body.name ? ` (${body.name})` : ''}\nКвартира: /kvartira/${body.listing_id}`,
-      );
-    }
-  } catch (err) {
-    console.error('founder notify (callback) failed:', err);
-  }
+  // the listing is fresh in their head. Best-effort — uses the shared
+  // notifyFounder helper so the role-filter semantics (admin OR staff)
+  // match isFounder() and the rest of the codebase. The earlier inline
+  // `.eq('role', 'admin')` lookup silently failed when the founder's
+  // user_roles row used role='staff', losing every callback notification
+  // (founder discovered this 2026-05-09).
+  await notifyFounder(
+    `📞 Запрос обратной связи\n${body.phone.trim()}${body.name ? ` (${body.name})` : ''}\nКвартира: /kvartira/${body.listing_id}`,
+  );
 
   return NextResponse.json({ ok: true });
 }

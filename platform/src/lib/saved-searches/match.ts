@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMessage } from '@/lib/telegram/bot';
+import { readFounderChatId } from '@/lib/analytics/founder-notify';
 import { formatMatchMessage, formatFounderRelayMessage } from './format';
 import { matchesListingFilters } from '@/lib/filters/listings';
 import { matchesBuildingFilters } from '@/lib/filters/buildings';
@@ -100,19 +101,17 @@ export async function notifyMatchingListing(
     .or('notify_chat_id.not.is.null,notify_phone.not.is.null');
   if (!searches || searches.length === 0) return;
 
-  // Founder chat_id is needed for the WhatsApp-fallback relay path.
+  // Founder chat_id is needed for the WhatsApp-fallback relay path —
+  // when a buyer subscribed via phone (no Telegram), we ping the founder
+  // so they can reach out manually. Uses the shared readFounderChatId
+  // helper so the role-filter semantics (admin OR staff) match isFounder()
+  // and the rest of the codebase. The earlier inline `.eq('role', 'admin')`
+  // lookup silently failed when the founder's role was 'staff' (founder
+  // discovered this 2026-05-09 via the same regression on /api/callback-request).
   let founderChatId: number | null = null;
   const phoneRelayNeeded = searches.some((s) => s.notify_phone && !s.notify_chat_id);
   if (phoneRelayNeeded) {
-    const { data: founderRow } = await supabase
-      .from('user_roles')
-      .select('user_id, users:users!inner(tg_chat_id)')
-      .eq('role', 'admin')
-      .order('user_id', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    const u = (founderRow?.users as unknown as { tg_chat_id?: number | null } | null) ?? null;
-    founderChatId = u?.tg_chat_id ?? null;
+    founderChatId = await readFounderChatId();
   }
 
   const buildingArr = listing.building as unknown as
