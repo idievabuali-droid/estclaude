@@ -78,3 +78,4 @@ export type { RoomTypeFilterProps } from './RoomTypeFilter';
 export { HomeSubscribeButton } from './HomeSubscribeButton';
 export { FilterGroup } from './FilterGroup';
 export { FeedbackButton } from './FeedbackButton';
+export { RetrySaveOnReturn } from './RetrySaveOnReturn';

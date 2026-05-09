@@ -6,7 +6,7 @@ import { routing } from '@/i18n/routing';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
-import { CompareBar, FeedbackButton, PageView } from '@/components/blocks';
+import { CompareBar, FeedbackButton, PageView, RetrySaveOnReturn } from '@/components/blocks';
 import { AppToaster } from '@/components/primitives';
 import { getCurrentUser } from '@/lib/auth/session';
 import { Suspense } from 'react';
@@ -63,6 +63,11 @@ export default async function LocaleLayout({
       <Suspense fallback={null}>
         <PageView />
       </Suspense>
+      {/* RetrySaveOnReturn — fires the pending /api/saved/toggle call
+          if SaveToggle stashed an intent before bouncing the user to
+          /voyti for re-login. Mounted layout-level so it runs once per
+          page load regardless of which surface the user lands on. */}
+      <RetrySaveOnReturn />
       {/* Microsoft Clarity — fills the genuine analytics gap that the
           first-party `events` table can't: session replay, click +
           scroll heatmaps, rage-click / dead-click / quick-back

@@ -34,7 +34,17 @@ export default async function VoytiPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const sp = await searchParams;
-  const target = sp.redirect ?? '/';
+  // Open-redirect guard: only honour same-origin relative paths.
+  // Without this, `/voyti?redirect=https://evil.com` could be planted
+  // in a phishing link to bounce users to an attacker-controlled page
+  // *after* a successful Telegram login, fully bypassing trust signals.
+  // Accept only paths starting with a single "/" (rejects "//evil.com"
+  // protocol-relative URLs and absolute URLs).
+  const rawRedirect = sp.redirect;
+  const target =
+    rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//')
+      ? rawRedirect
+      : '/';
 
   const user = await getCurrentUser();
   if (user) {

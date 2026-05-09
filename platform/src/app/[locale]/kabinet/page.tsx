@@ -121,10 +121,22 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
   return (
     <>
       <section className="border-b border-stone-200 bg-white">
-        <AppContainer className="flex flex-col gap-4 py-5">
+        <AppContainer className="flex flex-col gap-4 py-8 md:py-10">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <div className="flex flex-col gap-1">
-              <h1 className="text-h1 font-semibold text-stone-900">Кабинет</h1>
+            <div className="flex flex-col gap-1.5">
+              {/* Eyebrow caption above the H1 — same brand grammar as
+                  /, /zhk/[slug], /kvartira/[slug] (uppercase tracked-
+                  widest stone-500). Without this the kabinet read as a
+                  different product (missing brand voice). */}
+              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                {founder ? 'Операторская' : 'Ваш аккаунт'}
+              </span>
+              <h1
+                className="text-h1 font-semibold leading-[var(--leading-h1)] text-stone-900"
+                style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+              >
+                Кабинет
+              </h1>
             </div>
             <div className="flex items-center gap-2">
               {/* Founder-only quick links to operator surfaces — kept
@@ -164,7 +176,7 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
 
       {/* Account settings — identity, notifications, logout. Available
           to every authenticated user regardless of seller status. */}
-      <section className="bg-stone-50 py-5">
+      <section className="bg-stone-50 py-8 md:py-10">
         <AppContainer>
           <AppCard>
             <AppCardContent>
@@ -184,15 +196,23 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
           login. Hidden entirely for non-founders (the queue is internal
           to the platform team). */}
       {founder ? (
-        <section className="bg-white py-5">
-          <AppContainer className="flex flex-col gap-3">
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-h2 font-semibold text-stone-900">
-                На модерации
-              </h2>
-              <span className="text-meta tabular-nums text-stone-500">
-                {pendingRows.length}
+        <section className="bg-white py-8 md:py-10">
+          <AppContainer className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                Очередь модерации
               </span>
+              <div className="flex items-baseline gap-2">
+                <h2
+                  className="text-h2 font-semibold leading-[var(--leading-h2)] text-stone-900"
+                  style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+                >
+                  На проверке
+                </h2>
+                <span className="text-meta tabular-nums text-stone-500">
+                  {pendingRows.length}
+                </span>
+              </div>
             </div>
             <ModerationList rows={pendingRows} />
           </AppContainer>
@@ -206,13 +226,23 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
           the always-empty notifications inbox (no insert pipeline
           existed). Action buttons (Edit / Hide / Mark Sold / Delete)
           replaced with real wired-up versions in <ListingActions />. */}
-      <section className="py-6 pb-9">
+      <section className="py-8 pb-12 md:py-10 md:pb-16">
         <AppContainer className="flex flex-col gap-4">
-          <div className="flex items-end justify-between">
-            <h2 className="text-h2 font-semibold text-stone-900">Мои объявления</h2>
-            <span className="text-meta text-stone-500 tabular-nums">
-              {myListings.length} {myListings.length === 1 ? 'объявление' : 'объявлений'}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+              Опубликовано вами
             </span>
+            <div className="flex items-end justify-between gap-2">
+              <h2
+                className="text-h2 font-semibold leading-[var(--leading-h2)] text-stone-900"
+                style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+              >
+                Мои объявления
+              </h2>
+              <span className="text-meta text-stone-500 tabular-nums">
+                {myListings.length} {myListings.length === 1 ? 'объявление' : 'объявлений'}
+              </span>
+            </div>
           </div>
 
           {myListings.length === 0 ? (

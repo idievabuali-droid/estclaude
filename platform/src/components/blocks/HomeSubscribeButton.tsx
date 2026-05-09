@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { MessageSquare } from 'lucide-react';
 import { AppButton } from '@/components/primitives';
+import { toast } from '@/components/primitives/AppToast';
 
 /**
  * §R retention surface on the home page — one-tap Telegram subscribe
@@ -46,8 +47,12 @@ export function HomeSubscribeButton() {
         window.location.href = data.deep_link;
       } else {
         // Logged-in Telegram user: subscribe is already complete on
-        // the server (notify_chat_id set). Brief feedback then reset.
+        // the server (notify_chat_id was bound from their session).
+        // Show success feedback so the tap doesn't feel like nothing
+        // happened — without this the spinner just disappears and
+        // users wonder if it worked. Identified pre-launch (P0).
         setPending(false);
+        toast.success('Подписка активирована — пришлём в Telegram, когда появятся новые квартиры.');
       }
     } catch (e) {
       console.error('home-subscribe error', e);

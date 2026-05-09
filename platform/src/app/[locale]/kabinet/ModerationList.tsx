@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
-import { AppButton } from '@/components/primitives';
+import { AppButton, AppCard, AppCardContent } from '@/components/primitives';
 import { toast } from '@/components/primitives/AppToast';
 import { formatPriceNumber, formatM2 } from '@/lib/format';
 
@@ -41,9 +41,18 @@ export function ModerationList({ rows }: ModerationListProps) {
 
   if (items.length === 0) {
     return (
-      <div className="rounded-md border border-dashed border-stone-200 bg-white p-6 text-center text-meta text-stone-500">
-        Очередь пуста — все объявления просмотрены.
-      </div>
+      <AppCard>
+        <AppCardContent>
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <span className="text-h3 font-semibold text-stone-900">
+              Очередь пуста
+            </span>
+            <span className="text-meta text-stone-500">
+              Все объявления просмотрены — спасибо. Новые отправки появятся здесь.
+            </span>
+          </div>
+        </AppCardContent>
+      </AppCard>
     );
   }
 
@@ -69,49 +78,61 @@ export function ModerationList({ rows }: ModerationListProps) {
     }
   }
 
+  // Each pending row gets its own AppCard for visual parity with the
+  // "Мои объявления" cards rendered 20 lines down on /kabinet — without
+  // the wrap, the moderation queue read like an admin-panel artifact
+  // (raw divs with manual borders) instead of part of the same product.
   return (
-    <div className="flex flex-col divide-y divide-stone-200 rounded-md border border-stone-200 bg-white">
+    <div className="flex flex-col gap-3">
       {items.map((row) => {
         const isPending = pendingId === row.id;
         return (
-          <div
-            key={row.id}
-            className={
-              'flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between ' +
-              (isPending ? 'opacity-60' : '')
-            }
-          >
-            <div className="flex flex-col gap-1">
-              <span className="text-meta font-semibold text-stone-900">
-                {row.building_name} · {row.rooms_count}-комн ·{' '}
-                {formatM2(row.size_m2)} · этаж {row.floor_number}
-              </span>
-              <span className="text-meta tabular-nums text-stone-700">
-                {formatPriceNumber(row.price_total_dirams)} TJS
-              </span>
-              <span className="text-caption text-stone-500 tabular-nums">
-                Отправил {row.seller_phone} · {formatRelative(row.created_at)}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <AppButton
-                variant="primary"
-                size="md"
-                onClick={() => moderate(row.id, 'approve')}
-                disabled={isPending}
+          <AppCard key={row.id}>
+            <AppCardContent>
+              <div
+                className={
+                  'flex flex-col gap-3 md:flex-row md:items-center md:justify-between ' +
+                  (isPending ? 'opacity-60' : '')
+                }
               >
-                <Check className="size-4" /> Одобрить
-              </AppButton>
-              <AppButton
-                variant="secondary"
-                size="md"
-                onClick={() => moderate(row.id, 'reject')}
-                disabled={isPending}
-              >
-                <X className="size-4" /> Отклонить
-              </AppButton>
-            </div>
-          </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-meta font-semibold text-stone-900">
+                    {row.building_name} · {row.rooms_count}-комн ·{' '}
+                    {formatM2(row.size_m2)} · этаж {row.floor_number}
+                  </span>
+                  <span className="text-meta tabular-nums text-stone-700">
+                    {formatPriceNumber(row.price_total_dirams)} TJS
+                  </span>
+                  {/* Phone + relative-time split across two lines on mobile
+                      (was one cramped line before) — phone is the action
+                      detail the founder calls; timestamp is contextual. */}
+                  <div className="flex flex-col text-caption tabular-nums text-stone-500 md:flex-row md:gap-2">
+                    <span>Отправил {row.seller_phone}</span>
+                    <span className="hidden md:inline">·</span>
+                    <span>{formatRelative(row.created_at)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <AppButton
+                    variant="primary"
+                    size="md"
+                    onClick={() => moderate(row.id, 'approve')}
+                    disabled={isPending}
+                  >
+                    <Check className="size-4" /> Одобрить
+                  </AppButton>
+                  <AppButton
+                    variant="secondary"
+                    size="md"
+                    onClick={() => moderate(row.id, 'reject')}
+                    disabled={isPending}
+                  >
+                    <X className="size-4" /> Отклонить
+                  </AppButton>
+                </div>
+              </div>
+            </AppCardContent>
+          </AppCard>
         );
       })}
     </div>

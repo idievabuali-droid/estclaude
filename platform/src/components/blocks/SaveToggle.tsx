@@ -107,9 +107,25 @@ export function SaveToggle({ type, id, className }: SaveToggleProps) {
       });
       if (res.status === 401) {
         // Session expired between mount and click — revert + prompt.
+        // Stash the save intent in sessionStorage so RetrySaveOnReturn
+        // (mounted in the locale layout) can re-fire it once the user
+        // completes login. Without this the user logs back in and the
+        // item they were trying to save is just lost — they have to
+        // remember which card it was and tap the heart again.
+        // sessionStorage scopes the retry to the current tab, so it
+        // never leaks across tabs / browser sessions.
+        try {
+          sessionStorage.setItem(
+            'retry_save',
+            JSON.stringify({ type, id, ts: Date.now() }),
+          );
+        } catch {
+          // sessionStorage can throw in private mode / quota — non-fatal,
+          // user just doesn't get auto-retry.
+        }
         setSaved(!optimistic);
         setAuthenticated(false);
-        toast.info('Сессия истекла. Войдите заново.', {
+        toast.info('Сессия истекла. Войдите заново — сохраним автоматически.', {
           action: {
             label: 'Войти',
             onClick: () =>

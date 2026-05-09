@@ -145,12 +145,17 @@ export function ListingActions({ listingId, status }: ListingActionsProps) {
       ) : null}
 
       {confirmingDelete ? (
+        // Stone-700 (neutral destructive) instead of rose-600 — the
+        // platform's brand rule explicitly avoids red for non-emergency
+        // states. Stone-700 reads as "serious / final" without the
+        // urgency colouring of red, matching the calm halal-by-design
+        // tone we use everywhere else.
         <AppButton
           variant="primary"
           size="sm"
           onClick={handleDelete}
           disabled={pending}
-          className="bg-rose-600 hover:bg-rose-700"
+          className="bg-stone-700 hover:bg-stone-800 active:bg-stone-900"
         >
           Точно удалить?
         </AppButton>
