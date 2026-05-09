@@ -51,21 +51,40 @@ export async function readFounderChatId(): Promise<number | null> {
   }
   try {
     const supabase = createAdminClient();
-    const { data: founderRow } = await supabase
+    // PostgREST embed hint must be the NAMED FK constraint, not just
+    // the related table. user_roles has TWO FKs to users
+    // (user_id + granted_by), so an unqualified `users:users!inner(...)`
+    // hits error PGRST201 ("Could not embed because more than one
+    // relationship was found"). The Supabase client surfaces that as
+    // null data + a populated error object — silently treated as "no
+    // row" by callers that only destructure data. This bug hid the
+    // entire founder-notify pipeline for /api/callback-request,
+    // /api/login-callback, and saved-searches/match.ts (founder
+    // discovered 2026-05-09: "I never receive numbers"). The named
+    // hint `users!user_roles_user_id_fkey` resolves the ambiguity.
+    // Same pattern applies elsewhere — see CLAUDE.md "PostgREST
+    // embed hint syntax".
+    const { data: founderRow, error } = await supabase
       .from('user_roles')
-      .select('user_id, users:users!inner(tg_chat_id)')
-      // Accept BOTH founder roles. See the doc-comment above for why.
+      .select('user_id, users:users!user_roles_user_id_fkey!inner(tg_chat_id)')
+      // Accept BOTH founder roles — matches isFounder() in lib/auth/roles.ts.
       .in('role', FOUNDER_ROLES as unknown as string[])
       .order('user_id', { ascending: true })
       .limit(1)
       .maybeSingle();
+    if (error) {
+      // Surface PostgREST / network errors loudly. Earlier they were
+      // swallowed because the destructure ignored `error` and treated
+      // null data as "no founder", masking the real cause.
+      console.error('notifyFounder: user_roles lookup query failed:', error);
+      cachedFounderChatId = null;
+      cacheLoadedAt = now;
+      return null;
+    }
     const tgChatId =
       ((founderRow?.users as unknown as { tg_chat_id?: number | null } | null) ?? null)
         ?.tg_chat_id ?? null;
     if (!founderRow) {
-      // No row at all — founder hasn't been granted admin/staff yet.
-      // Loud-ish warn so a future deploy + missing-role regression is
-      // visible in server logs.
       console.warn(
         'notifyFounder: no user_roles row with role in (admin, staff) — founder Telegram alerts will not fire until one is inserted.',
       );
@@ -81,6 +100,17 @@ export async function readFounderChatId(): Promise<number | null> {
     console.error('founder chat_id lookup failed:', err);
     return null;
   }
+}
+
+/**
+ * Bust the in-process cache. Use after writing a `user_roles` row in
+ * tests / dev so the next notifyFounder call re-queries instead of
+ * returning a 5-minute-old null. No use in production today; exported
+ * mainly so the dev console can hit it ad-hoc when debugging.
+ */
+export function _invalidateFounderChatIdCache(): void {
+  cachedFounderChatId = undefined;
+  cacheLoadedAt = 0;
 }
 
 /**
