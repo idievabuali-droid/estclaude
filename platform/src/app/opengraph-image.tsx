@@ -10,11 +10,16 @@ import { ImageResponse } from 'next/og';
  * eyebrow, one wordmark, one tagline — no clutter.
  *
  * Why JSX-rendered and not a static PNG file: lets us tweak copy +
- * colours without re-exporting an asset, and Next keeps it server-cached
- * at the edge so it's effectively free at unfurl time. Same approach
- * Vercel's own marketing pages use.
+ * colours without re-exporting an asset, and the response is cached
+ * (Vercel's edge cache + browser cache) so it's effectively free at
+ * unfurl time. Same approach Vercel's own marketing pages use.
+ *
+ * Why nodejs runtime, not edge: the `next/og` bundle (font + canvas
+ * deps) ships at ~1.06 MB which exceeds Vercel's 1 MB edge-function
+ * limit on Hobby. Node serverless allows 50 MB. The cold-start cost
+ * is sub-second and amortises over the cache TTL.
  */
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const alt = 'Vafo.tj — квартиры и новостройки в Таджикистане';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
