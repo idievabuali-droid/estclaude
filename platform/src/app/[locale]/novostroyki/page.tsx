@@ -177,6 +177,12 @@ export default async function NovostroykiPage({
     nearLng,
     nearRadiusM: nearRadius,
     sort: sp.sort,
+    // Free-text soft filter from the home hero "Найти" button. When
+    // the buyer typed text that didn't match a structural pattern
+    // (e.g. "Гулистон Резиденс"), we pass it through as a substring
+    // match against the building name. The eyebrow above the result
+    // list reflects the active query so the buyer can clear it.
+    q: sp.q,
   });
 
   const cards = await Promise.all(
@@ -296,6 +302,26 @@ export default async function NovostroykiPage({
                 />
               </div>
             </div>
+
+            {/* "Поиск: «X»" pill — set when the buyer typed free text on
+                the home hero and was routed here. Visible above the
+                count so they can see what's being soft-filtered and
+                clear it with one tap. */}
+            {sp.q ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-1 text-meta text-stone-700">
+                  <span className="text-stone-500">Поиск:</span>
+                  <span className="font-medium">«{sp.q}»</span>
+                  <Link
+                    href={`/novostroyki${buildQuery({ ...sp, q: undefined })}`}
+                    aria-label="Сбросить поиск"
+                    className="inline-flex size-5 items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                  >
+                    <X className="size-3.5" aria-hidden />
+                  </Link>
+                </span>
+              </div>
+            ) : null}
 
             {/* ABOVE-GRID HEADER — single line "X проектов в Вахдате"
                 + sort dropdown + Карта/Список tab toggle. Per the

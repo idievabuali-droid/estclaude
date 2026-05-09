@@ -55,6 +55,12 @@ export type FilterParams = {
   developer?: string;
   /** Wizard payoff flag — see WizardResultBanner + GuidedFinder. */
   wizard?: string;
+  /** Free-text search query — soft `ilike` post-filter on building
+   *  name + address. Set by the home hero "Найти" button when the
+   *  buyer typed text that didn't match a structural pattern (e.g.
+   *  "Гулистон" or "Резиденс"). Renders as a "Поиск: «X»" eyebrow
+   *  with a clear-X above the result list. */
+  q?: string;
 };
 
 /** Read a CSV param as a Set for membership checks + toggling. */

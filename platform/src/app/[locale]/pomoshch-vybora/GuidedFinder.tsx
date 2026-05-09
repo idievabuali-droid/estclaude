@@ -361,6 +361,13 @@ export function GuidedFinder() {
                   <LocationSearch
                     destinationPath="/novostroyki"
                     variant="compact"
+                    // Wizard step 1 is "what district interests you?" —
+                    // surfacing buildings or parametric "3-комн до 200к"
+                    // results from the same dropdown would confuse the
+                    // intent. scope="location" hides those buckets and
+                    // keeps recent-searches scoped separately so home
+                    // recents don't leak into the wizard.
+                    scope="location"
                     onPick={(hit) => {
                       const anchor: PickedAnchor =
                         hit.sourceKind === 'district'

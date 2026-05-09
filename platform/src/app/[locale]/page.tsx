@@ -1,7 +1,8 @@
 import { Sparkles, ArrowUpRight, Globe2, Home, Building2 } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { AppContainer } from '@/components/primitives';
-import { BuildingCard, LocationSearch, HomeSubscribeButton } from '@/components/blocks';
+import { BuildingCard, HomeSubscribeButton } from '@/components/blocks';
+import { HeroSearchRow } from './HeroSearchRow';
 import {
   IllustrationBuilding,
   IllustrationCamera,
@@ -105,23 +106,14 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             Реальные фото со стройки, а не рендеры. Помогаем выбрать за 2 минуты.
           </p>
 
-          {/* Search row — input + button. Mobile: stacked, button
-              full-width below. Desktop: button inline at right edge.
-              Button is a Link to /novostroyki (LocationSearch's
-              destination) so even with empty input the CTA browses
-              all projects. The search input itself still submits via
-              its own behaviour on Enter or result selection. */}
-          <div className="flex w-full max-w-2xl flex-col gap-2 md:flex-row md:items-stretch">
-            <div className="flex-1">
-              <LocationSearch destinationPath="/novostroyki" variant="hero" />
-            </div>
-            <Link
-              href="/novostroyki"
-              className="inline-flex h-12 shrink-0 items-center justify-center rounded-md bg-stone-900 px-6 text-meta font-semibold text-white transition-colors hover:bg-stone-800"
-            >
-              Найти
-            </Link>
-          </div>
+          {/* Search row — input + Найти button, lifted into a client
+              island (HeroSearchRow) so the button can read the typed
+              query and run the parametric-parser → smart-routing flow.
+              Buyers typing "3 комнаты до 200к" → /kvartiry with
+              filters; "Гулистон" → /novostroyki?q=Гулистон. Picking
+              from autocomplete still bypasses this and routes by
+              SearchHit kind. */}
+          <HeroSearchRow />
 
           {/* "Или подобрать за 2 минуты" — quiet sparkle link to the
               guided picker. Sparkle micro-rotates on hover (motion-safe). */}

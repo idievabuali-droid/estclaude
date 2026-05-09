@@ -64,6 +64,12 @@ type SearchParams = {
    *  match count + a save-as-alert prompt instead of a generic
    *  filter result page. */
   wizard?: string;
+  /** Free-text search query — soft `ilike` post-filter on building
+   *  name / address / standalone street_address. Set by the home hero
+   *  "Найти" button when the buyer typed text that didn't match a
+   *  structural pattern. Renders as a "Поиск: «X»" eyebrow above the
+   *  result list with a clear-X. */
+  q?: string;
 };
 
 export default async function KvartiryPage({
@@ -105,6 +111,11 @@ export default async function KvartiryPage({
     nearLng,
     nearRadiusM: nearRadius,
     sort: sp.sort,
+    // Free-text soft filter from the home hero "Найти" button when
+    // the buyer typed text that didn't match a structural pattern.
+    // Substring match against building.name + building.address +
+    // standalone street_address (case-insensitive). Empty no-ops.
+    q: sp.q,
   });
 
   // Pre-fetch building + developer + benchmark for each card. Standalone
@@ -231,6 +242,37 @@ export default async function KvartiryPage({
                 />
               </div>
             </div>
+
+            {/* "Поиск: «X»" pill — set when the buyer typed free text on
+                the home hero and was routed here. Visible above the
+                count so they can see what's being soft-filtered and
+                clear it with one tap. */}
+            {sp.q ? (
+              (() => {
+                const clearParams = new URLSearchParams();
+                for (const [k, v] of Object.entries(sp)) {
+                  if (k !== 'q' && typeof v === 'string') clearParams.set(k, v);
+                }
+                const clearHref = clearParams.toString()
+                  ? `/kvartiry?${clearParams.toString()}`
+                  : '/kvartiry';
+                return (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-1 text-meta text-stone-700">
+                      <span className="text-stone-500">Поиск:</span>
+                      <span className="font-medium">«{sp.q}»</span>
+                      <Link
+                        href={clearHref}
+                        aria-label="Сбросить поиск"
+                        className="inline-flex size-5 items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                      >
+                        <X className="size-3.5" aria-hidden />
+                      </Link>
+                    </span>
+                  </div>
+                );
+              })()
+            ) : null}
 
             {/* ABOVE-GRID HEADER — count + sort. */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 pb-4">

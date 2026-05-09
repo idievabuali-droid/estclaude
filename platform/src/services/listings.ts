@@ -50,6 +50,13 @@ export type ListingFilters = {
    *  cascade. 'cheapest' / 'expensive' sort by price_total_dirams.
    *  'newest' sorts by published_at desc. */
   sort?: 'recommended' | 'cheapest' | 'expensive' | 'newest';
+  /** Free-text soft filter — case-insensitive substring match against
+   *  building.name + building.address (for ЖК listings) or
+   *  listing.street_address (for standalones). Empty/undefined no-ops.
+   *  Fires AFTER the structural filters above so it never blows up
+   *  the result set on its own — used as a "narrow further" tool by
+   *  the home hero search. */
+  q?: string | null;
 };
 
 const TIER_RANK: Record<string, number> = {
@@ -81,7 +88,11 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
   let q = supabase
     .from('listings')
     .select(
-      `*, buildings:buildings!left(city), cover_photo:photos!listings_cover_photo_fk(storage_path)`,
+      // building name + address joined so the post-fetch `q` filter
+      // (free-text search from the home hero) can substring-match
+      // against them. We keep using the !left modifier so standalones
+      // (building_id null) still come through with `buildings: null`.
+      `*, buildings:buildings!left(city, name, address), cover_photo:photos!listings_cover_photo_fk(storage_path)`,
     )
     .eq('status', 'active');
   if (filters.rooms?.length) q = q.in('rooms_count', filters.rooms);
@@ -180,12 +191,39 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
   // Standalone listing → use listing.district_id ∈ active-city
   // districts (we don't embed the districts FK because it's a fragile
   // dependency on migration timing — see top of function).
-  const filtered = (data ?? []).filter((row: Record<string, unknown>) => {
+  let filtered = (data ?? []).filter((row: Record<string, unknown>) => {
     const buildingCity = (row.buildings as { city?: string } | null)?.city;
     if (buildingCity) return buildingCity === ACTIVE_CITY;
     const districtId = row.district_id as string | null | undefined;
     return districtId != null && activeDistrictIds.has(districtId);
   });
+
+  // Free-text soft filter (q) — applied AFTER all structural filters
+  // so it narrows the existing result set rather than fanning it out.
+  // Substring match (case-insensitive) against:
+  //   - building.name.ru / building.address.ru (ЖК listings)
+  //   - listing.street_address (standalone listings)
+  // Empty/undefined q is a no-op. Used by the home hero "Найти" when
+  // the buyer typed text that didn't match a structural pattern.
+  const qFilter = filters.q?.trim().toLowerCase();
+  if (qFilter) {
+    filtered = filtered.filter((row: Record<string, unknown>) => {
+      const building = row.buildings as
+        | { name?: { ru?: string }; address?: { ru?: string } }
+        | null;
+      const buildingName = building?.name?.ru?.toLowerCase() ?? '';
+      const buildingAddress = building?.address?.ru?.toLowerCase() ?? '';
+      const standaloneAddress = (
+        (row.street_address as string | null | undefined) ?? ''
+      ).toLowerCase();
+      return (
+        buildingName.includes(qFilter) ||
+        buildingAddress.includes(qFilter) ||
+        standaloneAddress.includes(qFilter)
+      );
+    });
+  }
+
   const listings = filtered.map(mapListing);
 
   // Effective trust tier needs the developer's verified status — only
