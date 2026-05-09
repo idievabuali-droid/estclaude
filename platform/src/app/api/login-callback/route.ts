@@ -17,7 +17,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { readAnonIdServer } from '@/lib/analytics/anon-id';
-import { sendMessage } from '@/lib/telegram/bot';
+import { notifyFounder } from '@/lib/analytics/founder-notify';
 
 interface Body {
   phone: string;
@@ -66,31 +66,22 @@ export async function POST(req: NextRequest) {
   }
 
   // Founder gets pinged so they can WhatsApp the buyer right away.
-  // Best-effort; if the lookup fails the founder can still see the
-  // event in /kabinet/analytics.
-  try {
-    const { data: founderRow } = await supabase
-      .from('user_roles')
-      .select('user_id, users:users!inner(tg_chat_id)')
-      .eq('role', 'admin')
-      .order('user_id', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    const tgChatId =
-      ((founderRow?.users as unknown as { tg_chat_id?: number | null } | null) ?? null)
-        ?.tg_chat_id ?? null;
-    if (tgChatId) {
-      const lines = [
-        '📲 Новый запрос на вход через WhatsApp',
-        `Телефон: ${phone}`,
-      ];
-      if (body.name?.trim()) lines.push(`Имя: ${body.name.trim()}`);
-      lines.push(`Источник: ${body.source ?? '/voyti'}`);
-      await sendMessage(tgChatId, lines.join('\n'));
-    }
-  } catch (err) {
-    console.error('founder notify (login-callback) failed:', err);
-  }
+  // Uses the shared notifyFounder helper so the role-filter semantics
+  // (admin OR staff) match isFounder() and the rest of the codebase.
+  // The earlier inline `.eq('role', 'admin')` lookup silently failed
+  // when the founder's user_roles row used role='staff' — exactly the
+  // same regression that broke /api/callback-request and saved-search
+  // WhatsApp-fallback alerts. Founder discovered this 2026-05-09 ("when
+  // someone leaves their number to log in, I don't receive it anywhere").
+  // Even if the notify fails, the event row above keeps the request
+  // visible in /kabinet/analytics drill-down for that visitor.
+  const lines = [
+    '📲 Новый запрос на вход через WhatsApp',
+    `Телефон: ${phone}`,
+  ];
+  if (body.name?.trim()) lines.push(`Имя: ${body.name.trim()}`);
+  lines.push(`Источник: ${body.source ?? '/voyti'}`);
+  await notifyFounder(lines.join('\n'));
 
   return NextResponse.json({ ok: true });
 }
