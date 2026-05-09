@@ -11,7 +11,7 @@ import { AppButton } from '@/components/primitives';
  * POSTs an empty-filter saved search (`page: 'kvartiry'`, no filters;
  * ACTIVE_CITY = 'vahdat' is enforced server-side by listings queries
  * so the subscriber receives matches across the whole city). The
- * endpoint returns a `deep_link` to @zhk_tj_bot which finishes the
+ * endpoint returns a `deep_link` to @VafoTjBot which finishes the
  * subscribe handshake. We open the link in the same tab — Telegram
  * intercepts the URL via the OS app handler on mobile, falls back to
  * the web bot page on desktop.

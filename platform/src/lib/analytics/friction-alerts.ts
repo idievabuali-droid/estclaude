@@ -30,7 +30,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { notifyFounder } from './founder-notify';
 
-const SITE_BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://жк.tj';
+const SITE_BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://vafo.tj';
 
 /** A short anon_id slice for the alert message — 8 chars is enough to
  *  paste into the dashboard URL without leaking the full id in chat

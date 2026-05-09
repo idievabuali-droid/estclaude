@@ -56,8 +56,8 @@ export function SiteFooter() {
               О платформе
             </h3>
             <p className="text-meta text-stone-600">
-              ЖК.tj — поиск новостроек и квартир в Вахдате с проверенными
-              застройщиками и реальными фото со стройки.
+              Вафо — квартиры и новостройки по Таджикистану с проверенными
+              продавцами и реальными фото. Каждое объявление вычитываем вручную.
             </p>
           </div>
 
@@ -92,7 +92,7 @@ export function SiteFooter() {
         </div>
 
         <div className="flex flex-col gap-2 border-t border-stone-100 pt-4 text-caption text-stone-500 md:flex-row md:items-center md:justify-between">
-          <span className="tabular-nums">© 2026 ЖК.tj · Вахдат, Таджикистан</span>
+          <span className="tabular-nums">© 2026 Вафо · Ваҳдат, Таджикистан</span>
           <span>
             Команда платформы вычитывает каждое объявление перед публикацией.
           </span>

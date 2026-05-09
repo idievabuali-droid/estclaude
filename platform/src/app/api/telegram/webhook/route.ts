@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 async function promptShareContact(chatId: number): Promise<void> {
   await sendMessage(
     chatId,
-    'Нажмите кнопку ниже, чтобы поделиться номером телефона. Это нужно для входа на ЖК.tj и уведомлений по сохранённым квартирам.\n\n⚠️ Не печатайте номер вручную — Telegram не сможет проверить, что он ваш. Используйте кнопку.',
+    'Нажмите кнопку ниже, чтобы поделиться номером телефона. Это нужно для входа на Вафо и уведомлений по сохранённым квартирам.\n\n⚠️ Не печатайте номер вручную — Telegram не сможет проверить, что он ваш. Используйте кнопку.',
     {
       replyMarkup: {
         keyboard: [
@@ -118,7 +118,7 @@ async function handleStartCommand(message: TgMessage): Promise<void> {
   if (!token) {
     await sendMessage(
       chatId,
-      'Привет! Чтобы войти на ЖК.tj, откройте сайт и нажмите «Войти через Telegram» — затем вернитесь сюда по ссылке.',
+      'Привет! Чтобы войти на Вафо, откройте сайт и нажмите «Войти через Telegram» — затем вернитесь сюда по ссылке.',
     );
     return;
   }
@@ -147,7 +147,7 @@ async function handleStartCommand(message: TgMessage): Promise<void> {
   ) {
     await sendMessage(
       chatId,
-      'Ссылка устарела. Откройте сайт ЖК.tj и снова нажмите «Войти через Telegram».',
+      'Ссылка устарела. Откройте сайт Вафо и снова нажмите «Войти через Telegram».',
     );
     return;
   }
@@ -201,7 +201,7 @@ async function handleContactShare(message: TgMessage, contact: TgContact): Promi
   if (!session) {
     await sendMessage(
       chatId,
-      'Сначала нажмите «Войти через Telegram» на сайте ЖК.tj и откройте бота по ссылке.',
+      'Сначала нажмите «Войти через Telegram» на сайте Вафо и откройте бота по ссылке.',
     );
     return;
   }
@@ -326,7 +326,7 @@ async function handleSubscribeStart(chatId: number, token: string): Promise<void
   if (!session) {
     await sendMessage(
       chatId,
-      'Ссылка для подписки не найдена. Откройте сайт ЖК.tj, выберите фильтры и нажмите «Подписаться» снова.',
+      'Ссылка для подписки не найдена. Откройте сайт Вафо, выберите фильтры и нажмите «Подписаться» снова.',
     );
     return;
   }
@@ -394,6 +394,6 @@ async function handleNonContactInput(message: TgMessage): Promise<void> {
   // Generic orientation — no pending session.
   await sendMessage(
     chatId,
-    'Я бот ЖК.tj — помогаю войти на сайт и присылаю уведомления по сохранённым квартирам. Откройте сайт ЖК.tj и нажмите «Войти через Telegram», чтобы начать.',
+    'Я бот Вафо — помогаю войти на сайт и присылаю уведомления по сохранённым квартирам. Откройте сайт Вафо и нажмите «Войти через Telegram», чтобы начать.',
   );
 }

@@ -163,7 +163,7 @@ out tags center 1200;`;
     method: 'POST',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
-      'user-agent': 'zhk.tj-poi-seed/1.0 (+https://zhk.tj)',
+      'user-agent': 'vafo-poi-seed/1.0 (+https://vafo.tj)',
       accept: 'application/json',
     },
     body: `data=${encodeURIComponent(query)}`,

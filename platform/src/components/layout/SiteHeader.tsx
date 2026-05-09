@@ -22,14 +22,15 @@ export async function SiteHeader() {
     <header className="sticky top-0 z-30 border-b border-stone-200 bg-white">
       <AppContainer className="flex h-14 items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2 font-semibold text-terracotta-600">
-          {/* Wordmark in Lora serif — visual cohesion with home H1.
-              Tightened tracking + slight size bump reads as quiet
-              sophistication; combined with the warm terracotta brand
-              colour, it's the brand-identity moment of the chrome. */}
+          {/* Wordmark in Source Serif 4 — visual cohesion with home H1.
+              Tracking tighter than headline body but looser than the
+              cold-tech Stripe/Linear treatment, so the trust-wedge
+              brand reads warm. Combined with the terracotta colour,
+              it's the brand-identity moment of the chrome. */}
           <span
-            className="text-h3 tracking-[-0.01em]"
+            className="text-h3 tracking-[0.005em]"
             style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
-          >ЖК.tj</span>
+          >Вафо</span>
         </Link>
 
         <nav className="hidden items-center gap-5 text-meta font-medium text-stone-700 md:flex">

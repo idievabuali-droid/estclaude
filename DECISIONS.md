@@ -8,6 +8,14 @@ Newest at top.
 
 ---
 
+## 2026-05-09 · Rebrand from ЖК.tj to Вафо / Vafo
+
+**Locked:** New name **Вафо / Vafo** — Tajik/Persian word for "faithfulness, loyalty, fidelity" — replaces "ЖК.tj" everywhere. Visual system kept (terracotta-700 + stone palette + Source Serif 4); only the wordmark text + favicon + OG image change. 17 wordmark instances across 9 files updated; root metadata gets `metadataBase`, `Вафо` title template, OpenGraph + favicon references. Added `public/favicon.svg` (Cyrillic В glyph) and `src/app/opengraph-image.tsx` (edge-rendered 1200×630 PNG with eyebrow + wordmark + tagline). Telegram-bot copy updated; bot username @zhk_tj_bot → @VafoTjBot referenced in comments only (the actual handle is read from `TELEGRAM_BOT_USERNAME` env var, swapped at deploy time). Fallback chain if Vafo is blocked at procurement: Эътимод → Меҳр → Боварӣ.
+**Why:** "ЖК" is Russian real-estate jargon (no warmth, no positioning) and ".tj" reads as anchored to one country/segment. Founder wants country-wide ambition + the trust-and-warmth feel that matches the platform's manual-verification wedge. Vafo bakes both into a single 4-letter word with a 1000-year cultural pedigree.
+**Affects:** `src/components/layout/{SiteHeader,SiteFooter}.tsx`, `src/app/[locale]/{page,voyti/page,pomoshch-vybora/page,sravnenie/page,diaspora/page}.tsx`, `src/app/api/telegram/webhook/route.ts`, `src/app/layout.tsx`, `src/app/opengraph-image.tsx` (new), `src/lib/{analytics/friction-alerts,saved-searches/format,founder-contacts}.ts`, `scripts/{setup-telegram,fire-test-notification,seed-vahdat-pois}.mjs`, `public/favicon.svg` (new). Domain procurement (`vafo.tj`), bot username (`@VafoTjBot`), and env var swap (`NEXT_PUBLIC_SITE_URL`, `TELEGRAM_BOT_USERNAME`) are founder-side deploy steps; legacy `ЖК.tj` 301-redirects for at least 12 months.
+
+---
+
 ## 2026-05-07 · `/post` location-pick correctness pass
 
 **Locked:** LocationSection now tracks an explicit `target` (lat/lng/key) — POI picks set target to the POI's own coords; LocationPicker flies to / re-emits whatever the parent passes (no more centroid overwrite). `nearestDistrictId` skips districts whose centroid matches the Vahdat-fallback (was always returning districts[0] = Центр when all five rows had NULL centroids). PostFlow redirect after submit branches on mode + uses `data.created[0].slug` for standalone / single-apartment posts (was hitting /novostroyki). AddressAutocomplete dropdown shows Russian POI kind + district labels. Migration 0020 backfills the five Vahdat district centroids with rough approximations.

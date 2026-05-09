@@ -22,7 +22,7 @@ import { listListings } from '@/services/listings';
  * Section order (top to bottom):
  *   1. Hero — pill + serif H1 with italic accent + subhead +
  *      search-with-button + "или подобрать" sparkle link + nav strip
- *   2. Trust block — "Почему ЖК.tj" eyebrow + H2 statement + 3 icon
+ *   2. Trust block — "Почему Вафо" eyebrow + H2 statement + 3 icon
  *      cards (verified visits / real photos / 2-min match)
  *   3. Featured ЖК — 3 BuildingCards (curated by featured_rank)
  *   4. Retention — one-tap Vahdat-wide Telegram subscribe
@@ -164,7 +164,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </AppContainer>
       </section>
 
-      {/* ─── TRUST BLOCK — "Почему ЖК.tj" ─────────────────────────
+      {/* ─── TRUST BLOCK — "Почему Вафо" ─────────────────────────
           First-class section between hero and Featured. Eyebrow label
           + H2 statement + 3 icon cards. Replaces the prior in-hero
           USP cards — better placement, single-job heading, breathable. */}
@@ -172,7 +172,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         <AppContainer className="flex flex-col gap-6 md:gap-8">
           <div className="flex flex-col items-center gap-2 text-center">
             <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
-              Почему ЖК.tj
+              Почему Вафо
             </span>
             <h2
               className="text-h2 font-semibold leading-[var(--leading-h2)] text-stone-900 md:text-h1"

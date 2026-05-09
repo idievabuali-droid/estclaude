@@ -16,7 +16,7 @@
  *
  * The actual delivery (Telegram message arriving) is observable on the
  * founder's @-handle (relay path for WhatsApp subscribers) or the
- * @zhk_tj_bot conversation (direct path for Telegram subscribers).
+ * @VafoTjBot conversation (direct path for Telegram subscribers).
  *
  * Cleanup: GET this endpoint to remove all test listings inserted by
  * prior runs (slug starts with "test-match-").
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
     ok: true,
     listing_id: inserted.id,
     slug: inserted.slug,
-    note: 'Notify pipeline ran. Check Telegram (your @-handle for WhatsApp-subscribed searches; @zhk_tj_bot for Telegram-subscribed).',
+    note: 'Notify pipeline ran. Check Telegram (your @-handle for WhatsApp-subscribed searches; @VafoTjBot for Telegram-subscribed).',
   });
 }
 

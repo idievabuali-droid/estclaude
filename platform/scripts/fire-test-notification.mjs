@@ -9,7 +9,7 @@
  * inline so we can run it from a Node script without the Next.js
  * server context. Two delivery paths:
  *
- *   - notify_chat_id set      → direct buyer message via @zhk_tj_bot
+ *   - notify_chat_id set      → direct buyer message via @VafoTjBot
  *   - notify_phone, no chat_id → relay message to the founder asking
  *                                them to manually WhatsApp the buyer
  *

@@ -34,10 +34,10 @@ export default async function PomoshchVyboraPage({
         <div className="flex items-center justify-between">
           <Link
             href="/"
-            className="text-h3 font-semibold tracking-[-0.01em] text-terracotta-700"
+            className="text-h3 font-semibold tracking-[0.005em] text-terracotta-700"
             style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
           >
-            ЖК.tj
+            Вафо
           </Link>
           <Link
             href="/izbrannoe"

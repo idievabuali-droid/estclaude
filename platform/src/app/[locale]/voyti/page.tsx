@@ -67,10 +67,10 @@ export default async function VoytiPage({
             grammar (Stripe, Linear, Cal.com all use it). */}
         <div className="flex flex-col items-center gap-1 text-center">
           <span
-            className="text-h2 font-semibold text-terracotta-700 tracking-[-0.01em]"
+            className="text-h2 font-semibold text-terracotta-700 tracking-[0.005em]"
             style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
           >
-            ЖК.tj
+            Вафо
           </span>
         </div>
 

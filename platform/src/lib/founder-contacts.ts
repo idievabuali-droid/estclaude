@@ -9,14 +9,15 @@
  * `phone` is the digits-only form used for tel:/whatsapp links;
  * `phoneDisplay` is what we show in copy. Keep both in sync.
  *
- * `telegramHandle` is a personal handle (without `@`). For now we
- * point at `zhk_tj_admin` — change this when you have a real handle.
+ * `telegramHandle` is a personal handle (without `@`). Keep this in
+ * sync with whichever Telegram username the founder uses for buyer
+ * outreach — distinct from the platform's auth bot.
  */
 export const FOUNDER_CONTACTS = {
   phone: '+992935563306',
   phoneDisplay: '+992 93 556 33 06',
   whatsappLink: 'https://wa.me/992935563306',
-  // Personal Telegram handle for buyer outreach (NOT @zhk_tj_bot —
+  // Personal Telegram handle for buyer outreach (NOT @VafoTjBot —
   // that's the auth bot; messages there go nowhere). Confirmed via
   // founder's own tg_username in the analytics drill-down.
   telegramHandle: 'idievabuali',

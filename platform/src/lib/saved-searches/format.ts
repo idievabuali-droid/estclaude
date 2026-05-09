@@ -92,7 +92,7 @@ export interface MatchMessageInput {
   size_m2: number;
   price_total_tjs: number;
   listing_slug: string;
-  origin: string; // e.g. https://zhk.tj
+  origin: string; // e.g. https://vafo.tj
 }
 
 /** Telegram body for a direct-to-buyer match alert. */
