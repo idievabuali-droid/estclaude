@@ -28,13 +28,20 @@ import { getDistrictBenchmark } from '@/services/benchmarks';
 import { getNearbyPOIs } from '@/services/poi';
 import { getBuildingProgress } from '@/services/progress';
 import { supabasePublicUrl } from '@/services/photos';
-import { formatPriceNumber, pluralRu, formatHandoverQuarter } from '@/lib/format';
+import { formatPriceNumber, formatHandoverQuarter } from '@/lib/format';
 import { STAGE_INFO } from '@/lib/building-stages';
 
-/** Max apartment cards rendered inline on the building detail page.
- *  When more exist, a "Посмотреть все N" CTA links to the filtered
- *  /kvartiry?building=<slug> page where buyers can drill down. */
-const APARTMENTS_PREVIEW_LIMIT = 6;
+// APARTMENTS_PREVIEW_LIMIT was the slice cap before — sliced 6 of N
+// listings into RoomTypeFilter while the page header + bottom CTA
+// still showed N. Result: "Квартиры (12)" + "Все (6)" + "Посмотреть
+// все 12" all on one screen, three different counts pointing at the
+// same set (founder critique 2026-05-09). Removed; we now render all
+// listings inline so the filter chips, page header, and any preview
+// counts share a single source of truth (`listings.length`). The
+// "Посмотреть все" jump-out is gone — the inline RoomTypeFilter
+// already serves the same narrowing job. If a single ЖК ever holds
+// hundreds of listings the right answer is in-section pagination,
+// not a separate count.
 
 /**
  * Building detail page (/zhk/[slug]).
@@ -486,25 +493,13 @@ export default async function BuildingDetailPage({
               </AppCardContent>
             </AppCard>
           ) : (
-            <>
-              <RoomTypeFilter
-                listings={listings.slice(0, APARTMENTS_PREVIEW_LIMIT)}
-                building={building}
-                developer={developer}
-                districtMedianPerM2={median?.median ?? null}
-                districtSampleSize={median?.sample ?? 0}
-              />
-              {listings.length > APARTMENTS_PREVIEW_LIMIT ? (
-                <Link
-                  href={`/kvartiry?building=${building.slug}`}
-                  className="inline-flex w-fit items-center gap-1 self-end text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
-                >
-                  Посмотреть все {listings.length}{' '}
-                  {pluralRu(listings.length, ['квартиру', 'квартиры', 'квартир'])}
-                  <ArrowUpRight className="size-3.5" aria-hidden />
-                </Link>
-              ) : null}
-            </>
+            <RoomTypeFilter
+              listings={listings}
+              building={building}
+              developer={developer}
+              districtMedianPerM2={median?.median ?? null}
+              districtSampleSize={median?.sample ?? 0}
+            />
           )}
         </AppContainer>
       </section>
