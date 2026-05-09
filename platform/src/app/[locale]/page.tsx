@@ -159,9 +159,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
           {/* Subhead — Inter sans for clarity. Replaces the prior
               3-claim trust line (now folded into the dedicated trust
-              block section below). */}
+              block section below). The earlier "а не рендеры" framing
+              read as in-the-weeds for a buyer who isn't already
+              comparing renders to photos — we just stake the positive
+              claim now (founder critique 2026-05-09). */}
           <p className="max-w-xl text-meta text-stone-700 md:text-body">
-            Реальные фото со стройки, а не рендеры. Помогаем выбрать за 2 минуты.
+            Свежие фото со стройки. Помогаем выбрать за 2 минуты.
           </p>
 
           {/* Search row — input + Найти button, lifted into a client
@@ -248,8 +251,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             />
             <TrustCard
               Illustration={IllustrationCamera}
-              title="Реальные фото, не рендеры"
-              body="Обновляем еженедельно."
+              title="Свежие фото со стройки"
+              body="Обновляем ежемесячно."
             />
             <TrustCard
               Illustration={IllustrationCompass}
