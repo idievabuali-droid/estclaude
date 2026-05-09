@@ -9,6 +9,10 @@ import { nearestDistrictId } from '@/lib/listings/nearest-district';
 interface DistrictOption {
   id: string;
   name: string;
+  /** May fall back to Vahdat town-centre when the district seed row
+   *  has no centroid in the DB. The map still renders correctly; the
+   *  auto-derive logic skips districts whose centroid matches the
+   *  fallback to avoid "every pin snaps to districts[0]". */
   center_lat: number;
   center_lng: number;
 }
@@ -81,13 +85,21 @@ export function LocationSection({
   onCoordsChange,
   onPickExistingBuilding,
 }: LocationSectionProps) {
-  // The map's centerKey changes whenever the seller picks a district
-  // OR an autocomplete suggestion. LocationPicker watches this to
-  // recenter + reset the marker.
-  const [centerKey, setCenterKey] = useState(districtId || 'init');
-  const district = districts.find((d) => d.id === districtId) ?? districts[0];
-  const centerLat = district?.center_lat ?? 38.5511;
-  const centerLng = district?.center_lng ?? 69.0214;
+  // The point the map should fly to + use as the chosen marker
+  // position whenever `key` changes. Tracked separately from the form's
+  // `coords` because district-change-via-dropdown should reset the
+  // marker to the district centroid, while POI picks should drop the
+  // marker exactly on the POI (not the district fallback). The parent's
+  // `coords` is the source of truth for the *form*; this `target` is
+  // the source of truth for the *map view*.
+  const [target, setTarget] = useState(() => {
+    const initial = districts.find((d) => d.id === districtId) ?? districts[0];
+    return {
+      lat: coords?.lat ?? initial?.center_lat ?? 38.5511,
+      lng: coords?.lng ?? initial?.center_lng ?? 69.0214,
+      key: districtId || 'init',
+    };
+  });
 
   function handlePick(pick: AddressPick) {
     if (pick.kind === 'building') {
@@ -102,23 +114,27 @@ export function LocationSection({
     if (pick.kind === 'district' && pick.latitude != null && pick.longitude != null) {
       onDistrictChange(pick.districtId);
       onCoordsChange({ lat: pick.latitude, lng: pick.longitude });
-      setCenterKey(pick.districtId);
+      setTarget({ lat: pick.latitude, lng: pick.longitude, key: pick.districtId });
       return;
     }
     if (pick.kind === 'poi') {
       onCoordsChange({ lat: pick.latitude, lng: pick.longitude });
       // Snap district to whichever centroid is closest to the POI —
       // the picker's POI doesn't carry district_id directly, only the
-      // human district slug.
+      // human district slug. nearestDistrictId returns null if all
+      // centroids share the Vahdat-fallback (so we don't blindly snap
+      // to districts[0]).
       const snapped = nearestDistrictId(pick.latitude, pick.longitude, districts);
       if (snapped && snapped !== districtId) {
         onDistrictChange(snapped);
-        setCenterKey(snapped);
-      } else {
-        // Force LocationPicker to recenter on the new coords even when
-        // the district didn't change — bump the key with a fresh value.
-        setCenterKey(`poi-${pick.latitude.toFixed(4)}-${pick.longitude.toFixed(4)}`);
       }
+      // Always recenter the map on the POI coords (NOT the district
+      // centroid) so the seller sees the place they picked.
+      setTarget({
+        lat: pick.latitude,
+        lng: pick.longitude,
+        key: `poi-${pick.latitude.toFixed(4)}-${pick.longitude.toFixed(4)}`,
+      });
       return;
     }
     // 'free' — seller pressed Enter / clicked "use as typed". No
@@ -129,10 +145,23 @@ export function LocationSection({
     onCoordsChange(next);
     // Auto-snap district to whatever centroid is closest to the new
     // pin position. Cheap (≤10 districts in V1). Seller can override
-    // via the dropdown below.
+    // via the dropdown below. nearestDistrictId returns null when
+    // centroid data is missing → we keep the seller's chosen district.
     const snapped = nearestDistrictId(next.lat, next.lng, districts);
     if (snapped && snapped !== districtId) {
       onDistrictChange(snapped);
+    }
+  }
+
+  function handleDistrictChange(nextId: string) {
+    onDistrictChange(nextId);
+    const d = districts.find((dd) => dd.id === nextId);
+    if (d) {
+      // Reset the map view + marker to the new district's centroid.
+      // The form's `coords` will follow via LocationPicker's centerKey
+      // effect — switching район is the seller saying "ignore the old
+      // pin, I'm somewhere else now."
+      setTarget({ lat: d.center_lat, lng: d.center_lng, key: nextId });
     }
   }
 
@@ -164,10 +193,7 @@ export function LocationSection({
               label="Район"
               required
               value={districtId}
-              onChange={(e) => {
-                onDistrictChange(e.target.value);
-                setCenterKey(e.target.value);
-              }}
+              onChange={(e) => handleDistrictChange(e.target.value)}
               options={districts.map((d) => ({ value: d.id, label: d.name }))}
               helperText="Подбираем автоматически по точке на карте — поправьте, если выбрано неточно."
               errorText={districtError}
@@ -175,9 +201,9 @@ export function LocationSection({
           </div>
 
           <LocationPicker
-            centerLat={centerLat}
-            centerLng={centerLng}
-            centerKey={centerKey}
+            centerLat={target.lat}
+            centerLng={target.lng}
+            centerKey={target.key}
             value={coords}
             onChange={handleCoordsChange}
           />

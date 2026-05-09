@@ -10,6 +10,40 @@ import type { SearchHit } from '@/services/search';
  *  out before this type narrows the dropdown rendering. */
 type LocatableHit = Exclude<SearchHit, { sourceKind: 'developer' }>;
 
+/** Russian labels for POI kinds (the value of `pois.kind` — sourced
+ *  from OSM via scripts/seed-vahdat-pois.mjs). Kept in this file so the
+ *  dropdown row reads naturally to a Russian-speaking seller; the raw
+ *  English string ("supermarket") looked like a bug to roleplay sellers. */
+const POI_KIND_RU: Record<string, string> = {
+  mosque: 'Мечеть',
+  school: 'Школа',
+  kindergarten: 'Детсад',
+  hospital: 'Поликлиника',
+  pharmacy: 'Аптека',
+  supermarket: 'Магазин',
+  transit: 'Транспорт',
+  park: 'Парк',
+  square: 'Площадь',
+  street: 'Улица',
+};
+
+/** Vahdat district slugs → short Russian display names. Same set the
+ *  rest of /post uses; embedded here so we can localise the secondary
+ *  line on POI rows without piping district objects all the way down. */
+const DISTRICT_SLUG_RU: Record<string, string> = {
+  'vahdat-center': 'Центр',
+  gulistan: 'Гулистон',
+  sharora: 'Шарора',
+  istiqlol: 'Истиқлол',
+  sarbozor: 'Сарбозор',
+};
+
+function poiSecondaryLabel(kind: string, districtSlug: string | null): string {
+  const kindLabel = POI_KIND_RU[kind] ?? kind;
+  const districtLabel = districtSlug ? DISTRICT_SLUG_RU[districtSlug] ?? districtSlug : null;
+  return districtLabel ? `${kindLabel} · ${districtLabel}` : kindLabel;
+}
+
 /**
  * Picked from the autocomplete dropdown. Encodes EVERY signal the
  * /post form might want from a hit:
@@ -302,7 +336,7 @@ export function AddressAutocomplete({
                     ? `ЖК${hit.districtName ? ` · ${hit.districtName}` : ''}`
                     : hit.sourceKind === 'district'
                       ? 'Район'
-                      : `${hit.kind}${hit.district_slug ? ` · ${hit.district_slug}` : ''}`}
+                      : poiSecondaryLabel(hit.kind, hit.district_slug)}
                 </span>
               </span>
             </li>

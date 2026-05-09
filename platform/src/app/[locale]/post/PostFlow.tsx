@@ -650,14 +650,22 @@ export function PostFlow({
             ? `Опубликовано ${okCount} из ${okCount + failCount}`
             : `Опубликовано: ${okCount} ${plural(okCount, ['квартира', 'квартиры', 'квартир'])}`,
         );
-        // Land on the new building page when one was created; otherwise
-        // back to the existing building's page.
-        const slug = data.building_slug ?? null;
-        if (slug) router.push(`/zhk/${slug}`);
-        else if (existingBuildingId) {
-          // We don't know the slug client-side, send to /novostroyki to
-          // see all buildings (the new listing is in there).
-          router.push('/novostroyki');
+        // Redirect rules:
+        //   - new ЖК → /zhk/<slug>: the seller wants to see their fresh
+        //     building page with the units beneath it.
+        //   - standalone OR single-apartment-into-existing-ЖК → land
+        //     directly on the apartment detail page so they can verify
+        //     the listing looks right (price/photos/address). Falls
+        //     back to /kabinet when the API didn't return a slug.
+        //   - everything else → /kabinet (multi-apartment posts cover
+        //     mass-add cases where there isn't one obvious destination).
+        const buildingSlug = data.building_slug ?? null;
+        const aptSlug =
+          data.created && data.created.length === 1 ? data.created[0]?.slug ?? null : null;
+        if (mode === 'new-building' && buildingSlug) {
+          router.push(`/zhk/${buildingSlug}`);
+        } else if (aptSlug) {
+          router.push(`/kvartira/${aptSlug}`);
         } else {
           router.push('/kabinet');
         }
