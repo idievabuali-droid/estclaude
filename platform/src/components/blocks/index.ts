@@ -83,4 +83,6 @@ export type {
 } from './FeaturedListingsRow';
 export { FilterGroup } from './FilterGroup';
 export { FeedbackButton } from './FeedbackButton';
+export { ScrollSpyTabs } from './ScrollSpyTabs';
+export type { ScrollSpyTabsProps, ScrollSpyTab } from './ScrollSpyTabs';
 export { RetrySaveOnReturn } from './RetrySaveOnReturn';

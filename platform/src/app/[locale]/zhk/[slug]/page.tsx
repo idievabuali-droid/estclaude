@@ -21,6 +21,7 @@ import {
   BuildingStickyContact,
   MessagingPopoverButton,
   CardPhotoCarousel,
+  ScrollSpyTabs,
 } from '@/components/blocks';
 import type { PoiCategory } from '@/services/poi';
 import { getBuilding, getDeveloperById, getDeveloperStats, listBuildings } from '@/services/buildings';
@@ -457,60 +458,40 @@ export default async function BuildingDetailPage({
           getting silently dropped off the screen). The fade is
           pointer-events-none so taps on the last visible tab still
           work normally. */}
-      <nav
-        aria-label="Разделы"
-        className="sticky top-14 z-20 border-b border-stone-200 bg-white/95 backdrop-blur"
-      >
-        <AppContainer className="relative">
-          <div className="-mx-1 flex items-center gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <a
-              href="#units"
-              className="inline-flex h-9 shrink-0 items-center rounded-sm bg-stone-100 px-3 text-meta font-medium text-stone-900 hover:bg-stone-200"
-            >
-              Квартиры ({listings.length})
-            </a>
-            <a
-              href="#stage"
-              className="inline-flex h-9 shrink-0 items-center rounded-sm px-3 text-meta font-medium text-stone-700 hover:bg-stone-100"
-            >
-              Стадия
-            </a>
-            {(building.status === 'under_construction' || building.status === 'near_completion') ? (
-              <Link
-                href={`/zhk/${building.slug}/progress`}
-                className="inline-flex h-9 shrink-0 items-center gap-1 rounded-sm bg-amber-50 px-3 text-meta font-medium text-[color:var(--color-badge-tier-developer)] hover:bg-amber-100"
-              >
-                <Camera className="size-3.5" /> Ход стройки
-              </Link>
-            ) : null}
-            <a
-              href="#about"
-              className="inline-flex h-9 shrink-0 items-center rounded-sm px-3 text-meta font-medium text-stone-700 hover:bg-stone-100"
-            >
-              О проекте
-            </a>
-            <a
-              href="#nearby"
-              className="inline-flex h-9 shrink-0 items-center rounded-sm px-3 text-meta font-medium text-stone-700 hover:bg-stone-100"
-            >
-              Что рядом
-            </a>
-            <a
-              href="#developer"
-              className="inline-flex h-9 shrink-0 items-center rounded-sm px-3 text-meta font-medium text-stone-700 hover:bg-stone-100"
-            >
-              Застройщик
-            </a>
-          </div>
-          {/* Right-edge fade — visual cue that the tab row scrolls
-              horizontally. md:hidden because at desktop widths every
-              tab fits and the gradient would just look like clipping. */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-white/95 to-transparent md:hidden"
-          />
-        </AppContainer>
-      </nav>
+      {/* Sub-nav with scroll-spy — active tab follows the section
+          currently in view. Founder critique 2026-05-11: "the shadow
+          that shows where we are stays only on apartments, doesn't
+          move through stages." Mature-platform pattern (Cian, Avito,
+          Rightmove project detail pages): IntersectionObserver flips
+          the active class as the user scrolls or clicks-and-scrolls.
+          See ScrollSpyTabs for the observer math.
+
+          The "Ход стройки" tab is a route change to /zhk/<slug>/progress
+          rather than an in-page anchor; rendered with externalHref so
+          it's exempt from scroll-spy (never gets active state, has its
+          amber-pill visual treatment to mark it as a route jump). */}
+      <ScrollSpyTabs
+        ariaLabel="Разделы"
+        tabs={[
+          { id: 'units', label: `Квартиры (${listings.length})` },
+          { id: 'stage', label: 'Стадия' },
+          ...(building.status === 'under_construction' || building.status === 'near_completion'
+            ? [
+                {
+                  id: 'progress-ext',
+                  label: 'Ход стройки',
+                  externalHref: `/zhk/${building.slug}/progress`,
+                  externalClassName:
+                    'bg-amber-50 text-[color:var(--color-badge-tier-developer)] hover:bg-amber-100',
+                  icon: <Camera className="size-3.5" />,
+                },
+              ]
+            : []),
+          { id: 'about', label: 'О проекте' },
+          { id: 'nearby', label: 'Что рядом' },
+          { id: 'developer', label: 'Застройщик' },
+        ]}
+      />
 
       {/* ─── 3. STAGE + KEY STATS (combined) ─────────────────────
            Two related sub-blocks in one section. Buyers asking "what
