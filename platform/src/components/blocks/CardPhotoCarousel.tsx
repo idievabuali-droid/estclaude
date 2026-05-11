@@ -9,7 +9,8 @@ export interface CardPhotoCarouselProps {
   photos: string[];
   /** Aspect ratio of the cover area, e.g. "4/3" for ListingCard,
    *  "16/10" for BuildingCard (cinematic crop, premium real-estate
-   *  pattern). "16/9" kept for back-compat with any legacy callers. */
+   *  pattern). "16/9" kept for back-compat with any legacy callers.
+   *  Ignored when `heightClassName` is provided. */
   aspect: '4/3' | '16/9' | '16/10';
   /** Alt-text base — index appended automatically. */
   alt: string;
@@ -28,6 +29,14 @@ export interface CardPhotoCarouselProps {
    *  while the user swipes (e.g. a label that lives bottom-right on
    *  every photo, not just the cover). Optional. */
   persistentOverlay?: React.ReactNode;
+  /** Override the aspect-ratio class with explicit height classes
+   *  (e.g. `"h-[40vh] md:h-[60vh]"`). Used by hero-sized placements
+   *  like the `/zhk/<slug>` detail page where the cover should be
+   *  viewport-proportional rather than fixed-aspect. When set, the
+   *  `aspect` prop is ignored visually but still required on the prop
+   *  signature so this is a non-breaking addition for every existing
+   *  caller. */
+  heightClassName?: string;
 }
 
 /**
@@ -65,11 +74,13 @@ export function CardPhotoCarousel({
   style,
   children,
   persistentOverlay,
+  heightClassName,
 }: CardPhotoCarouselProps) {
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
-  const aspectClass =
-    aspect === '4/3' ? 'aspect-[4/3]' : aspect === '16/10' ? 'aspect-[16/10]' : 'aspect-[16/9]';
+  const aspectClass = heightClassName ?? (
+    aspect === '4/3' ? 'aspect-[4/3]' : aspect === '16/10' ? 'aspect-[16/10]' : 'aspect-[16/9]'
+  );
 
   // Scroll listener wires the counter + dots to the live scroll position.
   // Only attached when there's actual scroll to listen to.

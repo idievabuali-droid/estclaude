@@ -20,6 +20,7 @@ import {
   SaveToggle,
   BuildingStickyContact,
   MessagingPopoverButton,
+  CardPhotoCarousel,
 } from '@/components/blocks';
 import type { PoiCategory } from '@/services/poi';
 import { getBuilding, getDeveloperById, getDeveloperStats, listBuildings } from '@/services/buildings';
@@ -204,57 +205,72 @@ export default async function BuildingDetailPage({
           Premium-real-estate pattern (Knight Frank, The Modern House,
           Sotheby's): full-width photograph at 60vh on desktop, 40vh
           on mobile. Photography is the product — give it the room it
-          deserves. Stage badge top-left, Save/Share top-right; the
-          photo-count chip lives bottom-right as a small overlay
-          control (when the project has multiple photos). */}
-      <div
-        className="relative h-[40vh] w-full bg-stone-100 md:h-[60vh]"
-        style={building.cover_photo_url ? undefined : { backgroundColor: building.cover_color }}
-      >
-        {building.cover_photo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={building.cover_photo_url}
-            alt={building.name.ru}
-            className="absolute inset-0 size-full object-cover"
-          />
-        ) : null}
-        {/* Soft top + bottom gradient for chip legibility on bright
-            photos without darkening the photograph's centre. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-black/0 to-black/20"
-        />
-        <div className="absolute left-3 top-3 md:left-5 md:top-5">
-          <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-stone-200 bg-white/95 px-2.5 py-1 text-caption font-medium text-stone-700 backdrop-blur">
-            <span className="size-1.5 rounded-full bg-terracotta-600" aria-hidden />
-            {STAGE_INFO[building.status].label}
-          </span>
-        </div>
-        <div className="absolute right-3 top-3 flex items-center gap-2 md:right-5 md:top-5">
-          <ShareButton
-            compact
-            text={`ЖК ${building.name.ru} · ${district.name.ru}`}
-            title={building.name.ru}
-          />
-          <SaveToggle type="building" id={building.id} />
-        </div>
-        {/* Photo count + "Ход стройки" toggle — bottom-right overlay
-            controls. The count tells the buyer how much photography
-            exists; the progress link sends under-construction-project
-            buyers straight to the timeline (the strongest trust
-            signal we have). */}
-        <div className="absolute bottom-3 right-3 flex items-center gap-2 md:bottom-5 md:right-5">
-          {(building.status === 'under_construction' || building.status === 'near_completion') ? (
-            <Link
-              href={`/zhk/${building.slug}/progress`}
-              className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white/95 px-2.5 py-1 text-caption font-medium text-stone-700 backdrop-blur hover:bg-white"
-            >
-              <Camera className="size-3.5" /> Ход стройки
-            </Link>
-          ) : null}
-        </div>
-      </div>
+          deserves.
+
+          Was a static single-image hero before — even when buildings
+          had multiple photos, the buyer could only see the cover and
+          had no way to swipe through the rest (founder critique
+          2026-05-11: "I cannot swipe photo even if we have several").
+          Now reuses CardPhotoCarousel with `heightClassName` so the
+          full-bleed hero gets the same scroll-snap swipe gesture +
+          desktop arrow controls + counter chip that listing cards
+          have. Falls back to a single static frame when the building
+          has 0 or 1 photo (the carousel handles all three modes
+          itself). */}
+      <CardPhotoCarousel
+        photos={building.photo_urls ?? []}
+        aspect="16/9" /* ignored — heightClassName below overrides */
+        heightClassName="h-[40vh] w-full md:h-[60vh]"
+        alt={building.name.ru}
+        className="bg-stone-100"
+        style={
+          (building.photo_urls?.length ?? 0) > 0
+            ? undefined
+            : { backgroundColor: building.cover_color }
+        }
+        persistentOverlay={
+          /* Persistent overlays sit ABOVE every slide so they don't
+             disappear when the buyer swipes. Includes the soft top/
+             bottom gradient (chip legibility on bright photos), the
+             stage badge top-left, share/save top-right, and the
+             "Ход стройки" link bottom-right. */
+          <>
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-black/0 to-black/20"
+            />
+            <div className="absolute left-3 top-3 md:left-5 md:top-5">
+              <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-stone-200 bg-white/95 px-2.5 py-1 text-caption font-medium text-stone-700 backdrop-blur">
+                <span className="size-1.5 rounded-full bg-terracotta-600" aria-hidden />
+                {STAGE_INFO[building.status].label}
+              </span>
+            </div>
+            <div className="absolute right-3 top-3 flex items-center gap-2 md:right-5 md:top-5">
+              <ShareButton
+                compact
+                text={`ЖК ${building.name.ru} · ${district.name.ru}`}
+                title={building.name.ru}
+              />
+              <SaveToggle type="building" id={building.id} />
+            </div>
+            {/* "Ход стройки" sends under-construction-project buyers
+                straight to the timeline (the strongest trust signal
+                we have). Positioned bottom-right; the counter chip
+                CardPhotoCarousel renders is top-left so they don't
+                collide. */}
+            <div className="absolute bottom-3 right-3 flex items-center gap-2 md:bottom-5 md:right-5">
+              {(building.status === 'under_construction' || building.status === 'near_completion') ? (
+                <Link
+                  href={`/zhk/${building.slug}/progress`}
+                  className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white/95 px-2.5 py-1 text-caption font-medium text-stone-700 backdrop-blur hover:bg-white"
+                >
+                  <Camera className="size-3.5" /> Ход стройки
+                </Link>
+              ) : null}
+            </div>
+          </>
+        }
+      />
 
       {/* ─── 1.5 SUMMARY BAND ────────────────────────────────────
           Two-column layout below the gallery hero per the senior-
