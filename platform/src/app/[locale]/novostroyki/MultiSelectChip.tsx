@@ -59,7 +59,7 @@ export interface MultiSelectChipProps {
   /** Options shown as toggle chips inside the sheet. */
   options: MultiSelectOption[];
   /** Which CSV-encoded URL param this chip drives, e.g. "status". */
-  paramKey: 'status' | 'handover' | 'amenities' | 'nearby';
+  paramKey: 'status' | 'handover' | 'amenities' | 'nearby' | 'rooms';
   /** Full current URL filter state — preserved across navigation so
    *  applying this chip doesn't wipe other filters. */
   current: FilterParams;

@@ -16,6 +16,7 @@ import type { BuildingStatus } from '@/types/domain';
 import type { PoiCategory } from '@/services/poi';
 import { buildQuery, type FilterParams } from './filter-state';
 import { PriceChip } from './PriceChip';
+import { SizeChip } from './SizeChip';
 import { MultiSelectChip, type PoiIconKey } from './MultiSelectChip';
 import { NovostroykiFilterRail } from './FilterRail';
 
@@ -43,6 +44,15 @@ const AMENITIES_FILTERS: Array<{ value: string; label: string }> = [
   { value: 'playground', label: 'Детская площадка' },
   { value: 'gym', label: 'Фитнес' },
   { value: 'commercial-floor', label: 'Коммерческий этаж' },
+];
+
+/** Apartment-criteria rooms options (mobile chip-bar). 1/2/3/4 — matches
+ *  the /kvartiry rooms chip set + the desktop FilterRail's ROOM_FILTERS. */
+const ROOM_FILTERS_MOBILE: Array<{ value: string; label: string }> = [
+  { value: '1', label: '1' },
+  { value: '2', label: '2' },
+  { value: '3', label: '3' },
+  { value: '4', label: '4' },
 ];
 
 /** "Что рядом" mobile chip filters — POI categories within 1km walking
@@ -181,6 +191,12 @@ export default async function NovostroykiPage({
     // match against the building name. The eyebrow above the result
     // list reflects the active query so the buyer can clear it.
     q: sp.q,
+    // Apartment-criteria filters — service layer keeps only buildings
+    // with at least one active listing matching these. URL params
+    // match /kvartiry conventions (`rooms`, `size_from`, `size_to`).
+    roomsIn: sp.rooms?.split(',').map((r) => parseInt(r, 10)).filter((n) => Number.isFinite(n) && n > 0),
+    sizeFromApt: sp.size_from ? parseFloat(sp.size_from) : null,
+    sizeToApt: sp.size_to ? parseFloat(sp.size_to) : null,
   });
 
   const cards = await Promise.all(
@@ -268,9 +284,23 @@ export default async function NovostroykiPage({
             {/* MOBILE chip bar — preserved for <md. The new desktop
                 rail covers md+. The "Фильтры" full-screen sheet
                 pattern (also in the prescription) is deferred to a
-                follow-up polish pass. */}
+                follow-up polish pass.
+
+                Order matches the desktop rail: apartment-criteria
+                chips (Комнат / Площадь / Цена) first since they're
+                the most decisive, then building-level chips. Founder
+                critique 2026-05-11: buyers shop by "I want a 2-bedroom
+                around 60 m² under 200K" — those filters need to be
+                front-loaded. */}
             <div className="-mx-4 md:hidden">
               <div className="flex items-center gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <MultiSelectChip
+                  label="Комнат"
+                  paramKey="rooms"
+                  options={ROOM_FILTERS_MOBILE}
+                  current={sp}
+                />
+                <SizeChip current={sp} />
                 <PriceChip current={sp} />
                 <MultiSelectChip
                   label="Что рядом"

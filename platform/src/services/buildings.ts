@@ -76,6 +76,21 @@ export type BuildingFilters = {
   sort?: 'recommended' | 'cheapest' | 'expensive' | 'newest';
   city?: 'dushanbe' | 'vahdat';
   q?: string;
+  /**
+   * Apartment-criteria filters — keep only buildings that contain
+   * AT LEAST ONE active listing matching the criteria. The buyer's
+   * mental model on /novostroyki is unit-level ("I want a 2-bedroom
+   * around 60 m²"), so the buildings list filters by what apartments
+   * each ЖК actually contains. Cian / Avito / Bayut new-project pages
+   * all expose this set of filters alongside the building-level ones.
+   *
+   * Note: a building-level price filter (`priceFrom` / `priceTo` above)
+   * already operates on the cheapest-unit total, which IS apartment
+   * price semantically — so no separate `priceFromApt` is needed.
+   */
+  roomsIn?: number[];
+  sizeFromApt?: number | null;
+  sizeToApt?: number | null;
 };
 
 /** Haversine distance in meters between two lat/lng points. Used for
@@ -262,6 +277,38 @@ export async function listBuildings(filters: BuildingFilters = {}): Promise<Mock
     buildings = buildings.filter((b) =>
       required.every((a) => (b.amenities ?? []).includes(a)),
     );
+  }
+
+  // Apartment-criteria filter — keep only buildings that contain at
+  // least one active listing matching rooms / size criteria. Runs as
+  // ONE supabase query against `listings` filtered by `building_id IN
+  // (current survivors)` so the cost is bounded by the buildings that
+  // have already passed every other filter. Done AFTER the cheap
+  // in-JS filters above but BEFORE the radius + Overpass-POI blocks
+  // below — those are the most expensive and benefit most from a
+  // smaller candidate set.
+  const hasApartmentCriteria =
+    (filters.roomsIn?.length ?? 0) > 0 ||
+    filters.sizeFromApt != null ||
+    filters.sizeToApt != null;
+  if (hasApartmentCriteria && buildings.length > 0) {
+    let q = supabase
+      .from('listings')
+      .select('building_id')
+      .in(
+        'building_id',
+        buildings.map((b) => b.id),
+      )
+      .eq('status', 'active')
+      .not('building_id', 'is', null);
+    if (filters.roomsIn?.length) q = q.in('rooms_count', filters.roomsIn);
+    if (filters.sizeFromApt != null) q = q.gte('size_m2', filters.sizeFromApt);
+    if (filters.sizeToApt != null) q = q.lte('size_m2', filters.sizeToApt);
+    const { data: matchingListings } = await q;
+    const validBuildingIds = new Set(
+      (matchingListings ?? []).map((l) => l.building_id as string),
+    );
+    buildings = buildings.filter((b) => validBuildingIds.has(b.id));
   }
 
   // Radius filter from LocationSearch — keep only buildings within

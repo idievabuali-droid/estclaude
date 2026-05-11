@@ -16,6 +16,7 @@ import type { BuildingStatus } from '@/types/domain';
 import type { PoiCategory } from '@/services/poi';
 import { csvSet, toggleHref, type FilterParams } from './filter-state';
 import { PriceChip } from './PriceChip';
+import { SizeChip } from './SizeChip';
 
 /**
  * Desktop filter rail for /novostroyki — 260px column on the left of
@@ -41,6 +42,10 @@ const STATUS_FILTERS: Array<{ value: BuildingStatus; label: string }> = [
   { value: 'near_completion', label: 'Почти готов' },
   { value: 'delivered', label: 'Сдан' },
 ];
+
+/** Apartment-criteria room-count pills — match /kvartiry's pattern.
+ *  Strings (not numbers) because the URL param is a CSV ("1,2,3"). */
+const ROOM_FILTERS = ['1', '2', '3', '4'];
 
 const HANDOVER_FILTERS: Array<{ value: string; label: string }> = [
   { value: 'delivered', label: 'Сдан' },
@@ -84,7 +89,10 @@ function hasAnyFilter(sp: FilterParams): boolean {
       sp.price_per_m2_from ||
       sp.price_per_m2_to ||
       sp.developer ||
-      sp.near_label,
+      sp.near_label ||
+      sp.rooms ||
+      sp.size_from ||
+      sp.size_to,
   );
 }
 
@@ -109,8 +117,53 @@ export function NovostroykiFilterRail({ current }: { current: FilterParams }) {
         ) : null}
       </div>
 
-      {/* PRICE — keep PriceChip popover; rail-friendly width via
-          parent flex full-width container. */}
+      {/* ─── APARTMENT-LEVEL FILTERS (the buyer's actual mental
+              model: "I want a 2-bedroom around 60 m² under 200K")
+              ─────────────────────────────────────────────────────
+          Apartment-criteria filters sit at the TOP of the rail
+          because they're the most decisive — Cian / Avito / Bayut
+          new-project rails do the same. Each one gates the building
+          list to those projects that contain ≥1 apartment matching.
+          Building-level filters (Стадия / Сдача / Что рядом /
+          Удобства) come after as secondary narrowing. */}
+
+      {/* КОМНАТ — pill multi-select, matches /kvartiry's room pills
+          exactly so the same buyer using both pages sees the same
+          control. */}
+      <FilterGroup label="Комнат">
+        <div className="flex flex-wrap gap-2">
+          {ROOM_FILTERS.map((value) => {
+            const active = csvSet(current.rooms).has(value);
+            return (
+              <Link
+                key={value}
+                href={toggleHref(current, 'rooms', value)}
+                className={cn(
+                  'inline-flex h-9 min-w-[2.75rem] items-center justify-center rounded-full px-3 text-meta font-medium transition-colors tabular-nums',
+                  active
+                    ? 'bg-stone-900 text-white hover:bg-stone-800'
+                    : 'border border-stone-300 bg-white text-stone-700 hover:border-stone-400 hover:bg-stone-50',
+                )}
+              >
+                {value}
+              </Link>
+            );
+          })}
+        </div>
+      </FilterGroup>
+
+      {/* ПЛОЩАДЬ — apartment size range. SizeChip is the popover
+          (same component shape as PriceChip below), supports
+          decimals for the half-meter sizes common in Tajik listings. */}
+      <FilterGroup label="Площадь">
+        <SizeChip current={current} />
+      </FilterGroup>
+
+      {/* ЦЕНА — existing PriceChip operates on the building's
+          cheapest-unit total, which IS apartment price semantically.
+          Stays here under apartment-criteria for that reason —
+          conceptually it's "starting price of an apartment in this
+          building", not a building-level field. */}
       <FilterGroup label="Цена">
         <PriceChip current={current} />
       </FilterGroup>
