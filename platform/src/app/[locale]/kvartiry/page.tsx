@@ -226,9 +226,15 @@ export default async function KvartiryPage({
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col gap-5">
-            {/* MOBILE chip bar — preserved for <md. */}
-            <div className="-mx-4 md:hidden">
-              <div className="flex items-center gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {/* MOBILE chip bar — preserved for <md.
+                Sticky on scroll (top-14 anchors below the SiteHeader's
+                h-14) so the buyer can change filters at any scroll
+                depth without scrolling back up. Founder critique
+                2026-05-11: "the filters should stick on top." z-20 <
+                SiteHeader's z-30; bg-white + border-b so cards
+                underneath don't bleed through. */}
+            <div className="sticky top-14 z-20 -mx-4 border-b border-stone-200 bg-white md:hidden">
+              <div className="flex items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <MultiSelectChip
                   label="Комнат"
                   paramKey="rooms"

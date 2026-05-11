@@ -202,6 +202,25 @@ export default async function NovostroykiPage({
     floorToApt: sp.floor_to ? parseInt(sp.floor_to, 10) : null,
   });
 
+  // Parse the same apartment-criteria the gating filter above used,
+  // so we can also narrow the inline unit preview on each card to
+  // matching units only. Founder critique 2026-05-11: the building
+  // card's inline list ("3-комн · 11 м² · 12 эт ...") was ignoring
+  // the filter — buyer with `?rooms=2` saw the building card (because
+  // the building has ≥1 2-room unit, gating works) but the 3 unit
+  // rows shown were not 2-room ones, which felt broken.
+  const aptRooms = sp.rooms?.split(',').map((r) => parseInt(r, 10)).filter((n) => Number.isFinite(n) && n > 0) ?? [];
+  const aptSizeFrom = sp.size_from ? parseFloat(sp.size_from) : null;
+  const aptSizeTo = sp.size_to ? parseFloat(sp.size_to) : null;
+  const aptFloorFrom = sp.floor_from ? parseInt(sp.floor_from, 10) : null;
+  const aptFloorTo = sp.floor_to ? parseInt(sp.floor_to, 10) : null;
+  const hasAptFilter =
+    aptRooms.length > 0 ||
+    aptSizeFrom != null ||
+    aptSizeTo != null ||
+    aptFloorFrom != null ||
+    aptFloorTo != null;
+
   const cards = await Promise.all(
     filtered.map(async (b) => {
       const [dev, dist, units] = await Promise.all([
@@ -209,7 +228,28 @@ export default async function NovostroykiPage({
         getDistrictById(b.district_id),
         getListingsForBuildingId(b.id),
       ]);
-      return { b, dev, dist, units: units.slice(0, 3), unitsTotal: units.length };
+      // Apply the apartment-criteria filter to the unit list so the
+      // preview rows visible on the card match what the buyer asked
+      // for. Same predicate as the service-layer building gate +
+      // /zhk detail page filter — keeps semantics consistent across
+      // all three surfaces.
+      const filteredUnits = hasAptFilter
+        ? units.filter((u) => {
+            if (aptRooms.length && !aptRooms.includes(u.rooms_count)) return false;
+            if (aptSizeFrom != null && Number(u.size_m2) < aptSizeFrom) return false;
+            if (aptSizeTo != null && Number(u.size_m2) > aptSizeTo) return false;
+            if (aptFloorFrom != null && u.floor_number < aptFloorFrom) return false;
+            if (aptFloorTo != null && u.floor_number > aptFloorTo) return false;
+            return true;
+          })
+        : units;
+      return {
+        b,
+        dev,
+        dist,
+        units: filteredUnits.slice(0, 3),
+        unitsTotal: filteredUnits.length,
+      };
     }),
   );
 
@@ -294,9 +334,18 @@ export default async function NovostroykiPage({
                 the most decisive, then building-level chips. Founder
                 critique 2026-05-11: buyers shop by "I want a 2-bedroom
                 around 60 m² under 200K" — those filters need to be
-                front-loaded. */}
-            <div className="-mx-4 md:hidden">
-              <div className="flex items-center gap-2 overflow-x-auto px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                front-loaded.
+
+                Sticky on scroll (top-14 anchors below the SiteHeader's
+                h-14) so the buyer can change filters at any scroll
+                depth without scrolling back up. Founder critique
+                2026-05-11 second pass: "the filters should stick on
+                top — anytime we want to change them we should be able
+                to do it." z-20 < SiteHeader's z-30 so the header still
+                overlaps if any visual collision; bg-white + border-b
+                so the cards underneath don't bleed through. */}
+            <div className="sticky top-14 z-20 -mx-4 border-b border-stone-200 bg-white md:hidden">
+              <div className="flex items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <MultiSelectChip
                   label="Комнат"
                   paramKey="rooms"
