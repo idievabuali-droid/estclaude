@@ -108,7 +108,15 @@ export function DetailPageActions({
         // size-9 with their own bg-white/90) sit cleanly inside this
         // pill; the outer bg-white provides the visual ground that
         // the page-white background can't.
-        'rounded-full border border-stone-200 bg-white shadow-md',
+        //
+        // Shadow applied via inline style referencing the project's
+        // --shadow-md token (defined in globals.css `@theme`). The
+        // Tailwind v4 `shadow-md` utility doesn't pull the @theme
+        // shadow tokens in this codebase — verified by computed-style
+        // probe showing all-transparent rgba — so we use the token
+        // directly. Single line, no hex literal, matches the rest of
+        // the platform's shadow rhythm.
+        'rounded-full border border-stone-200 bg-white',
         // Slide-in animation mirrors BuildingStickyContact's: fade +
         // translate together via transition-all. pointer-events-none
         // on the hidden state so the invisible pill doesn't intercept
@@ -119,6 +127,7 @@ export function DetailPageActions({
           : 'pointer-events-auto translate-y-0 opacity-100',
       )}
       aria-hidden={hidden}
+      style={{ boxShadow: 'var(--shadow-md)' }}
     >
       <ShareButton compact text={shareText} title={shareTitle} />
       <SaveToggle type={type} id={id} />
