@@ -1,5 +1,5 @@
-import { Eye, TrendingDown, TrendingUp } from 'lucide-react';
-import { formatPriceNumber, formatPostedAgo, pluralRu } from '@/lib/format';
+import { TrendingDown, TrendingUp } from 'lucide-react';
+import { formatPriceNumber, formatPostedAgo } from '@/lib/format';
 import type { ListingStats, PriceHistoryEntry } from '@/services/listing-stats';
 
 export interface ListingTrustSignalsProps {
@@ -7,42 +7,30 @@ export interface ListingTrustSignalsProps {
 }
 
 /**
- * Compact trust-signal strip shown under the price/posted-ago line on
- * /kvartira detail. Two pieces:
+ * Compact trust-signal strip shown under the posted-ago line on
+ * /kvartira detail. Renders the most-recent price change
+ * ("Цена снижена на 200 000 TJS · 8 апр") — the biggest transparency
+ * signal we have. Drop = emerald (good news for the buyer), raise =
+ * amber (worth noticing). Only the latest entry shown inline; detailed
+ * timeline is a future extension.
  *
- *   1. View count ("247 просмотров · 12 за сегодня") — same Cian
- *      pattern that says "yes other buyers are also looking, this
- *      isn't a dead listing." Only render when the count is non-zero
- *      so a brand-new listing with no traffic doesn't read as
- *      uninteresting.
+ * The view counter was removed 2026-05-11 per founder critique: showing
+ * "247 просмотров · 12 за сегодня" introduces a vague social-proof
+ * signal that doesn't help the buyer decide on the apartment itself
+ * (and at V1 traffic it can read as "nobody's looking" rather than
+ * the intended "you're in the right place"). Listings.stats.viewsTotal
+ * is still aggregated server-side for the founder's /kabinet/analytics
+ * dashboard; we just don't expose it on the buyer surface.
  *
- *   2. Most-recent price change ("Цена снижена на 200 000 TJS · 8 апр")
- *      — the biggest missing transparency signal. Only the latest
- *      entry shown inline; detailed timeline is a future extension.
- *
- * The whole block is muted greys (caption tier) so it stays a
- * supporting signal beneath the price hero, not a distraction.
+ * Returns null when there's no price-change entry — nothing to show.
  */
 export function ListingTrustSignals({ stats }: ListingTrustSignalsProps) {
-  const { viewsTotal, viewsToday, priceHistory } = stats;
-  const lastChange = priceHistory[0] ?? null;
-  if (viewsTotal === 0 && !lastChange) return null;
+  const lastChange = stats.priceHistory[0] ?? null;
+  if (!lastChange) return null;
 
   return (
     <div className="flex flex-col gap-1.5 text-caption text-stone-500">
-      {viewsTotal > 0 ? (
-        <span className="inline-flex items-center gap-1.5 tabular-nums">
-          <Eye className="size-3.5 text-stone-400" aria-hidden />
-          {viewsTotal} {pluralRu(viewsTotal, ['просмотр', 'просмотра', 'просмотров'])}
-          {viewsToday > 0 ? (
-            <>
-              <span className="text-stone-300">·</span>
-              <span>{viewsToday} за сегодня</span>
-            </>
-          ) : null}
-        </span>
-      ) : null}
-      {lastChange ? <PriceChangeLine entry={lastChange} /> : null}
+      <PriceChangeLine entry={lastChange} />
     </div>
   );
 }

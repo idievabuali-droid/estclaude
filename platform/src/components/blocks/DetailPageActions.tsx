@@ -42,6 +42,16 @@ export interface DetailPageActionsProps {
  * hero scrolls out" approach so there's no visual collision with the
  * hero's own overlay icons.
  *
+ * Visual treatment (second pass, founder critique 2026-05-11):
+ * earlier this rendered as two separate floating circles which read
+ * as "random icons" against the white page bg — the `bg-white/90` on
+ * each inner button only contrasts with a photo behind it, not with
+ * a white page. Now wraps both buttons in a single rounded pill with
+ * `shadow-md border bg-white` so the cluster looks like a deliberate
+ * action chip lifted off the page (Cian / Bayut sticky-actions
+ * pattern). The buttons keep their internal style; the wrapper does
+ * the visual integration.
+ *
  * Positioning: fixed top-[6.75rem] right-3 z-30. That puts the pill
  * BELOW SiteHeader (56px) AND the sticky sub-nav (~52px) so it doesn't
  * cover tab labels. Stays out of the way of the mobile bottom contact
@@ -91,7 +101,14 @@ export function DetailPageActions({
         // (~52px) so the island doesn't cover tab labels on /zhk. At
         // mobile widths the buffer above keeps the icons clear of the
         // sticky chrome.
-        'fixed right-3 top-[6.75rem] z-30 flex items-center gap-2 md:right-5',
+        'fixed right-3 top-[6.75rem] z-30 inline-flex items-center md:right-5',
+        // Unified pill: border + shadow + bg-white makes the cluster
+        // look like a deliberate chip lifted off the page, not two
+        // disconnected floating circles. The inner buttons (each
+        // size-9 with their own bg-white/90) sit cleanly inside this
+        // pill; the outer bg-white provides the visual ground that
+        // the page-white background can't.
+        'rounded-full border border-stone-200 bg-white shadow-md',
         // Slide-in animation mirrors BuildingStickyContact's: fade +
         // translate together via transition-all. pointer-events-none
         // on the hidden state so the invisible pill doesn't intercept
