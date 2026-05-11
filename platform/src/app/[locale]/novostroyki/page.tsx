@@ -449,6 +449,22 @@ export default async function NovostroykiPage({
                           district={dist}
                           matchingUnits={units}
                           activeListingsCount={unitsTotal}
+                          // Forward the apartment-criteria filters to
+                          // the /zhk detail page so its inline preview
+                          // narrows to matching units. Building-level
+                          // filters (status / handover / amenities /
+                          // nearby) are dropped — those don't apply
+                          // unit-by-unit inside one project. Founder
+                          // critique 2026-05-11: "when I filter
+                          // apartments and open a building, it should
+                          // show those apartments — not just any."
+                          forwardFilterParams={{
+                            rooms: sp.rooms,
+                            size_from: sp.size_from,
+                            size_to: sp.size_to,
+                            floor_from: sp.floor_from,
+                            floor_to: sp.floor_to,
+                          }}
                         />
                       );
                     })}

@@ -113,16 +113,82 @@ export async function generateMetadata({
   };
 }
 
+/**
+ * Apartment-criteria URL params forwarded from /novostroyki — when the
+ * buyer clicks a building card while a filter is active, /zhk applies
+ * those same filters to its inline "Доступные квартиры" preview. So a
+ * buyer who came in from /novostroyki?rooms=3 sees only 3-room units
+ * inside this building, not the random first 3 listings. Param names
+ * match the /kvartiry conventions exactly so the "Все квартиры" link
+ * below can forward them through to /kvartiry?building=<slug>&… and
+ * the filter rail there picks them up natively.
+ */
+interface ApartmentCriteriaParams {
+  rooms?: string;
+  size_from?: string;
+  size_to?: string;
+  floor_from?: string;
+  floor_to?: string;
+}
+
 export default async function BuildingDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; slug: string }>;
+  searchParams: Promise<ApartmentCriteriaParams>;
 }) {
   const { locale, slug } = await params;
   setRequestLocale(locale);
+  const sp = await searchParams;
   const data = await getBuilding(slug);
   if (!data) notFound();
-  const { building, developer, district, listings } = data;
+  const { building, developer, district, listings: allListings } = data;
+
+  // Parse the apartment-criteria filters from the URL. When the buyer
+  // came in from /novostroyki with filters applied, narrow the inline
+  // preview to matching units. JS-side filter on the in-memory listings
+  // array — fast, and the buyer is already on this building's page so
+  // the candidate set is small.
+  const filterRooms = sp.rooms
+    ?.split(',')
+    .map((r) => parseInt(r, 10))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const filterSizeFrom = sp.size_from ? parseFloat(sp.size_from) : null;
+  const filterSizeTo = sp.size_to ? parseFloat(sp.size_to) : null;
+  const filterFloorFrom = sp.floor_from ? parseInt(sp.floor_from, 10) : null;
+  const filterFloorTo = sp.floor_to ? parseInt(sp.floor_to, 10) : null;
+  const hasAptFilter =
+    (filterRooms?.length ?? 0) > 0 ||
+    filterSizeFrom != null ||
+    filterSizeTo != null ||
+    filterFloorFrom != null ||
+    filterFloorTo != null;
+  const listings = hasAptFilter
+    ? allListings.filter((l) => {
+        if (filterRooms?.length && !filterRooms.includes(l.rooms_count)) return false;
+        if (filterSizeFrom != null && Number(l.size_m2) < filterSizeFrom) return false;
+        if (filterSizeTo != null && Number(l.size_m2) > filterSizeTo) return false;
+        if (filterFloorFrom != null && l.floor_number < filterFloorFrom) return false;
+        if (filterFloorTo != null && l.floor_number > filterFloorTo) return false;
+        return true;
+      })
+    : allListings;
+
+  // Build the query-string suffix once so the "Все квартиры" jump-out
+  // below + any future "снять фильтры" link can reuse it. Empty when
+  // no apartment filter is active so we don't pollute the kvartiry URL.
+  const aptFilterQs = (() => {
+    if (!hasAptFilter) return '';
+    const search = new URLSearchParams();
+    if (sp.rooms) search.set('rooms', sp.rooms);
+    if (sp.size_from) search.set('size_from', sp.size_from);
+    if (sp.size_to) search.set('size_to', sp.size_to);
+    if (sp.floor_from) search.set('floor_from', sp.floor_from);
+    if (sp.floor_to) search.set('floor_to', sp.floor_to);
+    const s = search.toString();
+    return s ? `&${s}` : '';
+  })();
   // Parallel batch — including the new §D progress lookup and §H
   // similar-buildings queries. Two listBuildings() calls so we have
   // both same-developer and same-district candidates ready at merge
@@ -502,7 +568,16 @@ export default async function BuildingDetailPage({
               <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>
                 Доступные квартиры
               </h2>
-              <p className="text-meta text-stone-500 tabular-nums">{listings.length} объявлений</p>
+              {/* Count line shows the filtered total when the buyer
+                  came in from /novostroyki with apartment-criteria
+                  filters active, with the unfiltered project total
+                  appended in parens for context ("из N в ЖК"). When
+                  no filter is active it's a simple "N объявлений". */}
+              <p className="text-meta text-stone-500 tabular-nums">
+                {hasAptFilter
+                  ? `${listings.length} ${pluralRu(listings.length, ['объявление', 'объявления', 'объявлений'])} по вашим фильтрам · из ${allListings.length} в ЖК`
+                  : `${listings.length} ${pluralRu(listings.length, ['объявление', 'объявления', 'объявлений'])}`}
+              </p>
             </div>
             {building.price_per_m2_from_dirams ? (
               <div className="flex flex-col items-end">
@@ -517,13 +592,42 @@ export default async function BuildingDetailPage({
           </div>
 
           {listings.length === 0 ? (
-            <AppCard>
-              <AppCardContent>
-                <p className="text-body text-stone-700">
-                  Сейчас нет активных объявлений по этому ЖК.
-                </p>
-              </AppCardContent>
-            </AppCard>
+            /* Two distinct empty states:
+               - No listings AT ALL in this ЖК → original "Сейчас нет
+                 активных объявлений" copy.
+               - Filtered out → tell the buyer the FILTER produced
+                 zero results inside this building, and offer a quick
+                 link to drop the filter so they can still see what's
+                 here. Trust-first — don't leave the buyer wondering
+                 if the ЖК is empty when it's actually filter-induced. */
+            hasAptFilter && allListings.length > 0 ? (
+              <AppCard>
+                <AppCardContent>
+                  <div className="flex flex-col items-start gap-3">
+                    <p className="text-body text-stone-700">
+                      В этом ЖК нет квартир, подходящих под выбранные фильтры.
+                      Всего в ЖК {allListings.length}{' '}
+                      {pluralRu(allListings.length, ['квартира', 'квартиры', 'квартир'])}.
+                    </p>
+                    <Link
+                      href={`/zhk/${building.slug}`}
+                      className="inline-flex items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+                    >
+                      Показать все квартиры в этом ЖК
+                      <ArrowUpRight className="size-3.5" aria-hidden />
+                    </Link>
+                  </div>
+                </AppCardContent>
+              </AppCard>
+            ) : (
+              <AppCard>
+                <AppCardContent>
+                  <p className="text-body text-stone-700">
+                    Сейчас нет активных объявлений по этому ЖК.
+                  </p>
+                </AppCardContent>
+              </AppCard>
+            )
           ) : (
             <>
               {/* 3-card preview. Cian / Avito / Bayut all cap project-
@@ -545,8 +649,12 @@ export default async function BuildingDetailPage({
                 ))}
               </div>
               {listings.length > 3 ? (
+                /* "Посмотреть все" jump-out forwards the apartment-
+                   criteria filters to /kvartiry so its filter rail
+                   comes up pre-applied. Buyer's mental model stays
+                   intact across navigation. */
                 <Link
-                  href={`/kvartiry?building=${building.slug}`}
+                  href={`/kvartiry?building=${building.slug}${aptFilterQs}`}
                   className="inline-flex w-fit items-center gap-1 self-end text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
                 >
                   Посмотреть все {listings.length}{' '}

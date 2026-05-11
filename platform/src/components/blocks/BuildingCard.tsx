@@ -30,6 +30,24 @@ export interface BuildingCardProps {
    *  shows foreign-currency equivalent beneath TJS. */
   currency?: SupportedCurrency | null;
   rates?: ExchangeRates | null;
+  /**
+   * Apartment-criteria filter params (rooms / size_from / size_to /
+   * floor_from / floor_to) — when /novostroyki has these in its URL,
+   * we forward them to the /zhk detail page so the inline "Доступные
+   * квартиры" preview shows only the units matching the buyer's
+   * filter, not random ones. Optional + back-compat — home / diaspora
+   * / izbrannoe etc don't pass it and the link stays `/zhk/<slug>`.
+   *
+   * Each entry: the URL param key + its value (CSV for rooms, plain
+   * number for ranges). Empty / undefined values are stripped.
+   */
+  forwardFilterParams?: Partial<{
+    rooms: string;
+    size_from: string;
+    size_to: string;
+    floor_from: string;
+    floor_to: string;
+  }>;
   className?: string;
 }
 
@@ -46,6 +64,7 @@ export function BuildingCard({
   activeListingsCount,
   currency,
   rates,
+  forwardFilterParams,
   className,
 }: BuildingCardProps) {
   const showConversion = currency && currency !== 'TJS' && rates != null;
@@ -59,9 +78,23 @@ export function BuildingCard({
   }
   const tCommon = useTranslations('Common');
 
+  // Build the /zhk URL — when the caller forwards apartment-criteria
+  // filter params, append them so the detail page can narrow its
+  // inline preview to matching units. Strips empty values so an
+  // unfiltered link stays clean (no trailing `?`).
+  const detailHref = (() => {
+    if (!forwardFilterParams) return `/zhk/${building.slug}`;
+    const search = new URLSearchParams();
+    for (const [k, v] of Object.entries(forwardFilterParams)) {
+      if (v && v.length > 0) search.set(k, v);
+    }
+    const s = search.toString();
+    return s ? `/zhk/${building.slug}?${s}` : `/zhk/${building.slug}`;
+  })();
+
   return (
     <Link
-      href={`/zhk/${building.slug}`}
+      href={detailHref}
       onClick={() =>
         track('building_card_click', {
           building_id: building.id,
