@@ -407,6 +407,17 @@ export default async function ListingDetailPage({
                   Рассрочка от {formatPriceNumber(listing.installment_monthly_amount_dirams)} TJS / мес
                 </a>
               ) : null}
+              {/* Price-change badge ("Цена снижена на 200 000 TJS · 8
+                  апр") — moved here from the §13 Meta footer (founder
+                  review 2026-05-11, Product Designer lens): a price
+                  drop is one of the strongest trust signals on a
+                  listing, telling the buyer "this seller is realistic,
+                  the listing is fresh." Belongs adjacent to the price
+                  the buyer is making the decision on, not buried in
+                  the page-bottom metadata. Component returns null when
+                  there's no recent change, so this slot stays empty
+                  on stable listings (no visual clutter). */}
+              <ListingTrustSignals stats={stats} />
             </div>
             {/* Dual CTAs + secondary contact strip — handled by
                 ContactBarWithModal which renders inline on desktop
@@ -916,17 +927,19 @@ export default async function ListingDetailPage({
         </section>
       ) : null}
 
-      {/* ─── §13 META (quiet posted-ago + view counter) ─────────── */}
-      {/* Pulled out of the title block — these answer "how stale is
-          this?" not "what is this apartment". Bottom of the page is
-          the right place. pb-24 clears the mobile sticky contact
-          bar; desktop drops back to its smaller padding. */}
+      {/* ─── §13 META (quiet posted-ago timestamp) ─────────────── */}
+      {/* Page-bottom metadata. Was paired with ListingTrustSignals
+          (price-change badge) here, but the badge moved up to live
+          adjacent to the price block where it earns its trust signal.
+          Just the posted-ago line stays — buyer answers "how stale is
+          this listing?" without it competing with decision content.
+          pb-24 clears the mobile sticky contact bar; desktop drops
+          back to its smaller padding. */}
       <section className="border-t border-stone-200 py-4 pb-24 md:pb-7">
         <AppContainer className="flex flex-col gap-1">
           <span className="text-caption text-stone-400">
             Опубликовано {formatPostedAgo(listing.published_at)}
           </span>
-          <ListingTrustSignals stats={stats} />
         </AppContainer>
       </section>
 
