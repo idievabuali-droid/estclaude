@@ -122,13 +122,13 @@ const ROOMS = [
 ];
 
 const FINISHING = [
-  { value: 'no_finish', label: 'Без ремонта', hint: 'Дешевле, вы делаете ремонт сами' },
-  { value: 'pre_finish', label: 'Предчистовая', hint: 'Базовая отделка, вы завершаете' },
-  { value: 'full_finish', label: 'С ремонтом', hint: 'Готово к заезду' },
+  { value: 'no_finish', label: 'Без ремонта', hint: 'Голые стены, отделку делает покупатель' },
+  { value: 'pre_finish', label: 'Предчистовая', hint: 'Базовая отделка от застройщика' },
+  { value: 'full_finish', label: 'С ремонтом', hint: 'Чистовая отделка от застройщика' },
   {
     value: 'owner_renovated',
     label: 'Отремонтировано владельцем',
-    hint: 'Готовое жильё, осмотрите лично',
+    hint: 'Ремонт делал предыдущий владелец',
   },
   { value: 'any', label: 'Не важно', hint: 'Покажите все варианты' },
 ];

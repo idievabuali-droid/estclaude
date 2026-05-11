@@ -933,16 +933,27 @@ function RassrochkaMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * One-line subtitle describing the finishing TYPE only — never makes
+ * claims about readiness, move-in, or what the buyer can do next.
+ * Founder critique 2026-05-11: the earlier "готова для вашего ремонта"
+ * / "готова к заселению" copy was misleading because (a) the building
+ * itself might still be under construction (so the buyer can't start
+ * renovation OR move in regardless of finish type), and (b) a finished
+ * apartment may still lack appliances / furniture / utilities even
+ * when the building is delivered. We describe the state and let the
+ * buyer infer what's needed from the project stage + their own visit.
+ */
 function finishingDescription(t: string): string {
   switch (t) {
     case 'no_finish':
-      return 'квартира без отделки, готова для вашего ремонта';
+      return 'голые стены и стяжка пола — отделка не выполнена';
     case 'pre_finish':
-      return 'базовая отделка, готова к завершающему ремонту';
+      return 'предчистовая отделка от застройщика — нужна финишная';
     case 'full_finish':
-      return 'полная отделка от застройщика, готова к заселению';
+      return 'чистовая отделка от застройщика';
     case 'owner_renovated':
-      return 'отремонтировано владельцем, осмотрите лично';
+      return 'квартиру ремонтировал предыдущий владелец';
     default:
       return '';
   }
