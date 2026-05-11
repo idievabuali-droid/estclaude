@@ -9,6 +9,7 @@ import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo, formatHandoverQuarter } from '@/lib/format';
 import { getListing } from '@/services/listings';
+import { getDeveloperStats } from '@/services/buildings';
 import { getNearbyPOIs, type PoiCategory } from '@/services/poi';
 import { readCurrencyCookie } from '@/lib/currency-cookie-server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -141,7 +142,10 @@ export default async function ListingDetailPage({
   // Parallelise the rest. Was sequential before — the slowest single
   // call (getNearbyPOIs hits Overpass live, ~1-3s) blocked everything
   // after it, multiplying perceived latency on Tajik mobile networks.
-  const [visitor, pois, stats] = await Promise.all([
+  // devStats is a quick `count(*) by status` on the developer's
+  // buildings — used by the developer card below to show "Сдано N ·
+  // Строится M" instead of an opaque lifetime project count.
+  const [visitor, pois, stats, devStats] = await Promise.all([
     getCurrentUser(),
     // Skip POI fetch when we have no coords (standalone seller didn't
     // drop the pin). The compact-nearby section silently hides below.
@@ -149,6 +153,9 @@ export default async function ListingDetailPage({
       ? getNearbyPOIs(effectiveLat, effectiveLng)
       : Promise.resolve({} as Awaited<ReturnType<typeof getNearbyPOIs>>),
     getListingStats(listing.id, listing.slug),
+    developer
+      ? getDeveloperStats(developer.id)
+      : Promise.resolve({ total: 0, delivered: 0, underConstruction: 0, announced: 0 }),
   ]);
 
   // Pre-compute the compact nearby rows so the JSX stays readable.
@@ -726,19 +733,40 @@ export default async function ListingDetailPage({
                       </Link>
                     ) : null}
                   </h3>
+                  {/* Summary line: years on market + breakdown of
+                      delivered vs in-progress projects on OUR platform.
+                      Founder critique 2026-05-11: an opaque "4 проекта"
+                      total doesn't tell the buyer what they actually
+                      want to know — "have they finished anything, and
+                      what's currently being built?" The breakdown comes
+                      from getDeveloperStats() which counts published
+                      buildings by status, so the buyer can click "Все
+                      проекты застройщика" below and audit each row.
+                      Dropped the lifetime `projects_completed_count`
+                      field for this summary — it's manually set and
+                      unauditable; trust-first means showing only what
+                      buyers can verify themselves. */}
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-stone-700">
                     {developer.years_active != null ? (
                       <span className="tabular-nums">
                         {developer.years_active} {pluralYears(developer.years_active)} на рынке
                       </span>
                     ) : null}
-                    {developer.years_active != null && developer.projects_completed_count != null ? (
-                      <span className="text-stone-400" aria-hidden>·</span>
+                    {devStats.delivered > 0 ? (
+                      <>
+                        <span className="text-stone-400" aria-hidden>·</span>
+                        <span className="tabular-nums">
+                          Сдано {devStats.delivered}
+                        </span>
+                      </>
                     ) : null}
-                    {developer.projects_completed_count != null ? (
-                      <span className="tabular-nums">
-                        {developer.projects_completed_count} {pluralProjects(developer.projects_completed_count)}
-                      </span>
+                    {devStats.underConstruction > 0 ? (
+                      <>
+                        <span className="text-stone-400" aria-hidden>·</span>
+                        <span className="tabular-nums">
+                          Строится {devStats.underConstruction}
+                        </span>
+                      </>
                     ) : null}
                   </div>
                   <Link
@@ -966,15 +994,6 @@ function pluralYears(n: number): string {
   if (last > 1 && last < 5) return 'года';
   if (last === 1) return 'год';
   return 'лет';
-}
-
-function pluralProjects(n: number): string {
-  const abs = Math.abs(n) % 100;
-  const last = abs % 10;
-  if (abs > 10 && abs < 20) return 'проектов';
-  if (last > 1 && last < 5) return 'проекта';
-  if (last === 1) return 'проект';
-  return 'проектов';
 }
 
 function pluralFloors(n: number): string {
