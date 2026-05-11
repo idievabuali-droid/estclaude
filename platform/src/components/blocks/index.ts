@@ -85,4 +85,6 @@ export { FilterGroup } from './FilterGroup';
 export { FeedbackButton } from './FeedbackButton';
 export { ScrollSpyTabs } from './ScrollSpyTabs';
 export type { ScrollSpyTabsProps, ScrollSpyTab } from './ScrollSpyTabs';
+export { DetailPageActions } from './DetailPageActions';
+export type { DetailPageActionsProps } from './DetailPageActions';
 export { RetrySaveOnReturn } from './RetrySaveOnReturn';

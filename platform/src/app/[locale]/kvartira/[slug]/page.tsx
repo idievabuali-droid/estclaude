@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppChip, AppCard, AppCardContent } from '@/components/primitives';
-import { ListingCard, ListingTrustSignals, CallbackWidget, SaveToggle, ShareButton, NearbyChips, PhotoGallery } from '@/components/blocks';
+import { ListingCard, ListingTrustSignals, CallbackWidget, SaveToggle, ShareButton, NearbyChips, PhotoGallery, DetailPageActions } from '@/components/blocks';
 import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo, formatHandoverQuarter } from '@/lib/format';
@@ -215,6 +215,19 @@ export default async function ListingDetailPage({
 
   return (
     <>
+      {/* Persistent Save + Share floating island. Slides in once the
+          hero's own overlay icons scroll out of view. Founder critique
+          2026-05-11: "those buttons should be seen all the time, like
+          the contact button." Reveal anchor id matches both hero
+          variants below (photo-gallery + colour-placeholder). */}
+      <DetailPageActions
+        type="listing"
+        id={listing.id}
+        shareText={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} ${building ? `в ${building.name.ru}` : `на ${listing.street_address ?? '—'}`}`}
+        shareTitle={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
+        revealAfterId="kvartira-hero-actions"
+      />
+
       {/* ─── HERO + PHOTO GALLERY ───────────────────────────────── */}
       {/* Hero IS the gallery. Mobile: full-bleed scroll-snap carousel
           (swipe right/left between photos, tap any to fullscreen).
@@ -227,7 +240,13 @@ export default async function ListingDetailPage({
             alt={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} ${building ? `в ${building.name.ru}` : `на ${listing.street_address ?? '—'}`}`}
             heroAspect="21/9"
           />
-          <div className="pointer-events-none absolute right-3 top-3 z-20 flex items-center gap-2 md:right-5 md:top-5">
+          {/* id="kvartira-hero-actions" anchors the persistent
+              floating DetailPageActions island — when this overlay
+              scrolls off, the island slides in. */}
+          <div
+            id="kvartira-hero-actions"
+            className="pointer-events-none absolute right-3 top-3 z-20 flex items-center gap-2 md:right-5 md:top-5"
+          >
             <div className="pointer-events-auto">
               <ShareButton
                 compact
@@ -246,7 +265,10 @@ export default async function ListingDetailPage({
           style={{ backgroundColor: listing.cover_color }}
         >
           <div className="absolute inset-0 bg-gradient-to-t from-stone-900/65 via-stone-900/15 to-transparent" />
-          <div className="absolute right-3 top-3 z-10 flex items-center gap-2 md:right-5 md:top-5">
+          <div
+            id="kvartira-hero-actions"
+            className="absolute right-3 top-3 z-10 flex items-center gap-2 md:right-5 md:top-5"
+          >
             <ShareButton
               compact
               text={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} ${building ? `в ${building.name.ru}` : `на ${listing.street_address ?? '—'}`}`}

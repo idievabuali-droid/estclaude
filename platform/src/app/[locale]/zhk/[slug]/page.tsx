@@ -22,6 +22,7 @@ import {
   MessagingPopoverButton,
   CardPhotoCarousel,
   ScrollSpyTabs,
+  DetailPageActions,
 } from '@/components/blocks';
 import type { PoiCategory } from '@/services/poi';
 import { getBuilding, getDeveloperById, getDeveloperStats, listBuildings } from '@/services/buildings';
@@ -268,6 +269,21 @@ export default async function BuildingDetailPage({
 
   return (
     <>
+      {/* Persistent Save + Share floating island. Slides in once the
+          hero's own overlay icons scroll out of view (revealAfterId
+          watches the hero block via IntersectionObserver). Keeps the
+          two actions reachable at any scroll depth so the buyer never
+          has to scroll back to the top to bookmark or share. Founder
+          critique 2026-05-11: "those buttons should be seen all the
+          time, like the contact button." */}
+      <DetailPageActions
+        type="building"
+        id={building.id}
+        shareText={`ЖК ${building.name.ru} · ${district.name.ru}`}
+        shareTitle={building.name.ru}
+        revealAfterId="zhk-hero-actions"
+      />
+
       {/* ─── 1. GALLERY HERO ────────────────────────────────────
           Premium-real-estate pattern (Knight Frank, The Modern House,
           Sotheby's): full-width photograph at 60vh on desktop, 40vh
@@ -312,7 +328,14 @@ export default async function BuildingDetailPage({
                 {STAGE_INFO[building.status].label}
               </span>
             </div>
-            <div className="absolute right-3 top-3 flex items-center gap-2 md:right-5 md:top-5">
+            {/* `id="zhk-hero-actions"` is the IntersectionObserver
+                anchor for the persistent floating Save+Share island
+                below — when this overlay scrolls out of view the
+                island slides in. */}
+            <div
+              id="zhk-hero-actions"
+              className="absolute right-3 top-3 flex items-center gap-2 md:right-5 md:top-5"
+            >
               <ShareButton
                 compact
                 text={`ЖК ${building.name.ru} · ${district.name.ru}`}
