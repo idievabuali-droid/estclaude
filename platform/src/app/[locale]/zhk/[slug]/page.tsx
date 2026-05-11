@@ -13,12 +13,12 @@ import {
 } from '@/components/primitives';
 import {
   BuildingCard,
+  ListingCard,
   NearbyChips,
   BuildingStageProgress,
   ShareButton,
   SaveToggle,
   BuildingStickyContact,
-  RoomTypeFilter,
   MessagingPopoverButton,
 } from '@/components/blocks';
 import type { PoiCategory } from '@/services/poi';
@@ -28,7 +28,7 @@ import { getDistrictBenchmark } from '@/services/benchmarks';
 import { getNearbyPOIs } from '@/services/poi';
 import { getBuildingProgress } from '@/services/progress';
 import { supabasePublicUrl } from '@/services/photos';
-import { formatPriceNumber, formatHandoverQuarter } from '@/lib/format';
+import { formatPriceNumber, formatHandoverQuarter, pluralRu } from '@/lib/format';
 import { STAGE_INFO } from '@/lib/building-stages';
 
 // APARTMENTS_PREVIEW_LIMIT was the slice cap before — sliced 6 of N
@@ -455,13 +455,22 @@ export default async function BuildingDetailPage({
         </AppContainer>
       </section>
 
-      {/* ─── §C AVAILABLE APARTMENTS (the funnel, with room-type filter) ─
-           Moved up from the previous position 7 — competitors all put
-           apartments within the first scroll-and-a-half because that's
-           why buyers came to the page. Now grouped by room-type via
-           the RoomTypeFilter chip row (Cian-pattern). Chips render
-           only when inventory is varied (≥3 listings AND ≥2 distinct
-           room counts); single-room buildings keep the flat grid. */}
+      {/* ─── §C AVAILABLE APARTMENTS (preview + drill-down) ─────────
+           Mature-platform pattern (Cian, Avito, Bayut new-project pages):
+           show a SMALL inline preview of available units (~3 cards),
+           then a "Посмотреть все N квартир →" link to the dedicated
+           listing page filtered by this building. The full filter
+           rail (rooms / price / size / finishing) lives on
+           /kvartiry?building=<slug>, not here.
+
+           Earlier this section used RoomTypeFilter for inline filtering
+           but founder critique 2026-05-11 was that (a) showing every
+           listing inline clutters the project page and (b) inline
+           filtering on a previewed subset creates count mismatches
+           (founder originally saw "12 / 6 / 12" across three places).
+           The clean answer is one preview here + one full list there,
+           with the count on this page matching `listings.length` end-
+           to-end. */}
       <section id="units" className="scroll-mt-28 border-t border-stone-200 bg-stone-50 py-6">
         <AppContainer className="flex flex-col gap-5">
           <div className="flex items-end justify-between gap-3">
@@ -495,13 +504,36 @@ export default async function BuildingDetailPage({
               </AppCardContent>
             </AppCard>
           ) : (
-            <RoomTypeFilter
-              listings={listings}
-              building={building}
-              developer={developer}
-              districtMedianPerM2={median?.median ?? null}
-              districtSampleSize={median?.sample ?? 0}
-            />
+            <>
+              {/* 3-card preview. Cian / Avito / Bayut all cap project-
+                  page apartment previews around this number — enough
+                  to feel the inventory, not so many it overwhelms the
+                  project narrative. `hideBuildingName` because every
+                  card is in THIS building; the name would be redundant. */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
+                {listings.slice(0, 3).map((l) => (
+                  <ListingCard
+                    key={l.id}
+                    listing={l}
+                    building={building}
+                    developerVerified={developer.is_verified}
+                    districtMedianPerM2={median?.median ?? null}
+                    districtSampleSize={median?.sample ?? 0}
+                    hideBuildingName
+                  />
+                ))}
+              </div>
+              {listings.length > 3 ? (
+                <Link
+                  href={`/kvartiry?building=${building.slug}`}
+                  className="inline-flex w-fit items-center gap-1 self-end text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+                >
+                  Посмотреть все {listings.length}{' '}
+                  {pluralRu(listings.length, ['квартиру', 'квартиры', 'квартир'])}
+                  <ArrowUpRight className="size-3.5" aria-hidden />
+                </Link>
+              ) : null}
+            </>
           )}
         </AppContainer>
       </section>
@@ -708,23 +740,14 @@ export default async function BuildingDetailPage({
                   </div>
                 ) : null}
 
-                {/* Single CTA — primary "Связаться". Tapping opens
-                    a popover with all 3 channels (WhatsApp / Telegram
-                    / IMO) so the buyer picks the app they actually
-                    use; matches the pattern in the price card above
-                    and the mobile sticky bar below. The "Все проекты
-                    застройщика" link is demoted to a quiet text-link
-                    below the stats grid (still discoverable but not
-                    competing for click weight with the action). */}
-                <MessagingPopoverButton
-                  variant="primary-lg"
-                  label="Связаться с застройщиком"
-                  whatsappHref={`${FOUNDER_CONTACTS.whatsappLink}?text=${encodeURIComponent(
-                    `Здравствуйте! Интересует ЖК ${building.name.ru} от ${developer.display_name.ru}. Можете подсказать?`,
-                  )}`}
-                  telegramHref={FOUNDER_CONTACTS.telegramLink}
-                  imoHref={buildContactLinks(FOUNDER_CONTACTS.phone).imo}
-                />
+                {/* Developer card is intentionally a TRUST-SIGNAL block,
+                    not a second contact funnel. The price-card popover
+                    higher on the page (and the mobile sticky bar) cover
+                    the contact intent; a second "Связаться" here is
+                    redundant. Founder critique 2026-05-11: "still too
+                    many places to contact." Cian / Avito / Bayut all
+                    keep their developer-info card pure trust info — no
+                    duplicated CTA. */}
 
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
                   <DevStat label="Всего проектов" value={devStats.total} />

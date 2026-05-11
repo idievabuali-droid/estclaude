@@ -9,10 +9,7 @@ import { STAGE_INFO } from '@/lib/building-stages';
 import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
 import { CardPhotoCarousel } from './CardPhotoCarousel';
-import { MessagingPopoverButton } from './MessagingPopoverButton';
 import { FEATURES } from '@/lib/feature-flags';
-import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
-import { buildContactLinks } from '@/lib/contact-links';
 import { PriceConversion } from './PriceConversion';
 import { track } from '@/lib/analytics/track';
 import type { MockBuilding, MockDeveloper, MockDistrict, MockListing } from '@/lib/mock';
@@ -277,25 +274,16 @@ export function BuildingCard({
           </div>
         ) : null}
 
-        {/* Inline contact button — outlined, full-width. Lives at the
-            card-body footer so buyers see what the listing IS first,
-            then have an explicit "Связаться" affordance without the
-            photo-overlay icon competing for attention (founder critique
-            2026-05-09). Tap opens a popover with all 3 channels
-            (WhatsApp / Telegram / IMO) — same pattern as the /zhk
-            price card and the mobile sticky bar so the contact
-            grammar is consistent everywhere. The popover trigger
-            stops propagation so the parent `<Link>` wrapping the
-            card doesn't navigate. */}
-        <MessagingPopoverButton
-          variant="secondary-lg"
-          label="Связаться"
-          whatsappHref={`${FOUNDER_CONTACTS.whatsappLink}?text=${encodeURIComponent(
-            `Здравствуйте! Интересует ЖК ${building.name.ru} (${district.name.ru} · ${building.address.ru}). Можете подсказать?`,
-          )}`}
-          telegramHref={FOUNDER_CONTACTS.telegramLink}
-          imoHref={buildContactLinks(FOUNDER_CONTACTS.phone).imo}
-        />
+        {/* No contact CTA on the card. Cards are for SEEING — photo,
+            name, price, available units. Contact happens after the
+            buyer taps into the project detail page (/zhk/<slug>),
+            which has the price-card popover + mobile sticky bar.
+            Founder critique 2026-05-09 (second pass): an in-card
+            contact button still puts contact on a list surface where
+            the buyer hasn't yet decided which project they want to
+            ask about. Mature platforms (Cian, Avito, Rightmove) all
+            keep contact OFF cards and IN detail pages for the same
+            reason. */}
       </div>
     </Link>
   );
