@@ -46,6 +46,14 @@ export async function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
+          {/* Slot for page-contextual actions (Save + Share on
+              detail pages). Detail pages portal their actions in
+              via DetailPageActions → render with createPortal. Empty
+              on every other page. Sits inside the SiteHeader's
+              right-side cluster so the actions look like part of the
+              chrome, not floating debris below it (founder critique
+              2026-05-11). */}
+          <div id="site-header-actions" className="flex items-center gap-1" />
           <Link
             href="/post"
             className="hidden h-9 items-center rounded-md border border-stone-300 bg-white px-4 text-meta font-semibold text-stone-900 hover:bg-stone-100 md:inline-flex"

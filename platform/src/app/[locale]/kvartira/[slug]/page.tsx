@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { AppContainer, AppChip, AppCard, AppCardContent } from '@/components/primitives';
-import { ListingCard, ListingTrustSignals, CallbackWidget, SaveToggle, ShareButton, NearbyChips, PhotoGallery, DetailPageActions } from '@/components/blocks';
+import { ListingCard, ListingTrustSignals, CallbackWidget, NearbyChips, PhotoGallery, DetailPageActions } from '@/components/blocks';
 import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
 import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo, formatHandoverQuarter } from '@/lib/format';
@@ -215,17 +215,16 @@ export default async function ListingDetailPage({
 
   return (
     <>
-      {/* Persistent Save + Share floating island. Slides in once the
-          hero's own overlay icons scroll out of view. Founder critique
-          2026-05-11: "those buttons should be seen all the time, like
-          the contact button." Reveal anchor id matches both hero
-          variants below (photo-gallery + colour-placeholder). */}
+      {/* Save + Share portalled into the SiteHeader chrome — see
+          DetailPageActions for the slot mechanism. Replaces the
+          earlier hero-photo overlay AND the floating island. One
+          source, always visible, visually integrated with the rest
+          of the top chrome. */}
       <DetailPageActions
         type="listing"
         id={listing.id}
         shareText={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} ${building ? `в ${building.name.ru}` : `на ${listing.street_address ?? '—'}`}`}
         shareTitle={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
-        revealAfterId="kvartira-hero-actions"
       />
 
       {/* ─── HERO + PHOTO GALLERY ───────────────────────────────── */}
@@ -240,24 +239,10 @@ export default async function ListingDetailPage({
             alt={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} ${building ? `в ${building.name.ru}` : `на ${listing.street_address ?? '—'}`}`}
             heroAspect="21/9"
           />
-          {/* id="kvartira-hero-actions" anchors the persistent
-              floating DetailPageActions island — when this overlay
-              scrolls off, the island slides in. */}
-          <div
-            id="kvartira-hero-actions"
-            className="pointer-events-none absolute right-3 top-3 z-20 flex items-center gap-2 md:right-5 md:top-5"
-          >
-            <div className="pointer-events-auto">
-              <ShareButton
-                compact
-                text={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} ${building ? `в ${building.name.ru}` : `на ${listing.street_address ?? '—'}`}`}
-                title={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
-              />
-            </div>
-            <div className="pointer-events-auto">
-              <SaveToggle type="listing" id={listing.id} />
-            </div>
-          </div>
+          {/* Hero photo no longer carries Save + Share overlays —
+              moved to the SiteHeader chrome via <DetailPageActions>.
+              Same reasoning as on /zhk: one source, always visible,
+              visually integrated with the rest of the top chrome. */}
         </div>
       ) : (
         <div
@@ -265,17 +250,7 @@ export default async function ListingDetailPage({
           style={{ backgroundColor: listing.cover_color }}
         >
           <div className="absolute inset-0 bg-gradient-to-t from-stone-900/65 via-stone-900/15 to-transparent" />
-          <div
-            id="kvartira-hero-actions"
-            className="absolute right-3 top-3 z-10 flex items-center gap-2 md:right-5 md:top-5"
-          >
-            <ShareButton
-              compact
-              text={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)} ${building ? `в ${building.name.ru}` : `на ${listing.street_address ?? '—'}`}`}
-              title={`${listing.rooms_count}-комн ${formatM2(listing.size_m2)}`}
-            />
-            <SaveToggle type="listing" id={listing.id} />
-          </div>
+          {/* Hero placeholder no Save + Share — moved to SiteHeader. */}
         </div>
       )}
 

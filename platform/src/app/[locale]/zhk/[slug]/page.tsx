@@ -16,8 +16,6 @@ import {
   ListingCard,
   NearbyChips,
   BuildingStageProgress,
-  ShareButton,
-  SaveToggle,
   BuildingStickyContact,
   MessagingPopoverButton,
   CardPhotoCarousel,
@@ -269,19 +267,16 @@ export default async function BuildingDetailPage({
 
   return (
     <>
-      {/* Persistent Save + Share floating island. Slides in once the
-          hero's own overlay icons scroll out of view (revealAfterId
-          watches the hero block via IntersectionObserver). Keeps the
-          two actions reachable at any scroll depth so the buyer never
-          has to scroll back to the top to bookmark or share. Founder
-          critique 2026-05-11: "those buttons should be seen all the
-          time, like the contact button." */}
+      {/* Save + Share portalled into the SiteHeader chrome — see
+          DetailPageActions for the slot mechanism. Replaces the
+          earlier hero-photo overlay AND the floating island. One
+          source of these actions, always visible because SiteHeader
+          is sticky. */}
       <DetailPageActions
         type="building"
         id={building.id}
         shareText={`ЖК ${building.name.ru} · ${district.name.ru}`}
         shareTitle={building.name.ru}
-        revealAfterId="zhk-hero-actions"
       />
 
       {/* ─── 1. GALLERY HERO ────────────────────────────────────
@@ -328,21 +323,15 @@ export default async function BuildingDetailPage({
                 {STAGE_INFO[building.status].label}
               </span>
             </div>
-            {/* `id="zhk-hero-actions"` is the IntersectionObserver
-                anchor for the persistent floating Save+Share island
-                below — when this overlay scrolls out of view the
-                island slides in. */}
-            <div
-              id="zhk-hero-actions"
-              className="absolute right-3 top-3 flex items-center gap-2 md:right-5 md:top-5"
-            >
-              <ShareButton
-                compact
-                text={`ЖК ${building.name.ru} · ${district.name.ru}`}
-                title={building.name.ru}
-              />
-              <SaveToggle type="building" id={building.id} />
-            </div>
+            {/* Hero photo no longer carries its own Save + Share
+                overlay — those moved into the SiteHeader chrome via
+                <DetailPageActions> + the `#site-header-actions` slot,
+                so the actions are always visible at any scroll depth
+                AND visually integrated with the rest of the top
+                chrome (founder critique 2026-05-11 second pass:
+                "floating island doesn't make sense, it's not
+                connected"). Single source of these actions on the
+                page; no double-icon, no floating debris. */}
             {/* "Ход стройки" sends under-construction-project buyers
                 straight to the timeline (the strongest trust signal
                 we have). Positioned bottom-right; the counter chip

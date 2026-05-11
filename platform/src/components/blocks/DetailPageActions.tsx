@@ -1,136 +1,85 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { createPortal } from 'react-dom';
 import { ShareButton } from './ShareButton';
 import { SaveToggle } from './SaveToggle';
 
 export interface DetailPageActionsProps {
-  /** SaveToggle target — same as the hero overlay. */
+  /** SaveToggle target — same as the hero overlay previously was. */
   type: 'building' | 'listing';
   id: string;
   /** Pre-built share text + title (re-used from the hero overlay). */
   shareText: string;
   shareTitle: string;
-  /**
-   * When set, the island starts HIDDEN and slides in once the element
-   * with this DOM id has scrolled out of the viewport. Used to avoid
-   * double-icon at the top of the page where the hero already shows
-   * its own Save + Share overlay. Same pattern as BuildingStickyContact's
-   * hideUntilElementHiddenId.
-   *
-   * If the id resolves to no element (e.g. hero rendered conditionally
-   * and the condition failed), the island reverts to always-visible —
-   * never strand the buyer without access to save/share.
-   */
-  revealAfterId?: string;
 }
 
 /**
- * Detail-page floating action island. Holds Save + Share at a fixed
- * position just below the SiteHeader (top-right) on detail pages.
+ * Detail-page Save + Share actions, portalled INTO the SiteHeader's
+ * `#site-header-actions` slot so the buttons live inside the existing
+ * chrome instead of floating in mid-air below it.
  *
- * Why this exists: founder critique 2026-05-11 — "the share and save
- * buttons on the detail page should be seen all the time, like the
- * contact button." Before this, save+share lived only as overlays on
- * the hero photo; once the buyer scrolled past the hero they had no
- * way to save the listing without scrolling all the way back up.
+ * Pattern reference (Cian, Bayut, Avito, Rightmove, Zillow): on
+ * project / listing detail pages, save + share live in the persistent
+ * top bar — not as a separate floating island. The bar is already
+ * sticky on scroll, so the actions are always accessible without
+ * adding a second sticky element to the page.
  *
- * Mature-platform pattern (Cian, Avito, Bayut, Rightmove, Zillow): a
- * small floating action cluster that surfaces save/share at any
- * scroll depth. Cian and Bayut specifically use the "reveal after
- * hero scrolls out" approach so there's no visual collision with the
- * hero's own overlay icons.
+ * Earlier this component rendered as a fixed-positioned pill below
+ * the SiteHeader. Founder critique 2026-05-11 (second pass): "it is
+ * just staying on the like making a place that doesn't actually make
+ * sense at all … it's not connected." Correct — a floating island
+ * mid-screen with no visual anchor reads as orphan UI. The portal
+ * approach attaches the actions to the SiteHeader's right-side
+ * cluster (next to Войти / Кабинет) so they're visually integrated
+ * with the rest of the chrome.
  *
- * Visual treatment (second pass, founder critique 2026-05-11):
- * earlier this rendered as two separate floating circles which read
- * as "random icons" against the white page bg — the `bg-white/90` on
- * each inner button only contrasts with a photo behind it, not with
- * a white page. Now wraps both buttons in a single rounded pill with
- * `shadow-md border bg-white` so the cluster looks like a deliberate
- * action chip lifted off the page (Cian / Bayut sticky-actions
- * pattern). The buttons keep their internal style; the wrapper does
- * the visual integration.
+ * Mechanism: the SiteHeader renders an empty
+ * `<div id="site-header-actions">` slot. This component looks up that
+ * slot at mount and uses `createPortal` to render children into it.
+ * Slot is empty on non-detail pages — DetailPageActions is only
+ * mounted on /zhk + /kvartira details, where the page chooses to
+ * surface these actions.
  *
- * Positioning: fixed top-[6.75rem] right-3 z-30. That puts the pill
- * BELOW SiteHeader (56px) AND the sticky sub-nav (~52px) so it doesn't
- * cover tab labels. Stays out of the way of the mobile bottom contact
- * bar (which lives at the opposite edge of the viewport). z-30 lifts
- * it above page content but below modal dialogs.
+ * No IntersectionObserver / scroll-spy needed: SiteHeader is
+ * `sticky top-0 z-30`, so the actions are always in view at every
+ * scroll depth. The hero photo's own overlay save + share icons were
+ * removed in the same change — the header version is the single
+ * source for these actions across the entire detail page.
  */
 export function DetailPageActions({
   type,
   id,
   shareText,
   shareTitle,
-  revealAfterId,
 }: DetailPageActionsProps) {
-  // Start hidden when revealAfterId is set so the island doesn't flash
-  // on top of the hero overlay at page load. The IntersectionObserver
-  // below either keeps us hidden (anchor visible) or slides us in
-  // (anchor already scrolled past, e.g. via browser scroll restoration).
-  const [hidden, setHidden] = useState<boolean>(revealAfterId != null);
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (!revealAfterId) return;
-    const target = document.getElementById(revealAfterId);
-    if (!target) {
-      // Anchor not found — stay visible so save/share is always
-      // reachable. queueMicrotask defers past the synchronous effect
-      // body to satisfy react-hooks/set-state-in-effect (same pattern
-      // BuildingStickyContact + LocationSearch use).
-      queueMicrotask(() => setHidden(false));
+    // Look up the slot once on mount. SiteHeader renders the slot
+    // server-side so by the time this client effect runs it should
+    // exist. queueMicrotask defers the setState past the synchronous
+    // effect body to satisfy react-hooks/set-state-in-effect (same
+    // pattern used by BuildingStickyContact + LocationSearch). The
+    // requestAnimationFrame fallback handles the rare edge case where
+    // this component hydrates before the slot does (e.g. if
+    // SiteHeader is itself behind a Suspense boundary).
+    const find = () => document.getElementById('site-header-actions');
+    const initial = find();
+    if (initial) {
+      queueMicrotask(() => setSlot(initial));
       return;
     }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        // When the hero overlay is in view → hide the island (the
-        // overlay covers the same action). When it scrolls off → show.
-        setHidden(entry?.isIntersecting ?? false);
-      },
-      { threshold: 0 },
-    );
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [revealAfterId]);
+    const raf = requestAnimationFrame(() => setSlot(find()));
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
-  return (
-    <div
-      className={cn(
-        // Position: fixed below the SiteHeader (56px) + sub-nav band
-        // (~52px) so the island doesn't cover tab labels on /zhk. At
-        // mobile widths the buffer above keeps the icons clear of the
-        // sticky chrome.
-        'fixed right-3 top-[6.75rem] z-30 inline-flex items-center md:right-5',
-        // Unified pill: border + shadow + bg-white makes the cluster
-        // look like a deliberate chip lifted off the page, not two
-        // disconnected floating circles. The inner buttons (each
-        // size-9 with their own bg-white/90) sit cleanly inside this
-        // pill; the outer bg-white provides the visual ground that
-        // the page-white background can't.
-        //
-        // Shadow applied via inline style referencing the project's
-        // --shadow-md token (defined in globals.css `@theme`). The
-        // Tailwind v4 `shadow-md` utility doesn't pull the @theme
-        // shadow tokens in this codebase — verified by computed-style
-        // probe showing all-transparent rgba — so we use the token
-        // directly. Single line, no hex literal, matches the rest of
-        // the platform's shadow rhythm.
-        'rounded-full border border-stone-200 bg-white',
-        // Slide-in animation mirrors BuildingStickyContact's: fade +
-        // translate together via transition-all. pointer-events-none
-        // on the hidden state so the invisible pill doesn't intercept
-        // taps near the corner.
-        'transition-all duration-200 ease-out',
-        hidden
-          ? 'pointer-events-none -translate-y-1 opacity-0'
-          : 'pointer-events-auto translate-y-0 opacity-100',
-      )}
-      aria-hidden={hidden}
-      style={{ boxShadow: 'var(--shadow-md)' }}
-    >
+  if (!slot) return null;
+  return createPortal(
+    <>
       <ShareButton compact text={shareText} title={shareTitle} />
       <SaveToggle type={type} id={id} />
-    </div>
+    </>,
+    slot,
   );
 }
