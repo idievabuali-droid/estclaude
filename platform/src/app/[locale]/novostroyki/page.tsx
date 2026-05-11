@@ -17,6 +17,7 @@ import type { PoiCategory } from '@/services/poi';
 import { buildQuery, type FilterParams } from './filter-state';
 import { PriceChip } from './PriceChip';
 import { SizeChip } from './SizeChip';
+import { FloorChip } from './FloorChip';
 import { MultiSelectChip, type PoiIconKey } from './MultiSelectChip';
 import { NovostroykiFilterRail } from './FilterRail';
 
@@ -197,6 +198,8 @@ export default async function NovostroykiPage({
     roomsIn: sp.rooms?.split(',').map((r) => parseInt(r, 10)).filter((n) => Number.isFinite(n) && n > 0),
     sizeFromApt: sp.size_from ? parseFloat(sp.size_from) : null,
     sizeToApt: sp.size_to ? parseFloat(sp.size_to) : null,
+    floorFromApt: sp.floor_from ? parseInt(sp.floor_from, 10) : null,
+    floorToApt: sp.floor_to ? parseInt(sp.floor_to, 10) : null,
   });
 
   const cards = await Promise.all(
@@ -301,6 +304,7 @@ export default async function NovostroykiPage({
                   current={sp}
                 />
                 <SizeChip current={sp} />
+                <FloorChip current={sp} />
                 <PriceChip current={sp} />
                 <MultiSelectChip
                   label="Что рядом"

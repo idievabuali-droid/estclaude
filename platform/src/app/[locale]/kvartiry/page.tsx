@@ -11,6 +11,7 @@ import { pluralRu } from '@/lib/format';
 import type { FinishingType, SourceType } from '@/types/domain';
 import { PriceChip } from './PriceChip';
 import { SizeChip } from './SizeChip';
+import { FloorChip } from './FloorChip';
 import { MultiSelectChip } from './MultiSelectChip';
 import { MonthlyChip } from './MonthlyChip';
 import { KvartiryFilterRail } from './FilterRail';
@@ -40,6 +41,11 @@ type SearchParams = {
   size_from?: string;
   /** Max apartment size in m². */
   size_to?: string;
+  /** Apartment floor range (integer). Some buyers want a high floor
+   *  (view + breeze), some want a low floor (elderly parents +
+   *  strollers), some avoid the top floor (summer heat). */
+  floor_from?: string;
+  floor_to?: string;
   /** Building scope — when set, /kvartiry shows only this building's
    *  apartments. Used by the "Посмотреть все N квартир" CTA on the
    *  building detail page. The header changes to "Квартиры в ЖК X"
@@ -101,6 +107,8 @@ export default async function KvartiryPage({
     priceTo: sp.price_to ? BigInt(parseInt(sp.price_to, 10) * 100) : null,
     sizeFrom: sp.size_from ? parseFloat(sp.size_from) : null,
     sizeTo: sp.size_to ? parseFloat(sp.size_to) : null,
+    floorFrom: sp.floor_from ? parseInt(sp.floor_from, 10) : null,
+    floorTo: sp.floor_to ? parseInt(sp.floor_to, 10) : null,
     maxMonthlyDirams: sp.monthly_to
       ? BigInt(parseInt(sp.monthly_to, 10) * 100)
       : null,
@@ -230,6 +238,7 @@ export default async function KvartiryPage({
                 <PriceChip current={sp} />
                 <MonthlyChip current={sp} />
                 <SizeChip current={sp} />
+                <FloorChip current={sp} />
                 <MultiSelectChip
                   label="Отделка"
                   paramKey="finishing"
@@ -362,6 +371,8 @@ function hasActiveFiltersK(sp: SearchParams): boolean {
       sp.price_to ||
       sp.size_from ||
       sp.size_to ||
+      sp.floor_from ||
+      sp.floor_to ||
       sp.monthly_to,
   );
 }
@@ -373,6 +384,7 @@ function countActiveFiltersK(sp: SearchParams): number {
   if (sp.finishing) n++;
   if (sp.price_from || sp.price_to) n++;
   if (sp.size_from || sp.size_to) n++;
+  if (sp.floor_from || sp.floor_to) n++;
   if (sp.monthly_to) n++;
   return n;
 }
@@ -396,9 +408,13 @@ function buildRelaxOptionsKvartiry(
 ): Array<{ paramKey: string; label: string }> {
   // Same priority as /novostroyki — soft preferences before hard
   // constraints (price/rooms). Faridun won't relax his price ceiling
-  // by accident.
+  // by accident. Floor sits next to size/finishing in the "soft
+  // preference" tier — easier to give up than rooms or budget.
   const opts: Array<{ paramKey: string; label: string }> = [];
   if (sp.finishing) opts.push({ paramKey: 'finishing', label: 'Отделка' });
+  if (sp.floor_from || sp.floor_to) {
+    opts.push({ paramKey: sp.floor_to ? 'floor_to' : 'floor_from', label: 'Этаж' });
+  }
   if (sp.size_from || sp.size_to) {
     opts.push({ paramKey: sp.size_to ? 'size_to' : 'size_from', label: 'Площадь' });
   }
@@ -432,6 +448,9 @@ async function buildRelaxOptionsKvartiryWithCounts(
       } else if (opt.paramKey === 'size_from' || opt.paramKey === 'size_to') {
         delete next.size_from;
         delete next.size_to;
+      } else if (opt.paramKey === 'floor_from' || opt.paramKey === 'floor_to') {
+        delete next.floor_from;
+        delete next.floor_to;
       } else {
         delete (next as Record<string, unknown>)[opt.paramKey];
       }
@@ -443,6 +462,8 @@ async function buildRelaxOptionsKvartiryWithCounts(
         priceTo: next.price_to ? BigInt(parseInt(next.price_to, 10) * 100) : null,
         sizeFrom: next.size_from ? parseFloat(next.size_from) : null,
         sizeTo: next.size_to ? parseFloat(next.size_to) : null,
+        floorFrom: next.floor_from ? parseInt(next.floor_from, 10) : null,
+        floorTo: next.floor_to ? parseInt(next.floor_to, 10) : null,
         maxMonthlyDirams: next.monthly_to ? BigInt(parseInt(next.monthly_to, 10) * 100) : null,
         buildingId: scopedBuildingId,
         nearLat: next.near_lat ? parseFloat(next.near_lat) : null,

@@ -64,11 +64,13 @@ export type FilterParams = {
   /** Apartment-criteria filters — buildings list filters by what
    *  apartments each ЖК contains. Cian / Avito / Bayut new-project
    *  pattern. Comma-separated room counts ("1,2,3"); size range in m²
-   *  (decimals allowed). Service layer keeps only buildings with ≥1
-   *  active listing matching the criteria. */
+   *  (decimals allowed); floor range (integer). Service layer keeps
+   *  only buildings with ≥1 active listing matching the criteria. */
   rooms?: string;
   size_from?: string;
   size_to?: string;
+  floor_from?: string;
+  floor_to?: string;
 };
 
 /** Read a CSV param as a Set for membership checks + toggling. */
@@ -151,7 +153,8 @@ export function countActive(current: FilterParams): number {
     csvSet(current.nearby).size +
     csvSet(current.rooms).size +
     (current.price_from || current.price_to ? 1 : 0) +
-    (current.size_from || current.size_to ? 1 : 0)
+    (current.size_from || current.size_to ? 1 : 0) +
+    (current.floor_from || current.floor_to ? 1 : 0)
   );
 }
 

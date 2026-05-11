@@ -91,6 +91,10 @@ export type BuildingFilters = {
   roomsIn?: number[];
   sizeFromApt?: number | null;
   sizeToApt?: number | null;
+  /** Floor range — integer, inclusive. Same buyer-intent reasons as
+   *  the rooms / size filters above (high vs low floor preferences). */
+  floorFromApt?: number | null;
+  floorToApt?: number | null;
 };
 
 /** Haversine distance in meters between two lat/lng points. Used for
@@ -290,7 +294,9 @@ export async function listBuildings(filters: BuildingFilters = {}): Promise<Mock
   const hasApartmentCriteria =
     (filters.roomsIn?.length ?? 0) > 0 ||
     filters.sizeFromApt != null ||
-    filters.sizeToApt != null;
+    filters.sizeToApt != null ||
+    filters.floorFromApt != null ||
+    filters.floorToApt != null;
   if (hasApartmentCriteria && buildings.length > 0) {
     let q = supabase
       .from('listings')
@@ -304,6 +310,8 @@ export async function listBuildings(filters: BuildingFilters = {}): Promise<Mock
     if (filters.roomsIn?.length) q = q.in('rooms_count', filters.roomsIn);
     if (filters.sizeFromApt != null) q = q.gte('size_m2', filters.sizeFromApt);
     if (filters.sizeToApt != null) q = q.lte('size_m2', filters.sizeToApt);
+    if (filters.floorFromApt != null) q = q.gte('floor_number', filters.floorFromApt);
+    if (filters.floorToApt != null) q = q.lte('floor_number', filters.floorToApt);
     const { data: matchingListings } = await q;
     const validBuildingIds = new Set(
       (matchingListings ?? []).map((l) => l.building_id as string),

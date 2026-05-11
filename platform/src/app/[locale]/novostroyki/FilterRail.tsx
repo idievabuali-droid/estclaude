@@ -17,6 +17,7 @@ import type { PoiCategory } from '@/services/poi';
 import { csvSet, toggleHref, type FilterParams } from './filter-state';
 import { PriceChip } from './PriceChip';
 import { SizeChip } from './SizeChip';
+import { FloorChip } from './FloorChip';
 
 /**
  * Desktop filter rail for /novostroyki — 260px column on the left of
@@ -92,7 +93,9 @@ function hasAnyFilter(sp: FilterParams): boolean {
       sp.near_label ||
       sp.rooms ||
       sp.size_from ||
-      sp.size_to,
+      sp.size_to ||
+      sp.floor_from ||
+      sp.floor_to,
   );
 }
 
@@ -157,6 +160,13 @@ export function NovostroykiFilterRail({ current }: { current: FilterParams }) {
           decimals for the half-meter sizes common in Tajik listings. */}
       <FilterGroup label="Площадь">
         <SizeChip current={current} />
+      </FilterGroup>
+
+      {/* ЭТАЖ — apartment floor range. Same popover shape as Площадь
+          but integers only. Sits between Площадь and Цена since it's
+          another apartment-level dimension the buyer narrows on. */}
+      <FilterGroup label="Этаж">
+        <FloorChip current={current} />
       </FilterGroup>
 
       {/* ЦЕНА — existing PriceChip operates on the building's

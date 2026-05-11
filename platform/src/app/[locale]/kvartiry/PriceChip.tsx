@@ -12,6 +12,12 @@ export type KvartiryFilterParams = {
   price_to?: string;
   size_from?: string;
   size_to?: string;
+  /** Floor range — integer, no decimals. Some buyers want a high floor
+   *  for the view + breeze; some want low floors for elderly parents
+   *  or strollers; some avoid the top floor due to summer heat.
+   *  Driven by FloorChip. */
+  floor_from?: string;
+  floor_to?: string;
   building?: string;
 };
 

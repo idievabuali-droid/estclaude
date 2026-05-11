@@ -5,6 +5,7 @@ import { FilterGroup } from '@/components/blocks';
 import type { FinishingType } from '@/types/domain';
 import { PriceChip } from './PriceChip';
 import { SizeChip } from './SizeChip';
+import { FloorChip } from './FloorChip';
 import { MonthlyChip } from './MonthlyChip';
 
 export type KvartiryFilterParams = {
@@ -14,6 +15,10 @@ export type KvartiryFilterParams = {
   price_to?: string;
   size_from?: string;
   size_to?: string;
+  /** Apartment floor range (integer). Lives alongside size + price as
+   *  another apartment-level dimension buyers shop by. */
+  floor_from?: string;
+  floor_to?: string;
   monthly_to?: string;
   building?: string;
   near_lat?: string;
@@ -70,6 +75,8 @@ function hasAnyFilter(sp: KvartiryFilterParams): boolean {
       sp.price_to ||
       sp.size_from ||
       sp.size_to ||
+      sp.floor_from ||
+      sp.floor_to ||
       sp.monthly_to ||
       sp.near_label,
   );
@@ -172,6 +179,14 @@ export function KvartiryFilterRail({
       {/* ПЛОЩАДЬ — popover chip (range). */}
       <FilterGroup label="Площадь">
         <SizeChip current={current} />
+      </FilterGroup>
+
+      {/* ЭТАЖ — popover chip (range). Sits next to Площадь since both
+          are apartment dimensions the buyer narrows on. Integer-only;
+          common Vahdat buildings are 5–10 floors so the realistic
+          range is small. */}
+      <FilterGroup label="Этаж">
+        <FloorChip current={current} />
       </FilterGroup>
 
       {/* ОТДЕЛКА — pill multi-select. 4 options, soft pills. */}

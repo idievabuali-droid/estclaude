@@ -35,6 +35,12 @@ export type ListingFilters = {
   sizeFrom?: number | null;
   /** Max apartment size in m². */
   sizeTo?: number | null;
+  /** Min floor (inclusive). Integer; floor_number stored as int on
+   *  listings. Some buyers want a high floor for the view + breeze,
+   *  some want low floors for elderly parents or strollers. */
+  floorFrom?: number | null;
+  /** Max floor (inclusive). */
+  floorTo?: number | null;
   /** Max monthly installment payment in dirams. Filters to listings
    *  with installment_available=true AND monthly_amount ≤ cap. Faridun
    *  thinks "I can pay 4 000 TJS/month" — that's the actual mental
@@ -102,6 +108,8 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
   if (filters.priceTo) q = q.lte('price_total_dirams', Number(filters.priceTo));
   if (filters.sizeFrom != null) q = q.gte('size_m2', filters.sizeFrom);
   if (filters.sizeTo != null) q = q.lte('size_m2', filters.sizeTo);
+  if (filters.floorFrom != null) q = q.gte('floor_number', filters.floorFrom);
+  if (filters.floorTo != null) q = q.lte('floor_number', filters.floorTo);
   if (filters.maxMonthlyDirams != null) {
     q = q
       .eq('installment_available', true)

@@ -12,6 +12,8 @@ interface SearchParams {
   price_to?: string;
   size_from?: string;
   size_to?: string;
+  floor_from?: string;
+  floor_to?: string;
   building?: string;
   near_lat?: string;
   near_lng?: string;
