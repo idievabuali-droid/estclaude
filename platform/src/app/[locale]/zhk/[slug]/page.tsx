@@ -343,11 +343,16 @@ export default async function BuildingDetailPage({
                   no real visit-request flow). Founder critique
                   2026-05-09: "shows too many places to contact …
                   Запросить визит is taking today wrong place." Now one
-                  button → popover with all 3 channels (WhatsApp /
-                  Telegram / IMO) so the buyer picks their preferred
-                  app on tap. Mobile sticky bar below already does the
-                  same. */}
-              <div className="flex flex-col gap-2">
+                  button → popover with all 3 channels.
+
+                  The `id="zhk-inline-contact"` is a sentinel for the
+                  mobile sticky bar below — it watches this element via
+                  IntersectionObserver and stays hidden while this
+                  button is in view, then slides up once the buyer
+                  scrolls past. Keeps mobile from showing two contact
+                  CTAs at the same scroll position (founder critique
+                  2026-05-11, second pass). */}
+              <div id="zhk-inline-contact" className="flex flex-col gap-2">
                 <MessagingPopoverButton
                   variant="primary-lg"
                   label="Связаться с застройщиком"
@@ -838,6 +843,10 @@ export default async function BuildingDetailPage({
         telegramLink={FOUNDER_CONTACTS.telegramLink}
         imoHref={buildContactLinks(FOUNDER_CONTACTS.phone).imo}
         phone={FOUNDER_CONTACTS.phone}
+        // Hide the sticky bar while the inline contact button up top
+        // is in view — Cian / Avito / Bayut mobile pattern. The id
+        // is the sentinel wrapper around the price-card MessagingPopover.
+        hideUntilElementHiddenId="zhk-inline-contact"
       />
     </>
   );

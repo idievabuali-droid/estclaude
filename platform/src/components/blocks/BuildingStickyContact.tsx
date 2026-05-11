@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { formatPriceNumber } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { MessagingPopoverButton } from './MessagingPopoverButton';
 
 export interface BuildingStickyContactProps {
@@ -27,6 +29,20 @@ export interface BuildingStickyContactProps {
   imoHref?: string | null;
   /** Phone number for the tel: link, in raw +992... format. */
   phone: string;
+  /**
+   * When set, the bar starts HIDDEN and only slides in once the element
+   * with this DOM id has scrolled out of the viewport. Cian / Avito /
+   * Bayut all do this on project-detail mobile: an inline primary
+   * contact button lives in the price card up top, and the sticky bar
+   * only appears once the buyer scrolls past it — so contact is always
+   * one-tap, but the two CTAs never compete for attention at the same
+   * scroll position.
+   *
+   * If the id resolves to no element (e.g. price card hidden because
+   * no price is known), the bar reverts to always-visible. We never
+   * leave the buyer with NO sticky contact path on a long page.
+   */
+  hideUntilElementHiddenId?: string;
 }
 
 /**
@@ -66,6 +82,7 @@ export function BuildingStickyContact({
   // don't need to be touched if/when a per-channel call entry returns.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   phone,
+  hideUntilElementHiddenId,
 }: BuildingStickyContactProps) {
   const lines = [
     `Здравствуйте! Интересует ЖК ${buildingName}`,
@@ -77,9 +94,66 @@ export function BuildingStickyContact({
   const telegramHref = `${telegramLink}?text=${text}`;
   const imoHrefFinal = imoHref ?? null;
 
+  // `hidden` = bar slid off-screen + non-interactive. When
+  // hideUntilElementHiddenId is set, default to hidden so the bar
+  // doesn't flash on top of the inline button when the buyer lands
+  // at the top of the page (where the inline button is in view).
+  // Once the IntersectionObserver attaches it'll either keep us
+  // hidden (inline button visible) or slide us in (inline button
+  // already scrolled past, e.g. browser scroll restoration).
+  const [hidden, setHidden] = useState<boolean>(hideUntilElementHiddenId != null);
+
+  useEffect(() => {
+    if (!hideUntilElementHiddenId) return;
+    const target = document.getElementById(hideUntilElementHiddenId);
+    if (!target) {
+      // Graceful fallback: anchor element isn't in the DOM (e.g. the
+      // page-level inline contact rendered conditionally and the
+      // condition failed). Stay visible so the buyer always has a
+      // contact path — never strand them without a sticky on a long
+      // page. queueMicrotask defers the setState past the effect's
+      // synchronous body to satisfy the react-hooks/set-state-in-effect
+      // rule (same pattern LocationSearch uses for its hot-path effects).
+      queueMicrotask(() => setHidden(false));
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // `isIntersecting === true` means the anchor element (inline
+        // contact button) has at least one pixel inside the viewport.
+        // Hide the sticky bar while that's true — two CTAs at the
+        // same scroll position is exactly the redundancy this prop
+        // exists to prevent. Once the inline button has fully scrolled
+        // off-screen (isIntersecting === false), slide the bar in.
+        setHidden(entry?.isIntersecting ?? false);
+      },
+      // threshold 0 = trigger on the first / last pixel of the
+      // anchor. The transition is smooth (300ms via CSS) so the
+      // exact threshold doesn't need to be tuned for "early reveal."
+      { threshold: 0 },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hideUntilElementHiddenId]);
+
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white shadow-md md:hidden"
+      className={cn(
+        'fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white shadow-md md:hidden',
+        // Slide-up + fade transition. transition-all picks up both the
+        // translate-y and opacity changes from one declaration. The
+        // pointer-events-none on the hidden state prevents the bar from
+        // intercepting taps while it's animating off-screen.
+        'transition-all duration-300 ease-out',
+        hidden
+          ? 'pointer-events-none translate-y-full opacity-0'
+          : 'pointer-events-auto translate-y-0 opacity-100',
+      )}
+      // aria-hidden mirrors the visual state so screen readers don't
+      // announce a contact bar that isn't visible. Default `false`
+      // (always visible) matches existing back-compat behaviour for
+      // callers that don't pass `hideUntilElementHiddenId`.
+      aria-hidden={hidden}
       style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
     >
       <div className="flex items-center gap-3 px-3 pt-3">
