@@ -171,7 +171,13 @@ export function FeedbackButton() {
       >
         <MessageSquare className="size-3.5" aria-hidden />
         <span className="hidden sm:inline">Сообщить о проблеме</span>
-        <span className="sm:hidden">Проблема?</span>
+        {/* Was "Проблема?" — too narrow (only fits bug-reporting
+            mental model) and loaded with negative framing for a
+            buyer mid-research. The chip is a catch-all for bugs,
+            confusion, and ideas, so the mobile label should invite
+            ANY kind of message. "Сообщить?" matches the action
+            verb of the dialog without presuming what's wrong. */}
+        <span className="sm:hidden">Сообщить?</span>
       </button>
 
       {open ? (
