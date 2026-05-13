@@ -290,8 +290,22 @@ export function BuildingCard({
                 <span>
                   {u.rooms_count}-комн · {u.size_m2} м² · {u.floor_number} эт
                 </span>
-                <span className="font-semibold text-stone-900">
+                <span className="flex flex-wrap items-baseline justify-end gap-x-1.5 font-semibold text-stone-900">
                   {formatPriceNumber(u.price_total_dirams)} TJS
+                  {/* Currency conversion mirrors the headline price
+                      treatment: when the buyer chose £ / $ / € on
+                      /diaspora, each inline-unit row also shows the
+                      ≈ conversion so diaspora buyers don't have to
+                      mentally translate per-row. Only renders when
+                      showConversion is true (= /diaspora's
+                      currency cookie is set + non-TJS chosen). */}
+                  {showConversion ? (
+                    <PriceConversion
+                      priceDirams={u.price_total_dirams}
+                      target={currency}
+                      rates={rates}
+                    />
+                  ) : null}
                 </span>
               </div>
             ))}
