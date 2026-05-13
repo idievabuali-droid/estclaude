@@ -76,7 +76,7 @@ export function CallbackWidget({ listingId }: CallbackWidgetProps) {
         return;
       }
       setDone(true);
-      toast.success('Спасибо! Мы свяжемся с вами в WhatsApp.');
+      toast.success('Спасибо! Напишем в WhatsApp в течение рабочего дня.');
     } catch {
       toast.error('Сеть не отвечает. Попробуйте ещё раз.');
     } finally {
@@ -91,7 +91,7 @@ export function CallbackWidget({ listingId }: CallbackWidgetProps) {
           <div className="flex items-center gap-3">
             <Phone className="size-5 text-terracotta-700" aria-hidden />
             <p className="text-meta text-stone-700">
-              Запрос отправлен. Мы напишем в WhatsApp по номеру {phone}.
+              Запрос отправлен. Напишем в WhatsApp на {phone} в течение рабочего дня.
             </p>
           </div>
         </AppCardContent>
