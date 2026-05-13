@@ -27,10 +27,12 @@ export default async function PomoshchVyboraPage({
   return (
     <section className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-b from-terracotta-50/30 via-stone-50 to-stone-50 py-10 md:py-16">
       <div className="mx-auto flex w-full max-w-[540px] flex-col gap-8 px-4 md:gap-10">
-        {/* Minimal wizard top bar — wordmark on the left, "Сохранить
-            и выйти" on the right. Lets a buyer back out without
-            losing context (the link routes to /izbrannoe so any
-            anchor or saves they tapped earlier remain). */}
+        {/* Minimal wizard top bar — wordmark on the left, "Закрыть"
+            on the right. The link doesn't actually persist wizard
+            state, so the earlier "Сохранить и выйти" wording was a
+            lie — renamed to be honest about the action. Destination
+            stays /izbrannoe so any anon-saves the buyer tapped
+            earlier in the session are visible after exiting. */}
         <div className="flex items-center justify-between">
           <Link
             href="/"
@@ -43,7 +45,7 @@ export default async function PomoshchVyboraPage({
             href="/izbrannoe"
             className="text-meta font-medium text-stone-600 hover:text-terracotta-700 hover:underline"
           >
-            Сохранить и выйти
+            Закрыть
           </Link>
         </div>
 
