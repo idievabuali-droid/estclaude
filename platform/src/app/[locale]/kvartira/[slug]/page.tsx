@@ -432,99 +432,6 @@ export default async function ListingDetailPage({
         </AppContainer>
       </section>
 
-      {/* ─── ALTERNATIVES (moved here from §11 by founder review
-              2026-05-11, gov.uk IA lens): comparison shopping is the
-              highest-intent activity on a property listing. Cian /
-              Avito / Bayut new-project pages all surface "other units
-              in this building" inline right after the price + contact
-              module, BEFORE deep apartment-specific details — so
-              undecided buyers can compare without scrolling through
-              the whole page. Two variants kept (in-ЖК vs standalone)
-              + the empty-state fallback for standalones with no
-              similar listings. The original §11 numbering is gone;
-              the section anchors itself by intent now, not position. */}
-      {similar.length > 0 ? (
-        <section className="border-t border-stone-200 bg-stone-50 py-6">
-          <AppContainer className="flex flex-col gap-5">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div className="flex flex-col gap-1">
-                <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
-                  Альтернативы
-                </span>
-                <h2
-                  className="text-h2 font-semibold text-stone-900"
-                  style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
-                >
-                  {building ? 'Похожие в этом ЖК' : `Похожие в районе ${district.name.ru}`}
-                </h2>
-              </div>
-              {!building ? (
-                <Link
-                  href={`/kvartiry?district=${district.slug}`}
-                  className="inline-flex items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
-                >
-                  Все в районе
-                  <ArrowUpRight className="size-3.5" aria-hidden />
-                </Link>
-              ) : null}
-            </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
-              {similar.map((l) => (
-                <ListingCard
-                  key={l.id}
-                  listing={l}
-                  // For ЖК listings, all alternatives are in the same
-                  // building → pass it explicitly + hide the name in
-                  // each card. For standalone alternatives we don't
-                  // pass a building (most or all of them won't have
-                  // one anyway) — the card falls back to its standalone
-                  // variant with district + street_address.
-                  building={building && building.id === l.building_id ? building : null}
-                  developerVerified={(building && developer?.is_verified) ?? false}
-                  hideBuildingName={!!building}
-                />
-              ))}
-            </div>
-          </AppContainer>
-        </section>
-      ) : !building ? (
-        // Empty similar-list fallback for standalone — instead of just
-        // dead-ending, point the buyer at the full district browse so
-        // they have a clear next step.
-        <section className="border-t border-stone-200 bg-stone-50 py-6">
-          <AppContainer className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1">
-              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
-                Дальше
-              </span>
-              <h2
-                className="text-h2 font-semibold text-stone-900"
-                style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
-              >
-                Посмотреть другие квартиры
-              </h2>
-            </div>
-            <p className="text-meta text-stone-600">
-              Похожих в районе {district.name.ru} пока нет. Откройте полный список — найдёте варианты в соседних районах.
-            </p>
-            <Link
-              href={`/kvartiry?district=${district.slug}`}
-              className="inline-flex w-fit items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
-            >
-              Все квартиры в районе {district.name.ru}
-              <ArrowUpRight className="size-3.5" aria-hidden />
-            </Link>
-            <Link
-              href={`/kvartiry`}
-              className="inline-flex w-fit items-center gap-1 text-meta font-medium text-stone-700 hover:text-stone-900 hover:underline"
-            >
-              Все квартиры в Вахдате
-              <ArrowUpRight className="size-3.5" aria-hidden />
-            </Link>
-          </AppContainer>
-        </section>
-      ) : null}
-
       {/* ─── §4 ОБ ЭТОЙ КВАРТИРЕ (pill row + view_notes line) ──── */}
       {/* Per-apartment details that aren't in the title. Only finishing
           + bathroom + orientation + view_notes — balcony, ceiling, and
@@ -911,6 +818,99 @@ export default async function ListingDetailPage({
                   : `/kvartira/${listing.slug}#chto-ryadom`
               }
             />
+          </AppContainer>
+        </section>
+      ) : null}
+
+      {/* ─── §11 АЛЬТЕРНАТИВЫ ───────────────────────────────────── */}
+      {/* Two variants:
+            - In a ЖК: "Похожие в этом ЖК" — other apartments in the
+              same building, hides building-name from each card since
+              they're all in the same one (visual clutter).
+            - Standalone: "Похожие в этом районе" — other apartments
+              in the same district with rooms_count ±1, since there's
+              no building to anchor on. Drives buyer comparison so the
+              standalone detail page doesn't dead-end into the footer.
+          The "Все в районе" CTA lets the visitor escape into the full
+          district browse when their alternative wasn't in the top 3. */}
+      {similar.length > 0 ? (
+        <section className="border-t border-stone-200 bg-stone-50 py-6">
+          <AppContainer className="flex flex-col gap-5">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                  Альтернативы
+                </span>
+                <h2
+                  className="text-h2 font-semibold text-stone-900"
+                  style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+                >
+                  {building ? 'Похожие в этом ЖК' : `Похожие в районе ${district.name.ru}`}
+                </h2>
+              </div>
+              {!building ? (
+                <Link
+                  href={`/kvartiry?district=${district.slug}`}
+                  className="inline-flex items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+                >
+                  Все в районе
+                  <ArrowUpRight className="size-3.5" aria-hidden />
+                </Link>
+              ) : null}
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
+              {similar.map((l) => (
+                <ListingCard
+                  key={l.id}
+                  listing={l}
+                  // For ЖК listings, all alternatives are in the same
+                  // building → pass it explicitly + hide the name in
+                  // each card. For standalone alternatives we don't
+                  // pass a building (most or all of them won't have
+                  // one anyway) — the card falls back to its standalone
+                  // variant with district + street_address.
+                  building={building && building.id === l.building_id ? building : null}
+                  developerVerified={(building && developer?.is_verified) ?? false}
+                  hideBuildingName={!!building}
+                />
+              ))}
+            </div>
+          </AppContainer>
+        </section>
+      ) : !building ? (
+        // Empty similar-list fallback for standalone — instead of just
+        // dead-ending, point the buyer at the full district browse so
+        // they have a clear next step.
+        <section className="border-t border-stone-200 bg-stone-50 py-6">
+          <AppContainer className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                Дальше
+              </span>
+              <h2
+                className="text-h2 font-semibold text-stone-900"
+                style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+              >
+                Посмотреть другие квартиры
+              </h2>
+            </div>
+            <p className="text-meta text-stone-600">
+              Похожих в районе {district.name.ru} пока нет. Откройте полный список — найдёте варианты в соседних районах.
+            </p>
+            <Link
+              href={`/kvartiry?district=${district.slug}`}
+              className="inline-flex w-fit items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+            >
+              Все квартиры в районе {district.name.ru}
+              <ArrowUpRight className="size-3.5" aria-hidden />
+            </Link>
+            <Link
+              href={`/kvartiry`}
+              className="inline-flex w-fit items-center gap-1 text-meta font-medium text-stone-700 hover:text-stone-900 hover:underline"
+            >
+              Все квартиры в Вахдате
+              <ArrowUpRight className="size-3.5" aria-hidden />
+            </Link>
           </AppContainer>
         </section>
       ) : null}
