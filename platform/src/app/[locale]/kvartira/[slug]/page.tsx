@@ -186,7 +186,7 @@ export default async function ListingDetailPage({
     : null;
 
   // §8 О доме: total active listings in this building drives the
-  // "Все квартиры в этом доме (N) →" CTA. The `similar` list is
+  // "В продаже сейчас (N) →" CTA. The `similar` list is
   // capped at 3 by getListing(), so we need a separate count query
   // for the accurate total. `head: true` skips the row payload.
   // Skipped entirely for standalone listings — there's no parent
@@ -640,7 +640,7 @@ export default async function ListingDetailPage({
                       href={`/kvartiry?building=${building.slug}`}
                       className="mt-1 inline-flex w-fit items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
                     >
-                      Все квартиры в этом доме
+                      В продаже сейчас
                       {buildingUnitCount != null ? ` (${buildingUnitCount})` : ''}
                       <ArrowUpRight className="size-3.5" aria-hidden />
                     </Link>
