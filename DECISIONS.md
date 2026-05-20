@@ -8,6 +8,14 @@ Newest at top.
 
 ---
 
+## 2026-05-20 · Hidden intake bot — developer-data collection on mobile
+
+**Locked:** A separate Telegram bot (own token `INTAKE_BOT_TOKEN`, own webhook `/api/intake-bot`, own secret) the founder uses on their phone to collect data from developers — a tappable menu of ~19 questions, ✅ per answered question, re-tap to edit, confirm-gated reset for the next developer, "Показать всё" prints a copy-ready summary. No buyer-facing surface (no page / nav / sitemap); rides this deployment only for hosting. Code is self-contained in `src/lib/intake-bot/` and shares nothing with the `@VafoTjBot` login bot; in-progress state in the `intake_bot_sessions` table.
+**Why:** The founder needs to collect every field the building / apartment cards require without memorising what to ask — a guided form on the device they already carry to developer meetings.
+**Affects:** `supabase/migrations/0021_intake_bot_sessions.sql`, `src/lib/intake-bot/{types,telegram,questions,store,flow}.ts`, `src/app/api/intake-bot/route.ts`, `scripts/setup-intake-bot.mjs`, `.env.local` (two new keys). Founder-side: apply migration 0021, add the two env vars to Vercel, run `scripts/setup-intake-bot.mjs`.
+
+---
+
 ## 2026-05-09 · Home hero search box — scope-aware, grouped, smart-routed, parametric
 
 **Locked:** `LocationSearch` gained a `scope?: 'all' | 'location'` prop. Home hero (scope='all') surfaces districts + ЖК + developers + POIs PLUS a "По характеристикам" group when the buyer types parametric queries like "3 комнаты до 200к" / "с ремонтом". Wizard `/pomoshch-vybora` step 1 (scope='location') hides buildings + parametric — only districts + POIs, matching "what district interests you?" intent. Dropdown is now **grouped** with quiet uppercase tracked-stone-500 captions (РАЙОНЫ / ЖК / ЗАСТРОЙЩИКИ / ОРИЕНТИРЫ / ПО ХАРАКТЕРИСТИКАМ / НЕДАВНЕЕ) — same eyebrow grammar used everywhere else. **"Найти" button no longer discards typed text:** runs the new `parseQuery` (regex parser, conservative word-boundaries) → routes to `/kvartiry?rooms=X&price_to=Y&q=...` for parametric or `/novostroyki?q=...` for free text. Both destinations honour `?q=` via soft case-insensitive substring filter on building.name/address (and listing.street_address for /kvartiry standalones), with a "Поиск: «X»" pill above the result list. Other gaps closed: visible loading/empty/error states (was hide-the-dropdown), min-chars 2→1, scope-keyed `recent_searches` in localStorage surfaced on empty focus.
