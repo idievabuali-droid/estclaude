@@ -52,10 +52,18 @@ const ALLOWED_EVENT_TYPES = new Set([
   'login_callback_submitted',
   // Phase A feedback-loop additions:
   'feedback_submitted',
+  // Quiz events — wizard retired 2026-05-21 (replaced by hero chip flow).
+  // Historic events stay queryable; allowlist entries kept so any stale
+  // client still in flight gets 202 not silent-drop until cache flushes.
   'quiz_started',
   'quiz_step_answered',
   'quiz_completed',
   'quiz_abandoned',
+  // Hero chip-flow events (2026-05-21 replacement for wizard).
+  'hero_chip_opened',
+  'hero_chip_committed',
+  'hero_more_filters_toggled',
+  'hero_search_submitted',
 ]);
 
 /** Soft per-anon rate limit. In-memory map (per serverless instance);

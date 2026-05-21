@@ -137,8 +137,8 @@ export interface LocationSearchProps {
    *  routes to /kvartiry vs /novostroyki accordingly. */
   onSubmit?: (query: string, parsed: ParsedQuery) => void;
   /** When provided, the component calls this on pick INSTEAD of
-   *  navigating. Used by the /pomoshch-vybora wizard so the buyer
-   *  picks a location and stays in the wizard. */
+   *  navigating. Lets a parent flow capture a location pick without
+   *  the autocomplete routing the user away mid-step. */
   onPick?: (hit: SearchHit) => void;
 }
 

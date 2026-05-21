@@ -64,7 +64,7 @@ export function PriceChip({ current }: PriceChipProps) {
     <FilterChipSheet
       label="Цена"
       valueSummary={valueSummary}
-      sheetTitle="Общая цена"
+      sheetTitle="Цена, TJS"
       hasPending={hasPending}
       onApply={() => commit(from, to)}
       onReset={() => {

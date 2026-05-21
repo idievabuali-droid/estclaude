@@ -33,6 +33,11 @@ type SearchParams = {
   rooms?: string;
   source?: string;
   finishing?: string;
+  /** CSV of district slugs (e.g. "gulistan,sharora") — added 2026-05-21
+   *  so the home hero District chip applies on /kvartiry too (previously
+   *  the chip silently no-op'd here). Mirrors the same param on
+   *  /novostroyki. Empty / missing = no district filter. */
+  district?: string;
   /** Min total price in TJS (no decimals). */
   price_from?: string;
   /** Max total price in TJS. */
@@ -101,6 +106,7 @@ export default async function KvartiryPage({
     rooms: sp.rooms?.split(',').map((r) => parseInt(r, 10)),
     source: sp.source?.split(',') as SourceType[] | undefined,
     finishing: sp.finishing?.split(',') as FinishingType[] | undefined,
+    district: sp.district?.split(','),
     // Price params arrive as TJS strings ("800000"); convert to dirams
     // (1 TJS = 100 dirams) before handing to the service.
     priceFrom: sp.price_from ? BigInt(parseInt(sp.price_from, 10) * 100) : null,

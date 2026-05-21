@@ -99,36 +99,58 @@ export function PriceChip({ current }: PriceChipProps) {
         commit('', '');
       }}
     >
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="kv-price-from" className="text-caption text-stone-500">
-            от, TJS
-          </label>
-          <input
-            id="kv-price-from"
-            type="number"
-            inputMode="numeric"
-            min={0}
-            placeholder="300 000"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="h-11 rounded-md border border-stone-300 bg-white px-3 text-meta tabular-nums text-stone-900 focus:border-terracotta-600 focus:outline-none"
-          />
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="kv-price-from" className="text-caption text-stone-500">
+              от, TJS
+            </label>
+            <input
+              id="kv-price-from"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              placeholder="100 000"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="h-11 rounded-md border border-stone-300 bg-white px-3 text-meta tabular-nums text-stone-900 focus:border-terracotta-600 focus:outline-none"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="kv-price-to" className="text-caption text-stone-500">
+              до, TJS
+            </label>
+            <input
+              id="kv-price-to"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              placeholder="500 000"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="h-11 rounded-md border border-stone-300 bg-white px-3 text-meta tabular-nums text-stone-900 focus:border-terracotta-600 focus:outline-none"
+            />
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="kv-price-to" className="text-caption text-stone-500">
-            до, TJS
-          </label>
-          <input
-            id="kv-price-to"
-            type="number"
-            inputMode="numeric"
-            min={0}
-            placeholder="800 000"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="h-11 rounded-md border border-stone-300 bg-white px-3 text-meta tabular-nums text-stone-900 focus:border-terracotta-600 focus:outline-none"
-          />
+        {/* Quick-pick presets — same set as /novostroyki/PriceChip and
+            the home hero PriceChipHero, so the same buyer sees the same
+            affordances on every surface. Preset taps zero `от` and set
+            `до` to the preset value, then commit immediately. */}
+        <div className="flex flex-wrap gap-2">
+          {[150_000, 200_000, 250_000, 300_000, 400_000].map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => {
+                setFrom('');
+                setTo(String(preset));
+                commit('', String(preset));
+              }}
+              className="inline-flex h-8 items-center rounded-full border border-stone-200 bg-white px-3 text-caption font-medium tabular-nums text-stone-700 transition-colors hover:border-terracotta-400 hover:bg-terracotta-50 hover:text-terracotta-700"
+            >
+              до {new Intl.NumberFormat('ru-RU').format(preset)} TJS
+            </button>
+          ))}
         </div>
       </div>
     </FilterChipSheet>

@@ -30,11 +30,7 @@ import { track } from '@/lib/analytics/track';
 function shouldHideOnPath(pathname: string): boolean {
   // Strip locale prefix (e.g. "/ru/kabinet/..." → "/kabinet/...")
   const stripped = pathname.replace(/^\/[a-z]{2}(?=\/|$)/, '');
-  return (
-    stripped.startsWith('/kabinet') ||
-    stripped.startsWith('/post') ||
-    stripped.startsWith('/pomoshch-vybora')
-  );
+  return stripped.startsWith('/kabinet') || stripped.startsWith('/post');
 }
 
 /**

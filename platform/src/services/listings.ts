@@ -63,6 +63,11 @@ export type ListingFilters = {
    *  the result set on its own — used as a "narrow further" tool by
    *  the home hero search. */
   q?: string | null;
+  /** District slugs to filter by. For ЖК listings the district comes
+   *  from the parent building; for standalones it comes from the
+   *  listing's own district_id. Slug-not-id (the URL param carries
+   *  slugs; this service resolves them). Empty array = no filter. */
+  district?: string[];
 };
 
 const TIER_RANK: Record<string, number> = {
@@ -91,6 +96,20 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
     (activeDistrictsRes.data ?? []).map((d) => d.id as string),
   );
 
+  // Resolve district slugs → ids upfront when the filter is set, so
+  // both the post-fetch district check (ЖК via building.district_id +
+  // standalone via listing.district_id) can hit a Set in one pass.
+  let districtIdFilter: Set<string> | null = null;
+  if (filters.district?.length) {
+    const { data: dRows } = await supabase
+      .from('districts')
+      .select('id,slug')
+      .in('slug', filters.district);
+    const ids = (dRows ?? []).map((d) => d.id as string);
+    if (ids.length === 0) return [];
+    districtIdFilter = new Set(ids);
+  }
+
   let q = supabase
     .from('listings')
     .select(
@@ -98,7 +117,9 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
       // (free-text search from the home hero) can substring-match
       // against them. We keep using the !left modifier so standalones
       // (building_id null) still come through with `buildings: null`.
-      `*, buildings:buildings!left(city, name, address), cover_photo:photos!listings_cover_photo_fk(storage_path)`,
+      // district_id added so the post-fetch district filter (below) can
+      // gate ЖК listings by their parent building's district.
+      `*, buildings:buildings!left(city, name, address, district_id), cover_photo:photos!listings_cover_photo_fk(storage_path)`,
     )
     .eq('status', 'active');
   if (filters.rooms?.length) q = q.in('rooms_count', filters.rooms);
@@ -205,6 +226,24 @@ export async function listListings(filters: ListingFilters = {}): Promise<MockLi
     const districtId = row.district_id as string | null | undefined;
     return districtId != null && activeDistrictIds.has(districtId);
   });
+
+  // District filter (post-fetch, mirrors the city filter pattern above).
+  // For ЖК listings the district comes from the joined building.district_id;
+  // for standalones it comes from the listing's own district_id. Same
+  // disjunction shape as the city filter above. Only fires when the
+  // caller passed district slugs — slug-to-id resolution happens once
+  // before the main query (see top of function).
+  if (districtIdFilter) {
+    filtered = filtered.filter((row: Record<string, unknown>) => {
+      const buildingDistrictId = (row.buildings as { district_id?: string } | null)
+        ?.district_id;
+      if (buildingDistrictId) return districtIdFilter!.has(buildingDistrictId);
+      const standaloneDistrictId = row.district_id as string | null | undefined;
+      return (
+        standaloneDistrictId != null && districtIdFilter!.has(standaloneDistrictId)
+      );
+    });
+  }
 
   // Free-text soft filter (q) — applied AFTER all structural filters
   // so it narrows the existing result set rather than fanning it out.

@@ -1,4 +1,4 @@
-import { Sparkles, ArrowUpRight, Globe2, Home, Building2 } from 'lucide-react';
+import { ArrowUpRight, Globe2, Home, Building2 } from 'lucide-react';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { AppContainer } from '@/components/primitives';
 import {
@@ -7,7 +7,7 @@ import {
   FeaturedListingsRow,
   type FeaturedListingsRowItem,
 } from '@/components/blocks';
-import { HeroSearchRow } from './HeroSearchRow';
+import { HeroChipRow } from './HeroChipRow';
 import {
   IllustrationBuilding,
   IllustrationCamera,
@@ -28,10 +28,11 @@ import { getDistrictBenchmarks } from '@/services/benchmarks';
  * Home page (V1, mockup-aligned redesign).
  *
  * Section order (top to bottom):
- *   1. Hero — pill + serif H1 with italic accent + subhead +
- *      search-with-button + "или подобрать" sparkle link + nav strip
+ *   1. Hero — pill + serif H1 with italic accent + subhead + HeroChipRow
+ *      (segmented type tabs + 3 base chips + Ещё фильтры expander +
+ *      live-count Показать CTA)
  *   2. Trust block — "Почему Vafo.tj" eyebrow + H2 statement + 3 icon
- *      cards (verified visits / real photos / 2-min match)
+ *      cards (verified visits / real photos / chip-filter promise)
  *   3. Featured ЖК — 3 BuildingCards (curated by featured_rank)
  *   4. Featured apartments — 3 ListingCards (trust-tier cascade) via
  *      shared <FeaturedListingsRow> (single source of truth between
@@ -130,10 +131,14 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   return (
     <>
       {/* ─── HERO ─────────────────────────────────────────────────
-          Mockup-aligned: pill / H1 with italic serif accent / subhead /
-          search + "Найти" button / "или подобрать" sparkle / nav strip.
-          Faint warm gradient (terracotta-50/40 → stone-50) reads as
-          warm publication paper — atmosphere without competing visually. */}
+          Trust pill + serif H1 with italic accent + 1-line subhead +
+          HeroChipRow (segmented type tabs + 3 base chips + Ещё фильтры
+          expander + live-count Показать CTA) + 3 browse pills (one-tap
+          paths to /kvartiry, /novostroyki, /diaspora — these are the
+          only above-fold entry points to those pages, especially
+          Diaspora which has no header nav). Faint warm gradient
+          (terracotta-50/40 → stone-50) reads as warm publication paper
+          — atmosphere without competing visually. */}
       <section className="border-b border-stone-200 bg-gradient-to-b from-terracotta-50/40 via-stone-50 to-stone-50 py-16 md:py-24">
         <AppContainer className="flex flex-col items-center gap-5 text-center md:gap-6">
           {/* Trust pill — green dot + uppercase tracking-wider claim.
@@ -164,42 +169,26 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               comparing renders to photos — we just stake the positive
               claim now (founder critique 2026-05-09). */}
           <p className="max-w-xl text-meta text-stone-700 md:text-body">
-            Свежие фото со стройки. Помогаем выбрать за 2 минуты.
+            Свежие фото со стройки.
           </p>
 
-          {/* Search row — input + Найти button, lifted into a client
-              island (HeroSearchRow) so the button can read the typed
-              query and run the parametric-parser → smart-routing flow.
-              Buyers typing "3 комнаты до 200к" → /kvartiry with
-              filters; "Гулистон" → /novostroyki?q=Гулистон. Picking
-              from autocomplete still bypasses this and routes by
-              SearchHit kind. */}
-          <HeroSearchRow />
-
-          {/* "Или подобрать за 2 минуты" — quiet sparkle link to the
-              guided picker. Sparkle micro-rotates on hover (motion-safe). */}
-          <Link
-            href="/pomoshch-vybora"
-            className="group inline-flex items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
-          >
-            <Sparkles className="size-3.5 transition-transform duration-200 ease-out motion-safe:group-hover:rotate-[6deg]" />
-            или подобрать за 2 минуты
-          </Link>
+          {/* Hero chip row — segmented [Новостройки | Квартиры] + three
+              always-visible base chips (Комнат / Цена / Район) + an
+              "Ещё фильтры" expander for four type-aware extras + live-
+              count "Показать N" CTA. Drives the filtered-browse path. */}
+          <HeroChipRow />
 
           {/* Quiet nav strip — three browse entry points (all
               apartments / all new builds / diaspora) for visitors who
-              want to skip the search box and look directly. Was inline
-              text links separated by middle dots — read like fine
-              print, founder said "people may not even read them." Now
-              outlined pill chips matching the established design
-              language: same rounded-full + border-stone-200 + bg-white
-              + terracotta hover pattern as the eyebrow pill above the
-              H1 and the FilterRail filter chips on /novostroyki and
-              /kvartiry. Each gets a small leading icon for instant
-              recognition. flex-wrap so on a 375px viewport the three
-              chips stack to two rows instead of forcing horizontal
-              overflow. justify-center keeps the visual centre line of
-              the hero stack. */}
+              want to skip the search box and look directly. These are
+              the only above-fold entry points to those pages, especially
+              Diaspora which has no nav link in the header or bottom-nav.
+              Outlined pill chips matching the trust pill above + the
+              FilterRail chips on /novostroyki and /kvartiry. Each gets
+              a small leading icon for instant recognition. flex-wrap so
+              on a 375px viewport the three chips stack to two rows
+              instead of forcing horizontal overflow. justify-center
+              keeps the visual centre line of the hero stack. */}
           <div className="flex flex-wrap items-center justify-center gap-2">
             <Link
               href="/kvartiry"
@@ -256,8 +245,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             />
             <TrustCard
               Illustration={IllustrationCompass}
-              title="Подбор за 2 минуты"
-              body="Покажем подходящие именно вам."
+              title="Найдёте за минуты"
+              body="Фильтры рядом — комнаты, цена, район."
             />
           </div>
         </AppContainer>

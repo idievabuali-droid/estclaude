@@ -41,6 +41,12 @@ export interface FilterChipSheetProps {
    * is just looking and can dismiss without committing.
    */
   hasPending?: boolean;
+  /**
+   * Optional — fired when the buyer taps the chip face to open the
+   * sheet. Used by hero-chip analytics; not used by the destination
+   * page chips (each navigation already fires search_run).
+   */
+  onOpen?: () => void;
 }
 
 /**
@@ -68,9 +74,15 @@ export function FilterChipSheet({
   onReset,
   onClear,
   hasPending = false,
+  onOpen,
 }: FilterChipSheetProps) {
   const [open, setOpen] = useState(false);
   const isActive = valueSummary != null && valueSummary.length > 0;
+
+  function handleOpen() {
+    setOpen(true);
+    onOpen?.();
+  }
 
   function handleApply() {
     onApply();
@@ -85,7 +97,7 @@ export function FilterChipSheet({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         aria-expanded={open}
         aria-haspopup="dialog"
         className={

@@ -42,9 +42,6 @@ export function SiteFooter() {
             <Link href="/tsentr-pomoshchi" className="text-meta text-stone-700 hover:text-stone-900">
               Центр помощи
             </Link>
-            <Link href="/pomoshch-vybora" className="text-meta text-stone-700 hover:text-stone-900">
-              Подбор квартиры
-            </Link>
             <Link href="/post" className="text-meta text-stone-700 hover:text-stone-900">
               Разместить квартиру
             </Link>
