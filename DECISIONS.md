@@ -8,6 +8,14 @@ Newest at top.
 
 ---
 
+## 2026-05-21 · Home hero — chip-flow + live counts, wizard retired
+
+**Locked:** Replaced search-box + sparkle-link-to-`/pomoshch-vybora` with `HeroChipRow` — segmented [Новостройки|Квартиры] type tabs + 3 always-visible base chips (Комнат / Цена / Район) + "Ещё фильтры" expander toggling 4 type-aware extras (Площадь/Этаж/Стадия/Сдача OR Площадь/Этаж/Отделка/В рассрочку) + live-count "Показать N" CTA + global "Сбросить всё". State accumulates locally (sessionStorage), URL stays clean. New `/api/listings/count` + `/api/buildings/count` endpoints power the count, debounced 250ms + 30s edge cache. Browse pills (Все квартиры / Все новостройки / Я за границей) stay below the CTA — only above-fold path to /diaspora since the header has no nav. `/pomoshch-vybora` wizard route deleted (883 lines). Chip naming + sheet shapes unified across hero, /kvartiry, /novostroyki: Бюджет→Цена, Рассрочка→В рассрочку, sheet title "Цена, TJS" everywhere, /kvartiry/PriceChip gains the same 5 presets as /novostroyki, new Этаж chip mirrors FloorChip on both rails. `/kvartiry` now accepts the `district` URL param (previously silently no-op'd, so hero District chip + Квартиры returned all 35 listings instead of the filtered 7).
+**Why:** Wizard's 5-step walkthrough had higher cognitive cost than the 3-tap chip flow that replaced it; live counts give the same "calibrated" feel in real time without the ceremony. Same control labelled the same way on every surface stops buyers from re-learning the same chip per page.
+**Affects:** `src/app/[locale]/HeroChipRow.tsx` (new), `src/app/[locale]/page.tsx`, `src/app/api/{listings,buildings}/count/route.ts` (new), `src/app/[locale]/{kvartiry,novostroyki}/PriceChip.tsx`, `src/app/[locale]/kvartiry/page.tsx`, `src/services/listings.ts` (district filter, post-fetch by building.district_id OR standalone listing.district_id), `src/app/api/events/route.ts` (new `hero_*` events), `src/components/blocks/{FeedbackButton,FilterChipSheet,LocationSearch}.tsx`, `src/components/layout/SiteFooter.tsx`. Deleted: `src/app/[locale]/pomoshch-vybora/{GuidedFinder,page}.tsx`.
+
+---
+
 ## 2026-05-20 · Hidden intake bot — developer-data collection on mobile
 
 **Locked:** A separate Telegram bot (own token `INTAKE_BOT_TOKEN`, own webhook `/api/intake-bot`, own secret) the founder uses on their phone to collect data from developers — a tappable menu of ~19 questions, ✅ per answered question, re-tap to edit, confirm-gated reset for the next developer, "Показать всё" prints a copy-ready summary. No buyer-facing surface (no page / nav / sitemap); rides this deployment only for hosting. Code is self-contained in `src/lib/intake-bot/` and shares nothing with the `@VafoTjBot` login bot; in-progress state in the `intake_bot_sessions` table.
