@@ -30,6 +30,16 @@ export type MockDeveloper = {
   has_female_agent: boolean;
   years_active: number | null;
   projects_completed_count: number | null;
+  /** Short company description (bilingual jsonb). Rendered as a quiet
+   *  paragraph on /zhk/[slug] §G developer card when set. Captured
+   *  via NewDeveloperModal's "Краткое описание" field. */
+  description: Bilingual | null;
+  /** Free-form notes about the developer's current in-progress work
+   *  ("В работе 4: 1 котлован, 2 строится, 1 почти готов"). Captures
+   *  off-platform context the auto-computed devStats grid can't see —
+   *  the grid only counts projects published on Vafo. Column added in
+   *  migration 0022. */
+  portfolio_notes: string | null;
 };
 
 export type MockBuilding = {
@@ -173,6 +183,8 @@ export const mockDevelopers: MockDeveloper[] = [
     has_female_agent: true,
     years_active: 6,
     projects_completed_count: 4,
+    description: null,
+    portfolio_notes: null,
   },
   {
     id: 'dev-2',
@@ -183,6 +195,8 @@ export const mockDevelopers: MockDeveloper[] = [
     has_female_agent: false,
     years_active: 9,
     projects_completed_count: 6,
+    description: null,
+    portfolio_notes: null,
   },
   {
     id: 'dev-3',
@@ -193,6 +207,8 @@ export const mockDevelopers: MockDeveloper[] = [
     has_female_agent: false,
     years_active: 3,
     projects_completed_count: 1,
+    description: null,
+    portfolio_notes: null,
   },
 ];
 

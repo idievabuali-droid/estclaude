@@ -600,6 +600,8 @@ function mapDeveloper(r: {
   verified_at: string | null;
   years_active: number | null;
   projects_completed_count: number | null;
+  description?: { ru: string; tg?: string } | null;
+  portfolio_notes?: string | null;
 }): MockDeveloper {
   return {
     id: r.id,
@@ -610,6 +612,11 @@ function mapDeveloper(r: {
     has_female_agent: r.has_female_agent,
     years_active: r.years_active,
     projects_completed_count: r.projects_completed_count,
+    // description + portfolio_notes are optional on the row (older
+    // migrations didn't have them) — fall through to null when missing
+    // so callers can render conditionally without runtime errors.
+    description: (r.description as { ru: string; tg?: string } | null) ?? null,
+    portfolio_notes: r.portfolio_notes ?? null,
   };
 }
 

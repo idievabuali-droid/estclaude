@@ -26,8 +26,15 @@ interface CreateDeveloperBody {
    *  /zhk/[slug] as a trust signal. */
   years_active?: number;
   /** Number of projects the developer has completed (handed over).
-   *  Optional, nullable column. Surfaces on /zhk/[slug] too. */
+   *  Optional, nullable column. Surfaces on /zhk/[slug] alongside the
+   *  computed devStats grid to capture the developer's full career
+   *  total, not just on-Vafo projects. */
   projects_completed_count?: number;
+  /** Free-form notes about the developer's current in-progress work
+   *  ("В работе 4: 1 котлован, 2 строится, 1 почти готов"). Column
+   *  added in migration 0022 — text, nullable. Carries off-platform
+   *  context the auto-computed devStats grid can't see. */
+  portfolio_notes?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -71,6 +78,9 @@ export async function POST(req: NextRequest) {
       ? body.projects_completed_count
       : null;
 
+  // portfolio_notes — free text, trim and treat empty as null.
+  const portfolioNotes = body.portfolio_notes?.trim() || null;
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('developers')
@@ -83,6 +93,7 @@ export async function POST(req: NextRequest) {
         : null,
       years_active: yearsActive,
       projects_completed_count: projectsCompleted,
+      portfolio_notes: portfolioNotes,
       // 'pending' is the enum default but spelled out for clarity —
       // founder approves later from /kabinet (queue work, not this round).
       status: 'pending',

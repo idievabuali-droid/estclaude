@@ -849,17 +849,36 @@ export default async function BuildingDetailPage({
                         </Link>
                       ) : null}
                     </h3>
-                    {developer.years_active ? (
+                    {developer.years_active || developer.projects_completed_count ? (
                       <span className="text-meta text-stone-600 tabular-nums">
-                        На рынке {developer.years_active}{' '}
-                        {pluralYears(developer.years_active)}
-                        {developer.years_active
-                          ? ` · с ${new Date().getFullYear() - developer.years_active} года`
+                        {developer.years_active ? (
+                          <>
+                            На рынке {developer.years_active}{' '}
+                            {pluralYears(developer.years_active)}
+                            {` · с ${new Date().getFullYear() - developer.years_active} года`}
+                          </>
+                        ) : null}
+                        {/* Career-total finished projects — separate from
+                            the on-Vafo devStats grid below, which only
+                            counts buildings published on this platform.
+                            Founder enters this in NewDeveloperModal. */}
+                        {developer.projects_completed_count
+                          ? `${developer.years_active ? ' · ' : ''}всего сдано ${developer.projects_completed_count} ЖК`
                           : ''}
                       </span>
                     ) : null}
                   </div>
                 </div>
+
+                {/* Short company description (developer.description.ru),
+                    captured via NewDeveloperModal's "Краткое описание"
+                    field. Quiet paragraph — sets the company's voice
+                    before the verification + stats blocks below. */}
+                {developer.description?.ru ? (
+                  <p className="text-meta text-stone-700">
+                    {developer.description.ru}
+                  </p>
+                ) : null}
 
                 {/* Verification trust block — given visual prominence
                     per the prescription. The copy ("Команда платформы
@@ -879,6 +898,23 @@ export default async function BuildingDetailPage({
                   </div>
                 ) : null}
 
+                {/* Free-form "Сейчас в работе" notes — captures off-
+                    platform context the devStats grid below can't see
+                    (developer has 4 projects in progress at other sites,
+                    only 1 is on Vafo). Founder enters this via
+                    NewDeveloperModal; quiet bordered block so it reads
+                    as augmenting info, not a primary stat. */}
+                {developer.portfolio_notes ? (
+                  <div className="flex flex-col gap-1 rounded-md border border-stone-200 bg-stone-50/60 p-4">
+                    <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                      Сейчас в работе
+                    </span>
+                    <p className="whitespace-pre-line text-meta text-stone-700">
+                      {developer.portfolio_notes}
+                    </p>
+                  </div>
+                ) : null}
+
                 {/* Developer card is intentionally a TRUST-SIGNAL block,
                     not a second contact funnel. The price-card popover
                     higher on the page (and the mobile sticky bar) cover
@@ -888,25 +924,35 @@ export default async function BuildingDetailPage({
                     keep their developer-info card pure trust info — no
                     duplicated CTA. */}
 
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
-                  <DevStat label="Всего проектов" value={devStats.total} />
-                  <DevStat
-                    label="Сдано"
-                    value={devStats.delivered}
-                    accent="green"
-                    href="/novostroyki?status=delivered"
-                  />
-                  <DevStat
-                    label="Строится"
-                    value={devStats.underConstruction}
-                    accent="amber"
-                    href="/novostroyki?status=under_construction"
-                  />
-                  <DevStat
-                    label="Котлован"
-                    value={devStats.announced}
-                    href="/novostroyki?status=announced"
-                  />
+                <div className="flex flex-col gap-2">
+                  {/* Eyebrow disambiguates the grid from the manual
+                      "всего сдано X ЖК" line above the name. Grid
+                      counts ONLY buildings on Vafo (devStats is
+                      computed from the buildings table); the manual
+                      number is the developer's full career total. */}
+                  <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                    Проекты на Vafo
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
+                    <DevStat label="Всего" value={devStats.total} />
+                    <DevStat
+                      label="Сдано"
+                      value={devStats.delivered}
+                      accent="green"
+                      href="/novostroyki?status=delivered"
+                    />
+                    <DevStat
+                      label="Строится"
+                      value={devStats.underConstruction}
+                      accent="amber"
+                      href="/novostroyki?status=under_construction"
+                    />
+                    <DevStat
+                      label="Котлован"
+                      value={devStats.announced}
+                      href="/novostroyki?status=announced"
+                    />
+                  </div>
                 </div>
 
                 {devStats.total > 0 ? (

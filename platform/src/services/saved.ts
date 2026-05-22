@@ -63,6 +63,8 @@ function mapDev(r: {
   id: string; name: string; display_name: { ru: string; tg?: string };
   has_female_agent: boolean; status: string; verified_at: string | null;
   years_active: number | null; projects_completed_count: number | null;
+  description?: { ru: string; tg?: string } | null;
+  portfolio_notes?: string | null;
 }): MockDeveloper {
   return {
     id: r.id,
@@ -73,6 +75,8 @@ function mapDev(r: {
     has_female_agent: r.has_female_agent,
     years_active: r.years_active,
     projects_completed_count: r.projects_completed_count,
+    description: (r.description as { ru: string; tg?: string } | null) ?? null,
+    portfolio_notes: r.portfolio_notes ?? null,
   };
 }
 

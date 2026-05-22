@@ -414,6 +414,8 @@ export async function getListing(slug: string): Promise<{
         has_female_agent: devRow.has_female_agent,
         years_active: devRow.years_active,
         projects_completed_count: devRow.projects_completed_count,
+        description: devRow.description ?? null,
+        portfolio_notes: devRow.portfolio_notes ?? null,
       };
     }
   } else {

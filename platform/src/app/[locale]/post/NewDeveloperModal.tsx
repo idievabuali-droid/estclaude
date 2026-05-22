@@ -40,6 +40,12 @@ export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModa
   // when creating a developer inline; previously these were admin-only.
   const [yearsActive, setYearsActive] = useState('');
   const [projectsCompleted, setProjectsCompleted] = useState('');
+  // Free-form "what's going on now" — captures the intake bot's portfolio
+  // answer verbatim ("В работе 4: 1 котлован, 2 строится, 1 почти готов").
+  // The devStats grid on /zhk only counts on-Vafo projects; this carries
+  // the developer's off-platform context too. Column added in migration
+  // 0022 — see DECISIONS 2026-05-22.
+  const [portfolioNotes, setPortfolioNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   if (!open) return null;
@@ -76,6 +82,7 @@ export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModa
           description: description.trim() || undefined,
           years_active: yearsActiveNum ?? undefined,
           projects_completed_count: projectsCompletedNum ?? undefined,
+          portfolio_notes: portfolioNotes.trim() || undefined,
         }),
       });
       const data = (await res.json()) as
@@ -95,6 +102,7 @@ export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModa
       setDescription('');
       setYearsActive('');
       setProjectsCompleted('');
+      setPortfolioNotes('');
       onClose();
     } catch {
       toast.error('Сеть не отвечает. Попробуйте ещё раз.');
@@ -152,6 +160,7 @@ export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModa
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Например: вахдатская строительная компания, 5 проектов сдано"
+            helperText="Появится коротким абзацем на странице ЖК под названием застройщика."
           />
           {/* Portfolio fields — both optional. When provided they appear
               on /zhk/[slug] under the developer card ("8 лет на рынке,
@@ -165,13 +174,21 @@ export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModa
               placeholder="8"
             />
             <AppInput
-              label="Сдано проектов"
+              label="Всего сдано ЖК"
               inputMode="numeric"
               value={projectsCompleted}
               onChange={(e) => setProjectsCompleted(e.target.value)}
               placeholder="5"
             />
           </div>
+          <AppTextarea
+            label="Сейчас в работе"
+            rows={2}
+            value={portfolioNotes}
+            onChange={(e) => setPortfolioNotes(e.target.value)}
+            placeholder="Например: «В работе 4: 1 котлован, 2 строится, 1 почти готов»"
+            helperText="Расскажите про проекты застройщика, которых пока нет на Vafo — стройка вне платформы, скорый запуск, и т.п."
+          />
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <AppButton variant="secondary" onClick={onClose}>
