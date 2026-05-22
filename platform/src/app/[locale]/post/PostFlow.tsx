@@ -770,15 +770,30 @@ export function PostFlow({
           );
           if (e !== undefined) patch.projects_near_completion_count = e;
           if (Object.keys(patch).length > 0) {
-            void fetch(`/api/developers/${b.developer_id}/portfolio`, {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify(patch),
-            }).catch((err) => {
-              // Non-fatal — building is already published. Log so the
-              // dev sees it; the buyer won't notice the missing values.
-              console.error('portfolio patch failed:', err);
-            });
+            // Awaited (not fire-and-forget): a failure here — e.g.
+            // migration 0023 not applied, so the stage columns don't
+            // exist — must surface as a visible warning, not a silently
+            // swallowed console line. The building/listing is already
+            // published, so we warn but never block the redirect.
+            try {
+              const pRes = await fetch(
+                `/api/developers/${b.developer_id}/portfolio`,
+                {
+                  method: 'POST',
+                  headers: { 'content-type': 'application/json' },
+                  body: JSON.stringify(patch),
+                },
+              );
+              if (!pRes.ok) {
+                toast.error(
+                  'Объявление опубликовано, но портфолио застройщика не сохранилось.',
+                );
+              }
+            } catch {
+              toast.error(
+                'Объявление опубликовано, но портфолио застройщика не сохранилось.',
+              );
+            }
           }
         }
       }

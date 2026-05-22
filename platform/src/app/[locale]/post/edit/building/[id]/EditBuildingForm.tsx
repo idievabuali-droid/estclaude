@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import {
@@ -13,6 +13,7 @@ import {
 } from '@/components/primitives';
 import { toast } from '@/components/primitives/AppToast';
 import { PhotoPicker, type PendingPhoto } from '../../../PhotoPicker';
+import { NumberField } from '../../../NumberField';
 import { LocationSection } from '../../../LocationSection';
 import { NewDeveloperModal, type NewDeveloperResult } from '../../../NewDeveloperModal';
 import { NewDistrictModal, type NewDistrictResult } from '../../../NewDistrictModal';
@@ -53,6 +54,16 @@ export interface DeveloperOption {
   id: string;
   name: string;
   display_name_ru: string;
+  // Portfolio fields — pre-fill the «Портфолио застройщика» section
+  // when this developer is the selected one. Optional because a
+  // developer freshly created via NewDeveloperModal has none yet
+  // (the modal carries only name/phone/description). Same shape as
+  // PostFlow's DeveloperOption. Columns from migrations 0002 + 0023.
+  years_active?: number | null;
+  projects_completed_count?: number | null;
+  projects_announced_count?: number | null;
+  projects_under_construction_count?: number | null;
+  projects_near_completion_count?: number | null;
 }
 
 const STATUS_OPTIONS = [
@@ -128,6 +139,43 @@ export function EditBuildingForm({
   const [removePhotoIds, setRemovePhotoIds] = useState<string[]>([]);
   const [newExteriorPhotos, setNewExteriorPhotos] = useState<PendingPhoto[]>([]);
   const [newProgressPhotos, setNewProgressPhotos] = useState<PendingPhoto[]>([]);
+
+  // Developer portfolio state — the «Портфолио застройщика» section.
+  // Identical to the create flow (PostFlow.tsx): five number inputs,
+  // pre-filled from the selected developer, PATCHed to
+  // /api/developers/[id]/portfolio on save. This is the ONLY way to
+  // change a developer's portfolio after creation — NewDeveloperModal
+  // doesn't carry these fields (DECISIONS 2026-05-22).
+  const [portfolio, setPortfolio] = useState<{
+    years_active: number | '';
+    projects_completed: number | '';
+    projects_announced: number | '';
+    projects_under_construction: number | '';
+    projects_near_completion: number | '';
+  }>({
+    years_active: '',
+    projects_completed: '',
+    projects_announced: '',
+    projects_under_construction: '',
+    projects_near_completion: '',
+  });
+
+  // Pre-fill portfolio from the selected developer whenever the
+  // developer changes (or the list mutates from the new-developer
+  // modal). Empty → '' so NumberField shows a blank placeholder.
+  useEffect(() => {
+    const dev = developers.find((d) => d.id === developerId);
+    if (!dev) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPortfolio({
+      years_active: dev.years_active ?? '',
+      projects_completed: dev.projects_completed_count ?? '',
+      projects_announced: dev.projects_announced_count ?? '',
+      projects_under_construction: dev.projects_under_construction_count ?? '',
+      projects_near_completion: dev.projects_near_completion_count ?? '',
+    });
+  }, [developerId, developers]);
+
   const visibleExterior = existingExteriorPhotos.filter(
     (p) => !removePhotoIds.includes(p.id),
   );
@@ -189,7 +237,73 @@ export function EditBuildingForm({
         toast.error(('error' in data && data.error) || 'Не удалось сохранить');
         return;
       }
-      toast.success('Сохранено.');
+
+      // Persist the developer portfolio if any of the five fields
+      // changed from the developer's saved values. Diff-aware so a
+      // no-op save doesn't hit the endpoint. The building is already
+      // saved here — a portfolio failure surfaces as a warning toast
+      // but never blocks the redirect. Awaited (not fire-and-forget)
+      // so the warning is real, not a silently-swallowed console line.
+      let portfolioWarning = false;
+      const currentDev = developers.find((d) => d.id === developerId);
+      if (currentDev) {
+        const diffNum = (
+          current: number | null | undefined,
+          next: number | '',
+        ): number | null | undefined => {
+          const nextNum = next === '' ? null : next;
+          // Treat undefined (developer freshly created via the modal,
+          // no portfolio columns loaded) and null as the same "unset"
+          // state so an untouched field doesn't PATCH a spurious null.
+          return nextNum === (current ?? null) ? undefined : nextNum;
+        };
+        const portfolioPatch: Record<string, number | null> = {};
+        const fy = diffNum(currentDev.years_active, portfolio.years_active);
+        if (fy !== undefined) portfolioPatch.years_active = fy;
+        const fc = diffNum(
+          currentDev.projects_completed_count,
+          portfolio.projects_completed,
+        );
+        if (fc !== undefined) portfolioPatch.projects_completed_count = fc;
+        const fa = diffNum(
+          currentDev.projects_announced_count,
+          portfolio.projects_announced,
+        );
+        if (fa !== undefined) portfolioPatch.projects_announced_count = fa;
+        const fu = diffNum(
+          currentDev.projects_under_construction_count,
+          portfolio.projects_under_construction,
+        );
+        if (fu !== undefined) {
+          portfolioPatch.projects_under_construction_count = fu;
+        }
+        const fn = diffNum(
+          currentDev.projects_near_completion_count,
+          portfolio.projects_near_completion,
+        );
+        if (fn !== undefined) portfolioPatch.projects_near_completion_count = fn;
+        if (Object.keys(portfolioPatch).length > 0) {
+          try {
+            const pRes = await fetch(
+              `/api/developers/${developerId}/portfolio`,
+              {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify(portfolioPatch),
+              },
+            );
+            if (!pRes.ok) portfolioWarning = true;
+          } catch {
+            portfolioWarning = true;
+          }
+        }
+      }
+
+      if (portfolioWarning) {
+        toast.error('ЖК сохранён, но портфолио застройщика не обновилось.');
+      } else {
+        toast.success('Сохранено.');
+      }
       // Send the founder back to the public-facing /zhk/[slug] so they
       // can immediately verify the change rendered.
       router.push(`/zhk/${(data as { slug: string }).slug}`);
@@ -313,6 +427,64 @@ export function EditBuildingForm({
                   );
                 })}
               </div>
+            </div>
+          </div>
+        </AppCardContent>
+      </AppCard>
+
+      {/* Портфолио застройщика — five number inputs for the selected
+          developer's track record. Identical to the create flow's
+          section (PostFlow.tsx); pre-filled from the developer, PATCHed
+          to /api/developers/[id]/portfolio on save. Sits right after
+          «О ЖК» so the edit flow reads building → developer → photos,
+          the same order as create. */}
+      <AppCard>
+        <AppCardContent>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-h2 font-semibold text-stone-900">
+                Портфолио застройщика
+              </h2>
+              <p className="text-meta text-stone-500">
+                Опыт и проекты выбранного застройщика. Появится в карточке «О застройщике» на странице ЖК. Можно оставить пустым.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+              <NumberField
+                label="Лет на рынке"
+                value={portfolio.years_active}
+                onChange={(v) =>
+                  setPortfolio((p) => ({ ...p, years_active: v }))
+                }
+              />
+              <NumberField
+                label="Котлован"
+                value={portfolio.projects_announced}
+                onChange={(v) =>
+                  setPortfolio((p) => ({ ...p, projects_announced: v }))
+                }
+              />
+              <NumberField
+                label="Строится"
+                value={portfolio.projects_under_construction}
+                onChange={(v) =>
+                  setPortfolio((p) => ({ ...p, projects_under_construction: v }))
+                }
+              />
+              <NumberField
+                label="Почти готов"
+                value={portfolio.projects_near_completion}
+                onChange={(v) =>
+                  setPortfolio((p) => ({ ...p, projects_near_completion: v }))
+                }
+              />
+              <NumberField
+                label="Сдано"
+                value={portfolio.projects_completed}
+                onChange={(v) =>
+                  setPortfolio((p) => ({ ...p, projects_completed: v }))
+                }
+              />
             </div>
           </div>
         </AppCardContent>

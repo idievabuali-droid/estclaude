@@ -873,45 +873,60 @@ export default async function BuildingDetailPage({
                 ) : null}
 
                 {/* Career portfolio — the single portfolio block on
-                    this card. 4-cell grid matching the BuildingStatus
-                    enum (announced / under_construction / near_completion
-                    / delivered). Captured via the "Портфолио застройщика"
-                    section in PostFlow and saved on the developer row
-                    (migration 0023). Renders only when at least one
-                    count is set so unfilled developers don't show empty
-                    zeros. The on-Vafo project count is NOT a second grid
-                    — it rides inside the "Все проекты застройщика" link
-                    below as "(N)". */}
-                {developer.projects_announced_count != null ||
-                developer.projects_under_construction_count != null ||
-                developer.projects_near_completion_count != null ||
-                developer.projects_completed_count != null ? (
-                  <div className="flex flex-col gap-2">
-                    <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
-                      По портфолио
-                    </span>
-                    <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
-                      <DevStat
-                        label="Котлован"
-                        value={developer.projects_announced_count ?? 0}
-                      />
-                      <DevStat
-                        label="Строится"
-                        value={developer.projects_under_construction_count ?? 0}
-                        accent="amber"
-                      />
-                      <DevStat
-                        label="Почти готов"
-                        value={developer.projects_near_completion_count ?? 0}
-                      />
-                      <DevStat
-                        label="Сдано"
-                        value={developer.projects_completed_count ?? 0}
-                        accent="green"
-                      />
+                    this card. One DevStat cell per BuildingStatus stage,
+                    but ONLY stages with a non-zero count: a developer
+                    with just "25 сдано" shows one cell, not three "0"
+                    cells beside it (which read as broken). Hidden
+                    entirely when every stage is zero/unset. Captured via
+                    the "Портфолио застройщика" section in the building
+                    create + edit forms (developer row, migration 0023).
+                    The on-Vafo count is NOT a second grid — it rides
+                    inside the "Все проекты застройщика" link below. */}
+                {(() => {
+                  const allCells: Array<{
+                    label: string;
+                    value: number;
+                    accent?: 'amber' | 'green';
+                  }> = [
+                    {
+                      label: 'Котлован',
+                      value: developer.projects_announced_count ?? 0,
+                    },
+                    {
+                      label: 'Строится',
+                      value: developer.projects_under_construction_count ?? 0,
+                      accent: 'amber',
+                    },
+                    {
+                      label: 'Почти готов',
+                      value: developer.projects_near_completion_count ?? 0,
+                    },
+                    {
+                      label: 'Сдано',
+                      value: developer.projects_completed_count ?? 0,
+                      accent: 'green',
+                    },
+                  ];
+                  const cells = allCells.filter((c) => c.value > 0);
+                  if (cells.length === 0) return null;
+                  return (
+                    <div className="flex flex-col gap-2">
+                      <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                        По портфолио
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
+                        {cells.map((c) => (
+                          <DevStat
+                            key={c.label}
+                            label={c.label}
+                            value={c.value}
+                            accent={c.accent}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ) : null}
+                  );
+                })()}
 
                 {/* Developer card is intentionally a TRUST-SIGNAL block,
                     not a second contact funnel. The price-card popover

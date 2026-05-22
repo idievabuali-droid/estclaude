@@ -78,7 +78,9 @@ export default async function EditBuildingPage({
       .order('slug'),
     supabase
       .from('developers')
-      .select('id, name, display_name')
+      .select(
+        'id, name, display_name, years_active, projects_completed_count, projects_announced_count, projects_under_construction_count, projects_near_completion_count',
+      )
       .order('name'),
   ]);
 
@@ -110,6 +112,13 @@ export default async function EditBuildingPage({
     name: d.name as string,
     display_name_ru:
       ((d.display_name as { ru?: string }) ?? {}).ru ?? (d.name as string),
+    years_active: (d.years_active as number | null) ?? null,
+    projects_completed_count: (d.projects_completed_count as number | null) ?? null,
+    projects_announced_count: (d.projects_announced_count as number | null) ?? null,
+    projects_under_construction_count:
+      (d.projects_under_construction_count as number | null) ?? null,
+    projects_near_completion_count:
+      (d.projects_near_completion_count as number | null) ?? null,
   }));
 
   const initial: EditBuildingInitial = {

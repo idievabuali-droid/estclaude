@@ -10,6 +10,7 @@ import {
 import { SaveToggle } from '@/components/blocks';
 import { getBuilding } from '@/services/buildings';
 import { getBuildingProgress } from '@/services/progress';
+import { supabasePublicUrl } from '@/services/photos';
 
 /**
  * Construction-progress timeline (WEDGE-1).
@@ -18,9 +19,10 @@ import { getBuildingProgress } from '@/services/progress';
  * the project's actual physical progress. The single highest-trust signal for
  * new-build buyers — answers "is this building actually growing?".
  *
- * Until real Storage uploads land we render coloured placeholders with the
- * date stamp + attribution overlaid. The data layer (services + photos table)
- * is real Supabase — only the image bytes are placeholder.
+ * Renders the real uploaded photos (Supabase Storage) via supabasePublicUrl —
+ * the same resolver the detail-page §D preview uses, so the album and the
+ * inline preview show identical images. A colored placeholder is kept only as
+ * the fallback for a photo whose storage path can't be resolved.
  */
 export default async function ProgressPage({
   params,
@@ -113,13 +115,13 @@ export default async function ProgressPage({
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
-                  {m.photos.map((p, i) => (
+                  {m.photos.map((p) => (
                     <ProgressPhotoTile
                       key={p.id}
-                      coverColor={building.cover_color}
+                      storagePath={p.storage_path}
                       takenAt={p.taken_at}
                       developer={developer.display_name.ru}
-                      shadeIndex={i + m.photos.length}
+                      coverColor={building.cover_color}
                     />
                   ))}
                 </div>
@@ -152,37 +154,53 @@ export default async function ProgressPage({
 }
 
 function ProgressPhotoTile({
-  coverColor,
+  storagePath,
   takenAt,
   developer,
-  shadeIndex,
+  coverColor,
 }: {
-  coverColor: string;
+  storagePath: string;
   takenAt: string;
   developer: string;
-  shadeIndex: number;
+  /** Fallback background when the photo URL can't be resolved. */
+  coverColor: string;
 }) {
-  // Placeholder rendering: each tile gets a slightly varied shade of the
-  // building's cover color so the grid doesn't look like a single block.
-  // When real Storage uploads land, replace with <Image src={publicUrl} />.
-  const opacity = 0.65 + (shadeIndex % 4) * 0.08;
+  // Real uploaded photo when the storage path resolves to a public URL.
+  // The colored placeholder + camera icon is ONLY the can't-resolve
+  // fallback — previously this tile always rendered the placeholder and
+  // ignored the photo entirely, so the album diverged from the §D
+  // preview on the detail page (which already rendered the real image).
+  const url = supabasePublicUrl(storagePath);
   const date = new Date(takenAt).toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   });
   return (
-    <div className="group relative aspect-[4/3] overflow-hidden rounded-md">
-      <div
-        className="absolute inset-0"
-        style={{ backgroundColor: coverColor, opacity }}
-        aria-hidden
-      />
+    <div className="group relative aspect-[4/3] overflow-hidden rounded-md bg-stone-100">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt={`Ход строительства · ${date}`}
+          className="absolute inset-0 size-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+        />
+      ) : (
+        <>
+          <div
+            className="absolute inset-0"
+            style={{ backgroundColor: coverColor }}
+            aria-hidden
+          />
+          <Camera
+            className="absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 text-white/40"
+            aria-hidden
+          />
+        </>
+      )}
+      {/* Date + attribution overlay — kept on both the real-photo and
+          fallback paths; it's the trust signal (dated + attributed). */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0" />
-      <Camera
-        className="absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 text-white/40"
-        aria-hidden
-      />
       <div className="absolute bottom-2 left-2 right-2 flex flex-col gap-0.5 text-caption text-white drop-shadow-sm">
         <span className="font-semibold tabular-nums">{date}</span>
         <span className="truncate text-white/85">Загружено · {developer}</span>
