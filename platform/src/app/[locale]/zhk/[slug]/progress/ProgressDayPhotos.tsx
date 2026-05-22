@@ -137,7 +137,9 @@ function PhotoViewer({
       const width = el.clientWidth;
       const at = Math.round(el.scrollLeft / width);
       const next = Math.max(0, Math.min(at + delta, photos.length - 1));
-      el.scrollTo({ left: next * width, behavior: 'smooth' });
+      // Instant, not smooth: a smooth scrollTo is silently a no-op on
+      // this scroll-snap-mandatory container — instant lands cleanly.
+      el.scrollTo({ left: next * width });
     },
     [photos.length],
   );
