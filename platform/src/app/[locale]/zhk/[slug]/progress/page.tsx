@@ -119,8 +119,6 @@ export default async function ProgressPage({
                     <ProgressPhotoTile
                       key={p.id}
                       storagePath={p.storage_path}
-                      takenAt={p.taken_at}
-                      developer={developer.display_name.ru}
                       coverColor={building.cover_color}
                     />
                   ))}
@@ -155,13 +153,9 @@ export default async function ProgressPage({
 
 function ProgressPhotoTile({
   storagePath,
-  takenAt,
-  developer,
   coverColor,
 }: {
   storagePath: string;
-  takenAt: string;
-  developer: string;
   /** Fallback background when the photo URL can't be resolved. */
   coverColor: string;
 }) {
@@ -170,17 +164,16 @@ function ProgressPhotoTile({
   // the URL is missing OR the file 404s (e.g. seed placeholder rows
   // whose objects were never uploaded) — so a broken-image icon never
   // shows. Mirrors the §D preview on the detail page.
+  //
+  // No date/attribution overlay: the date lives once on the day's group
+  // header above, and provenance is covered by the page subtitle + the
+  // "Откуда эти фото" trust card. The tile is just the photo.
   const url = supabasePublicUrl(storagePath);
-  const date = new Date(takenAt).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
   return (
     <div className="group relative aspect-[4/3] overflow-hidden rounded-md bg-stone-100">
       <ImageWithFallback
         src={url}
-        alt={`Ход строительства · ${date}`}
+        alt="Фото хода строительства"
         className="absolute inset-0 size-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
         fallback={
           <>
@@ -196,13 +189,6 @@ function ProgressPhotoTile({
           </>
         }
       />
-      {/* Date + attribution overlay — kept on both the real-photo and
-          fallback paths; it's the trust signal (dated + attributed). */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0" />
-      <div className="absolute bottom-2 left-2 right-2 flex flex-col gap-0.5 text-caption text-white drop-shadow-sm">
-        <span className="font-semibold tabular-nums">{date}</span>
-        <span className="truncate text-white/85">Загружено · {developer}</span>
-      </div>
     </div>
   );
 }
