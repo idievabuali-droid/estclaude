@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { Plus, Pencil } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
@@ -11,12 +11,12 @@ import {
 } from '@/components/primitives';
 import { SourceChip, VerificationBadge } from '@/components/blocks';
 import { listMyListings } from '@/services/seller';
-import { getDeveloperById } from '@/services/buildings';
+import { getDeveloperById, listBuildings, listDistricts } from '@/services/buildings';
 import { formatPriceNumber, formatM2, formatFloor } from '@/lib/format';
 import { getCurrentUser } from '@/lib/auth/session';
 import { isFounder } from '@/lib/auth/roles';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { ListingStatus } from '@/types/domain';
+import type { ListingStatus, BuildingStatus } from '@/types/domain';
 import { AccountSettings } from './AccountSettings';
 import { ModerationList, type PendingListingRow } from './ModerationList';
 import { ListingActions } from './ListingActions';
@@ -32,6 +32,19 @@ const STATUS_BADGE: Record<
   sold: { label: 'Продано', tone: 'neutral' },
   expired: { label: 'Срок истёк', tone: 'neutral' },
   rejected: { label: 'Отклонено', tone: 'neutral' },
+};
+
+/** Building-stage → badge map for the founder's «Новостройки»
+ *  management list. Same enum + Russian labels as the /zhk stage
+ *  timeline and the /post status select. */
+const BUILDING_STATUS_BADGE: Record<
+  BuildingStatus,
+  { label: string; tone: 'tier-3' | 'tier-2' | 'tier-1' | 'neutral' }
+> = {
+  announced: { label: 'Котлован', tone: 'neutral' },
+  under_construction: { label: 'Строится', tone: 'tier-2' },
+  near_completion: { label: 'Почти готов', tone: 'tier-2' },
+  delivered: { label: 'Сдан', tone: 'tier-3' },
 };
 
 /**
@@ -109,6 +122,23 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
   const myListings = await listMyListings(user.id);
 
   const isSeller = myListings.length > 0;
+
+  // Founder-only: all published Vahdat buildings + a district-name
+  // lookup, for the «Новостройки» management section. In V1 the
+  // founder is the operator for the whole platform, so this lists
+  // every building — not just ones they personally created. This is
+  // the operator home for building edits; the buyer-facing /zhk page
+  // no longer carries an edit affordance (DECISIONS 2026-05-22).
+  let allBuildings: Awaited<ReturnType<typeof listBuildings>> = [];
+  let districtNameById = new Map<string, string>();
+  if (founder) {
+    const [buildings, districts] = await Promise.all([
+      listBuildings({}),
+      listDistricts(),
+    ]);
+    allBuildings = buildings;
+    districtNameById = new Map(districts.map((d) => [d.id, d.name.ru]));
+  }
 
   const developerIds = [
     ...new Set(myListings.map((l) => l.building?.developer_id).filter(Boolean)),
@@ -222,6 +252,115 @@ export default async function KabinetPage({ params }: { params: Promise<{ locale
               </div>
             </div>
             <ModerationList rows={pendingRows} />
+          </AppContainer>
+        </section>
+      ) : null}
+
+      {/* Новостройки — founder-only building management. Parallels the
+          «Мои объявления» apartment list below: this is where ЖК get
+          edited. The edit affordance used to live on the buyer-facing
+          /zhk page, which mixed operator controls into the shopping
+          surface — moved here so /kabinet is the single operator home
+          (DECISIONS 2026-05-22). Lists ALL published Vahdat buildings:
+          in V1 the founder manages the whole catalogue, not a personal
+          subset. */}
+      {founder ? (
+        <section className="bg-stone-50 py-8 md:py-10">
+          <AppContainer className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                Каталог
+              </span>
+              <div className="flex items-end justify-between gap-2">
+                <h2
+                  className="text-h2 font-semibold leading-[var(--leading-h2)] text-stone-900"
+                  style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
+                >
+                  Новостройки
+                </h2>
+                <span className="text-meta text-stone-500 tabular-nums">
+                  {allBuildings.length} ЖК
+                </span>
+              </div>
+            </div>
+
+            {allBuildings.length === 0 ? (
+              <AppCard>
+                <AppCardContent>
+                  <div className="flex flex-col items-center gap-3 py-6 text-center">
+                    <Plus className="size-8 text-stone-400" aria-hidden />
+                    <h3 className="text-h3 font-semibold text-stone-900">
+                      Пока нет ни одной новостройки
+                    </h3>
+                    <p className="text-meta text-stone-500">
+                      Добавьте первый ЖК с квартирами через «Новое объявление».
+                    </p>
+                    <Link href="/post">
+                      <AppButton variant="primary">Добавить ЖК</AppButton>
+                    </Link>
+                  </div>
+                </AppCardContent>
+              </AppCard>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {allBuildings.map((b) => {
+                  const status = BUILDING_STATUS_BADGE[b.status];
+                  return (
+                    <AppCard key={b.id}>
+                      <AppCardContent>
+                        <div className="flex items-start gap-3 md:gap-4">
+                          {/* Cover — uploaded photo when present, else
+                              the colored placeholder (same fallback the
+                              building cards use). */}
+                          {b.cover_photo_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={b.cover_photo_url}
+                              alt=""
+                              className="size-16 shrink-0 rounded-md object-cover md:size-24"
+                            />
+                          ) : (
+                            <div
+                              className="size-16 shrink-0 rounded-md md:size-24"
+                              style={{ backgroundColor: b.cover_color }}
+                              aria-hidden
+                            />
+                          )}
+
+                          <div className="flex flex-1 flex-col gap-2">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <Link
+                                href={`/zhk/${b.slug}`}
+                                className="text-h3 font-semibold text-stone-900 hover:text-terracotta-600"
+                              >
+                                {b.name.ru}
+                              </Link>
+                              <AppBadge variant={status.tone}>
+                                {status.label}
+                              </AppBadge>
+                            </div>
+
+                            <span className="text-meta text-stone-500">
+                              {districtNameById.get(b.district_id) ?? '—'} ·{' '}
+                              {b.total_units} кв · {b.total_floors} эт
+                            </span>
+
+                            <div className="border-t border-stone-100 pt-2">
+                              <Link href={`/post/edit/building/${b.id}`}>
+                                <AppButton variant="secondary" size="sm">
+                                  <Pencil className="size-3.5" />
+                                  Редактировать
+                                </AppButton>
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      </AppCardContent>
+                    </AppCard>
+                  );
+                })}
+              </div>
+            )}
           </AppContainer>
         </section>
       ) : null}

@@ -1,8 +1,6 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { MapPin, Calendar, Layers, Users, Camera, ArrowUpRight, Pencil } from 'lucide-react';
-import { getCurrentUser } from '@/lib/auth/session';
-import { isFounder } from '@/lib/auth/roles';
+import { MapPin, Calendar, Layers, Users, Camera, ArrowUpRight } from 'lucide-react';
 import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
 import { buildContactLinks } from '@/lib/contact-links';
 import { setRequestLocale } from 'next-intl/server';
@@ -146,12 +144,6 @@ export default async function BuildingDetailPage({
   const data = await getBuilding(slug);
   if (!data) notFound();
   const { building, developer, district, listings: allListings } = data;
-
-  // Founder-only "Редактировать" link in the summary band — gated server-
-  // side so the link only renders for users with the admin/staff role.
-  // Buyers see nothing different.
-  const currentUser = await getCurrentUser();
-  const isFounderUser = currentUser ? await isFounder(currentUser.id) : false;
 
   // Parse the apartment-criteria filters from the URL. When the buyer
   // came in from /novostroyki with filters applied, narrow the inline
@@ -382,16 +374,9 @@ export default async function BuildingDetailPage({
             </h1>
             {/* Address as a quiet single-line link to the map. No
                 chip border now — the H1 carries the visual weight,
-                the address is metadata. */}
-            {isFounderUser ? (
-              <Link
-                href={`/post/edit/building/${building.id}`}
-                className="inline-flex w-fit items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-1 text-caption font-medium text-stone-700 transition-colors hover:border-terracotta-400 hover:bg-terracotta-50 hover:text-terracotta-700"
-              >
-                <Pencil className="size-3.5" aria-hidden />
-                Редактировать ЖК
-              </Link>
-            ) : null}
+                the address is metadata. Building edit lives in
+                /kabinet → Новостройки (operator surface), never on
+                this buyer-facing page. */}
             <Link
               href={`/novostroyki?view=karta&focus=${building.slug}`}
               className="group inline-flex w-fit items-center gap-1 text-meta text-stone-600 transition-colors hover:text-terracotta-700"
@@ -887,15 +872,16 @@ export default async function BuildingDetailPage({
                   </div>
                 ) : null}
 
-                {/* Structured career portfolio — 4-cell grid matching
-                    the BuildingStatus enum (announced / under_construction
-                    / near_completion / delivered). Captured via the
-                    "Портфолио застройщика" section in PostFlow and saved
-                    on the developer row (migration 0023). Renders only
-                    when at least one count is set so unfilled developers
-                    don't show empty zeros. Pairs with the "Проекты на
-                    Vafo" grid below — same shape so the buyer reads
-                    them as comparable career-total vs on-platform. */}
+                {/* Career portfolio — the single portfolio block on
+                    this card. 4-cell grid matching the BuildingStatus
+                    enum (announced / under_construction / near_completion
+                    / delivered). Captured via the "Портфолио застройщика"
+                    section in PostFlow and saved on the developer row
+                    (migration 0023). Renders only when at least one
+                    count is set so unfilled developers don't show empty
+                    zeros. The on-Vafo project count is NOT a second grid
+                    — it rides inside the "Все проекты застройщика" link
+                    below as "(N)". */}
                 {developer.projects_announced_count != null ||
                 developer.projects_under_construction_count != null ||
                 developer.projects_near_completion_count != null ||
@@ -934,45 +920,22 @@ export default async function BuildingDetailPage({
                     redundant. Founder critique 2026-05-11: "still too
                     many places to contact." Cian / Avito / Bayut all
                     keep their developer-info card pure trust info — no
-                    duplicated CTA. */}
+                    duplicated CTA.
 
-                <div className="flex flex-col gap-2">
-                  {/* Eyebrow disambiguates the grid from the manual
-                      "всего сдано X ЖК" line above the name. Grid
-                      counts ONLY buildings on Vafo (devStats is
-                      computed from the buildings table); the manual
-                      number is the developer's full career total. */}
-                  <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
-                    Проекты на Vafo
-                  </span>
-                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
-                    <DevStat label="Всего" value={devStats.total} />
-                    <DevStat
-                      label="Сдано"
-                      value={devStats.delivered}
-                      accent="green"
-                      href="/novostroyki?status=delivered"
-                    />
-                    <DevStat
-                      label="Строится"
-                      value={devStats.underConstruction}
-                      accent="amber"
-                      href="/novostroyki?status=under_construction"
-                    />
-                    <DevStat
-                      label="Котлован"
-                      value={devStats.announced}
-                      href="/novostroyki?status=announced"
-                    />
-                  </div>
-                </div>
+                    Single portfolio block only: the «По портфолио» grid
+                    above is the developer's real career breakdown. The
+                    second auto-computed «Проекты на Vafo» grid was cut
+                    2026-05-22 — it duplicated the same shape with the
+                    platform's internal on-Vafo count, which the buyer
+                    doesn't need as a peer block. That count now rides
+                    inside the link below as "(N)". */}
 
                 {devStats.total > 0 ? (
                   <Link
                     href={`/novostroyki?developer=${developer.id}`}
                     className="inline-flex w-fit items-center gap-1 self-start text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
                   >
-                    Все проекты застройщика
+                    Все проекты застройщика на Vafo ({devStats.total})
                     <ArrowUpRight className="size-3.5" aria-hidden />
                   </Link>
                 ) : (
