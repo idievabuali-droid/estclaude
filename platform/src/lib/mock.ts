@@ -29,16 +29,31 @@ export type MockDeveloper = {
   verified_at: string | null;
   has_female_agent: boolean;
   years_active: number | null;
+  /** Career total of FINISHED ЖК — maps to BuildingStatus 'delivered'.
+   *  Captured via number-stepper input in PostFlow's "Портфолио
+   *  застройщика" section, alongside the three in-progress stages
+   *  below. Together the four ints describe the developer's full
+   *  cross-platform portfolio (vs the auto-computed devStats grid
+   *  which only counts buildings published on Vafo). */
   projects_completed_count: number | null;
+  /** Career total of projects in the 'announced' stage ("Котлован").
+   *  Added in migration 0023. */
+  projects_announced_count: number | null;
+  /** Career total of projects in the 'under_construction' stage
+   *  ("Строится"). Added in migration 0023. */
+  projects_under_construction_count: number | null;
+  /** Career total of projects in the 'near_completion' stage
+   *  ("Почти готов"). Added in migration 0023. */
+  projects_near_completion_count: number | null;
   /** Short company description (bilingual jsonb). Rendered as a quiet
    *  paragraph on /zhk/[slug] §G developer card when set. Captured
    *  via NewDeveloperModal's "Краткое описание" field. */
   description: Bilingual | null;
-  /** Free-form notes about the developer's current in-progress work
-   *  ("В работе 4: 1 котлован, 2 строится, 1 почти готов"). Captures
-   *  off-platform context the auto-computed devStats grid can't see —
-   *  the grid only counts projects published on Vafo. Column added in
-   *  migration 0022. */
+  /** Legacy free-text notes column (migration 0022). Kept on the schema
+   *  for back-compat with existing rows, but replaced in 2026-05-22 by
+   *  the structured stage counts above — NewDeveloperModal no longer
+   *  writes here, and /zhk no longer renders it. Will be dropped in a
+   *  future cleanup migration once verified there's no stale data. */
   portfolio_notes: string | null;
 };
 
@@ -183,6 +198,9 @@ export const mockDevelopers: MockDeveloper[] = [
     has_female_agent: true,
     years_active: 6,
     projects_completed_count: 4,
+    projects_announced_count: null,
+    projects_under_construction_count: null,
+    projects_near_completion_count: null,
     description: null,
     portfolio_notes: null,
   },
@@ -195,6 +213,9 @@ export const mockDevelopers: MockDeveloper[] = [
     has_female_agent: false,
     years_active: 9,
     projects_completed_count: 6,
+    projects_announced_count: null,
+    projects_under_construction_count: null,
+    projects_near_completion_count: null,
     description: null,
     portfolio_notes: null,
   },
@@ -207,6 +228,9 @@ export const mockDevelopers: MockDeveloper[] = [
     has_female_agent: false,
     years_active: 3,
     projects_completed_count: 1,
+    projects_announced_count: null,
+    projects_under_construction_count: null,
+    projects_near_completion_count: null,
     description: null,
     portfolio_notes: null,
   },

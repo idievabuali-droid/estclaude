@@ -414,6 +414,9 @@ export async function getListing(slug: string): Promise<{
         has_female_agent: devRow.has_female_agent,
         years_active: devRow.years_active,
         projects_completed_count: devRow.projects_completed_count,
+        projects_announced_count: devRow.projects_announced_count ?? null,
+        projects_under_construction_count: devRow.projects_under_construction_count ?? null,
+        projects_near_completion_count: devRow.projects_near_completion_count ?? null,
         description: devRow.description ?? null,
         portfolio_notes: devRow.portfolio_notes ?? null,
       };

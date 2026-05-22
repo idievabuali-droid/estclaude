@@ -600,6 +600,9 @@ function mapDeveloper(r: {
   verified_at: string | null;
   years_active: number | null;
   projects_completed_count: number | null;
+  projects_announced_count?: number | null;
+  projects_under_construction_count?: number | null;
+  projects_near_completion_count?: number | null;
   description?: { ru: string; tg?: string } | null;
   portfolio_notes?: string | null;
 }): MockDeveloper {
@@ -612,9 +615,13 @@ function mapDeveloper(r: {
     has_female_agent: r.has_female_agent,
     years_active: r.years_active,
     projects_completed_count: r.projects_completed_count,
-    // description + portfolio_notes are optional on the row (older
-    // migrations didn't have them) — fall through to null when missing
-    // so callers can render conditionally without runtime errors.
+    // Stage counts + description + portfolio_notes are optional on the
+    // row (older migrations didn't have them) — fall through to null
+    // when missing so callers can render conditionally without runtime
+    // errors. Columns added in migration 0023.
+    projects_announced_count: r.projects_announced_count ?? null,
+    projects_under_construction_count: r.projects_under_construction_count ?? null,
+    projects_near_completion_count: r.projects_near_completion_count ?? null,
     description: (r.description as { ru: string; tg?: string } | null) ?? null,
     portfolio_notes: r.portfolio_notes ?? null,
   };

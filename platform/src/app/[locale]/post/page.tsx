@@ -82,7 +82,12 @@ export default async function PostPage({
       .eq('city', 'vahdat')
       .order('display_order', { ascending: true }),
     listBuildings({}),
-    supabase.from('developers').select('id, name, display_name').order('name'),
+    supabase
+      .from('developers')
+      .select(
+        'id, name, display_name, years_active, projects_completed_count, projects_announced_count, projects_under_construction_count, projects_near_completion_count',
+      )
+      .order('name'),
     supabase
       .from('pois')
       .select('id, name, kind, latitude, longitude, popularity')
@@ -106,6 +111,13 @@ export default async function PostPage({
     id: d.id as string,
     name: d.name as string,
     display_name_ru: (d.display_name as { ru: string }).ru,
+    years_active: (d.years_active as number | null) ?? null,
+    projects_completed_count: (d.projects_completed_count as number | null) ?? null,
+    projects_announced_count: (d.projects_announced_count as number | null) ?? null,
+    projects_under_construction_count:
+      (d.projects_under_construction_count as number | null) ?? null,
+    projects_near_completion_count:
+      (d.projects_near_completion_count as number | null) ?? null,
   }));
 
   // Map landmarks — POIs from our curated table + every published ЖК

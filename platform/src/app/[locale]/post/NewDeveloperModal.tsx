@@ -32,20 +32,16 @@ export interface NewDeveloperModalProps {
  * way that's possible.
  */
 export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModalProps) {
+  // Minimal modal — only the three fields you must have to identify
+  // a developer. Portfolio breakdown (years_active, stage counts,
+  // notes) lives in the building form's "Портфолио застройщика"
+  // section instead, so the founder enters everything in one flow
+  // and via structured number-stepper selectors rather than free
+  // text. See DECISIONS 2026-05-22 (portfolio fields moved out of
+  // modal).
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [description, setDescription] = useState('');
-  // Portfolio fields — optional, schema columns are nullable (developers
-  // table migration 0002). Captured here so the founder can enter them
-  // when creating a developer inline; previously these were admin-only.
-  const [yearsActive, setYearsActive] = useState('');
-  const [projectsCompleted, setProjectsCompleted] = useState('');
-  // Free-form "what's going on now" — captures the intake bot's portfolio
-  // answer verbatim ("В работе 4: 1 котлован, 2 строится, 1 почти готов").
-  // The devStats grid on /zhk only counts on-Vafo projects; this carries
-  // the developer's off-platform context too. Column added in migration
-  // 0022 — see DECISIONS 2026-05-22.
-  const [portfolioNotes, setPortfolioNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   if (!open) return null;
@@ -54,22 +50,6 @@ export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModa
     if (submitting) return;
     if (!name.trim()) return toast.error('Введите название застройщика');
     if (!phone.trim()) return toast.error('Введите контактный телефон');
-
-    // Validate portfolio numbers if entered — non-negative integers.
-    // Empty = "not provided" (NULL on the row).
-    const yearsActiveNum = yearsActive.trim() ? parseInt(yearsActive.trim(), 10) : null;
-    const projectsCompletedNum = projectsCompleted.trim()
-      ? parseInt(projectsCompleted.trim(), 10)
-      : null;
-    if (yearsActiveNum != null && (!Number.isFinite(yearsActiveNum) || yearsActiveNum < 0)) {
-      return toast.error('«Лет на рынке» должно быть целым неотрицательным числом');
-    }
-    if (
-      projectsCompletedNum != null &&
-      (!Number.isFinite(projectsCompletedNum) || projectsCompletedNum < 0)
-    ) {
-      return toast.error('«Сдано проектов» должно быть целым неотрицательным числом');
-    }
 
     setSubmitting(true);
     try {
@@ -80,9 +60,6 @@ export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModa
           name: name.trim(),
           phone: phone.trim(),
           description: description.trim() || undefined,
-          years_active: yearsActiveNum ?? undefined,
-          projects_completed_count: projectsCompletedNum ?? undefined,
-          portfolio_notes: portfolioNotes.trim() || undefined,
         }),
       });
       const data = (await res.json()) as
@@ -100,9 +77,6 @@ export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModa
       setName('');
       setPhone('');
       setDescription('');
-      setYearsActive('');
-      setProjectsCompleted('');
-      setPortfolioNotes('');
       onClose();
     } catch {
       toast.error('Сеть не отвечает. Попробуйте ещё раз.');
@@ -160,34 +134,7 @@ export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModa
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Например: вахдатская строительная компания, 5 проектов сдано"
-            helperText="Появится коротким абзацем на странице ЖК под названием застройщика."
-          />
-          {/* Portfolio fields — both optional. When provided they appear
-              on /zhk/[slug] under the developer card ("8 лет на рынке,
-              сдано 5 ЖК") and feed the buyer's trust assessment. */}
-          <div className="grid grid-cols-2 gap-3">
-            <AppInput
-              label="Лет на рынке"
-              inputMode="numeric"
-              value={yearsActive}
-              onChange={(e) => setYearsActive(e.target.value)}
-              placeholder="8"
-            />
-            <AppInput
-              label="Всего сдано ЖК"
-              inputMode="numeric"
-              value={projectsCompleted}
-              onChange={(e) => setProjectsCompleted(e.target.value)}
-              placeholder="5"
-            />
-          </div>
-          <AppTextarea
-            label="Сейчас в работе"
-            rows={2}
-            value={portfolioNotes}
-            onChange={(e) => setPortfolioNotes(e.target.value)}
-            placeholder="Например: «В работе 4: 1 котлован, 2 строится, 1 почти готов»"
-            helperText="Расскажите про проекты застройщика, которых пока нет на Vafo — стройка вне платформы, скорый запуск, и т.п."
+            helperText="Появится коротким абзацем на странице ЖК под названием застройщика. Лет на рынке и портфолио — в форме ЖК ниже."
           />
         </div>
         <div className="mt-5 flex justify-end gap-2">

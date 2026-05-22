@@ -63,6 +63,9 @@ function mapDev(r: {
   id: string; name: string; display_name: { ru: string; tg?: string };
   has_female_agent: boolean; status: string; verified_at: string | null;
   years_active: number | null; projects_completed_count: number | null;
+  projects_announced_count?: number | null;
+  projects_under_construction_count?: number | null;
+  projects_near_completion_count?: number | null;
   description?: { ru: string; tg?: string } | null;
   portfolio_notes?: string | null;
 }): MockDeveloper {
@@ -75,6 +78,9 @@ function mapDev(r: {
     has_female_agent: r.has_female_agent,
     years_active: r.years_active,
     projects_completed_count: r.projects_completed_count,
+    projects_announced_count: r.projects_announced_count ?? null,
+    projects_under_construction_count: r.projects_under_construction_count ?? null,
+    projects_near_completion_count: r.projects_near_completion_count ?? null,
     description: (r.description as { ru: string; tg?: string } | null) ?? null,
     portfolio_notes: r.portfolio_notes ?? null,
   };

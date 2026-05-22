@@ -849,22 +849,11 @@ export default async function BuildingDetailPage({
                         </Link>
                       ) : null}
                     </h3>
-                    {developer.years_active || developer.projects_completed_count ? (
+                    {developer.years_active ? (
                       <span className="text-meta text-stone-600 tabular-nums">
-                        {developer.years_active ? (
-                          <>
-                            На рынке {developer.years_active}{' '}
-                            {pluralYears(developer.years_active)}
-                            {` · с ${new Date().getFullYear() - developer.years_active} года`}
-                          </>
-                        ) : null}
-                        {/* Career-total finished projects — separate from
-                            the on-Vafo devStats grid below, which only
-                            counts buildings published on this platform.
-                            Founder enters this in NewDeveloperModal. */}
-                        {developer.projects_completed_count
-                          ? `${developer.years_active ? ' · ' : ''}всего сдано ${developer.projects_completed_count} ЖК`
-                          : ''}
+                        На рынке {developer.years_active}{' '}
+                        {pluralYears(developer.years_active)}
+                        {` · с ${new Date().getFullYear() - developer.years_active} года`}
                       </span>
                     ) : null}
                   </div>
@@ -898,20 +887,43 @@ export default async function BuildingDetailPage({
                   </div>
                 ) : null}
 
-                {/* Free-form "Сейчас в работе" notes — captures off-
-                    platform context the devStats grid below can't see
-                    (developer has 4 projects in progress at other sites,
-                    only 1 is on Vafo). Founder enters this via
-                    NewDeveloperModal; quiet bordered block so it reads
-                    as augmenting info, not a primary stat. */}
-                {developer.portfolio_notes ? (
-                  <div className="flex flex-col gap-1 rounded-md border border-stone-200 bg-stone-50/60 p-4">
+                {/* Structured career portfolio — 4-cell grid matching
+                    the BuildingStatus enum (announced / under_construction
+                    / near_completion / delivered). Captured via the
+                    "Портфолио застройщика" section in PostFlow and saved
+                    on the developer row (migration 0023). Renders only
+                    when at least one count is set so unfilled developers
+                    don't show empty zeros. Pairs with the "Проекты на
+                    Vafo" grid below — same shape so the buyer reads
+                    them as comparable career-total vs on-platform. */}
+                {developer.projects_announced_count != null ||
+                developer.projects_under_construction_count != null ||
+                developer.projects_near_completion_count != null ||
+                developer.projects_completed_count != null ? (
+                  <div className="flex flex-col gap-2">
                     <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
-                      Сейчас в работе
+                      По портфолио
                     </span>
-                    <p className="whitespace-pre-line text-meta text-stone-700">
-                      {developer.portfolio_notes}
-                    </p>
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
+                      <DevStat
+                        label="Котлован"
+                        value={developer.projects_announced_count ?? 0}
+                      />
+                      <DevStat
+                        label="Строится"
+                        value={developer.projects_under_construction_count ?? 0}
+                        accent="amber"
+                      />
+                      <DevStat
+                        label="Почти готов"
+                        value={developer.projects_near_completion_count ?? 0}
+                      />
+                      <DevStat
+                        label="Сдано"
+                        value={developer.projects_completed_count ?? 0}
+                        accent="green"
+                      />
+                    </div>
                   </div>
                 ) : null}
 
