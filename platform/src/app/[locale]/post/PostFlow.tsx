@@ -15,6 +15,7 @@ import {
 import { toast } from '@/components/primitives/AppToast';
 import { PhotoPicker, type PendingPhoto } from './PhotoPicker';
 import { NewDeveloperModal } from './NewDeveloperModal';
+import { NewDistrictModal } from './NewDistrictModal';
 import { NumberField } from './NumberField';
 import { LocationSection } from './LocationSection';
 import {
@@ -188,6 +189,12 @@ interface DraftPayload {
   mode: Mode;
   building: BuildingDraft;
   buildingPhotos: PendingPhoto[];
+  /** Construction-progress photos (kind='progress'). Separate from
+   *  buildingPhotos so the cover-photo math doesn't accidentally pick
+   *  a progress shot. Added 2026-05-22 — the founder uploads new
+   *  progress photos every month, so this slot accumulates over time
+   *  and is editable from /post/edit/building/[id]. */
+  progressPhotos?: PendingPhoto[];
   coords: { lat: number; lng: number } | null;
   existingBuildingId: string;
   apartments: ApartmentDraft[];
@@ -208,7 +215,7 @@ interface BuildingDraft {
 }
 
 export function PostFlow({
-  districts,
+  districts: initialDistricts,
   existingBuildings,
   developers: initialDevelopers,
   isFounder,
@@ -217,6 +224,12 @@ export function PostFlow({
   benchmarksByDistrict,
   landmarks,
 }: PostFlowProps) {
+  // Districts list is mutable: opening the new-district modal can
+  // append a fresh entry. We initialise once from the server-fetched
+  // list and add to it locally as the user creates new ones (mirrors
+  // the developers-state pattern below).
+  const [districts, setDistricts] = useState(initialDistricts);
+  const [districtModalOpen, setDistrictModalOpen] = useState(false);
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('choose');
   const [submitting, setSubmitting] = useState(false);
@@ -275,6 +288,14 @@ export function PostFlow({
   // Becomes the building's hero image + the cover_photo_id reference
   // on /zhk pages and building cards.
   const [buildingPhotos, setBuildingPhotos] = useState<PendingPhoto[]>([]);
+
+  // Construction-progress photos (kind='progress'). Separate state +
+  // separate PhotoPicker so the cover-photo flag from progress shots
+  // never overrides the exterior cover — we concat
+  // [...buildingPhotos, ...progressPhotos] on submit so attachAndSetCover
+  // picks the first is_cover=true from the exterior set. Displayed on
+  // /zhk/[slug]/progress; accumulates over the build's lifetime.
+  const [progressPhotos, setProgressPhotos] = useState<PendingPhoto[]>([]);
 
   // Existing-building selection.
   const [existingBuildingId, setExistingBuildingId] = useState(
@@ -355,6 +376,7 @@ export function PostFlow({
         mode,
         building: b,
         buildingPhotos,
+        progressPhotos,
         coords,
         existingBuildingId,
         apartments,
@@ -362,7 +384,7 @@ export function PostFlow({
       saveDraft<DraftPayload>(userId, payload);
     }, 500);
     return () => window.clearTimeout(t);
-  }, [userId, mode, b, buildingPhotos, coords, existingBuildingId, apartments]);
+  }, [userId, mode, b, buildingPhotos, progressPhotos, coords, existingBuildingId, apartments]);
 
   function restoreDraft() {
     if (!draftPrompt) return;
@@ -371,6 +393,7 @@ export function PostFlow({
     setMode(p.mode);
     setB(p.building);
     setBuildingPhotos(p.buildingPhotos ?? []);
+    setProgressPhotos(p.progressPhotos ?? []);
     setCoords(p.coords ?? null);
     if (p.existingBuildingId) setExistingBuildingId(p.existingBuildingId);
     if (Array.isArray(p.apartments) && p.apartments.length > 0) {
@@ -564,7 +587,12 @@ export function PostFlow({
         amenities: b.amenities,
         latitude: coords?.lat,
         longitude: coords?.lng,
-        pendingPhotos: buildingPhotos,
+        // Concat exterior + progress so the API receives one array
+        // with per-photo `kind`. Order matters — `attachAndSetCover`
+        // picks the first is_cover=true row, which we want to be from
+        // the exterior set (a progress shot of foundations shouldn't
+        // become the building's hero image).
+        pendingPhotos: [...buildingPhotos, ...progressPhotos],
       };
     } else if (mode === 'standalone') {
       body.standalone = {
@@ -805,6 +833,7 @@ export function PostFlow({
               setExistingBuildingId(buildingId);
               setMode('existing-building');
             }}
+            onCreateNewDistrict={() => setDistrictModalOpen(true)}
           />
           <AppCard>
           <AppCardContent>
@@ -914,6 +943,20 @@ export function PostFlow({
                 photos={buildingPhotos}
                 onChange={setBuildingPhotos}
               />
+              {/* Construction-progress gallery — separate picker so
+                  cover-photo logic stays predictable (exterior cover
+                  doesn't get overwritten by a foundation shot). The
+                  founder typically adds 1 photo per month over the
+                  build's lifetime; max=15 leaves room for ~1 year of
+                  monthly updates. Editable later from /post/edit/
+                  building/[id]. */}
+              <PhotoPicker
+                label="Фото хода стройки"
+                kind="progress"
+                max={15}
+                photos={progressPhotos}
+                onChange={setProgressPhotos}
+              />
               <div className="flex flex-col gap-2">
                 <span className="text-caption font-medium text-stone-500">Удобства</span>
                 <div className="flex flex-wrap gap-2">
@@ -1008,6 +1051,7 @@ export function PostFlow({
             coords={coords}
             onCoordsChange={setCoords}
             landmarks={landmarks}
+            onCreateNewDistrict={() => setDistrictModalOpen(true)}
             onPickExistingBuilding={(buildingId) => {
               // Picked an existing ЖК from autocomplete while in
               // standalone mode → flip to existing-building. Saves the
@@ -1185,6 +1229,20 @@ export function PostFlow({
         onCreated={(dev) => {
           setDevelopers((list) => [...list, dev]);
           setB((s) => ({ ...s, developer_id: dev.id }));
+        }}
+      />
+
+      <NewDistrictModal
+        open={districtModalOpen}
+        onClose={() => setDistrictModalOpen(false)}
+        onCreated={(district) => {
+          // Append to the in-memory list so the dropdown picks it up,
+          // then auto-select in BOTH the building draft and the
+          // standalone draft — whichever LocationSection is currently
+          // visible will reflect the new district immediately.
+          setDistricts((list) => [...list, district]);
+          setB((s) => ({ ...s, district_id: district.id }));
+          setStandalone((s) => ({ ...s, district_id: district.id }));
         }}
       />
 

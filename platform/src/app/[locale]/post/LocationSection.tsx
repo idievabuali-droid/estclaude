@@ -47,7 +47,19 @@ export interface LocationSectionProps {
   // ─── Optional: building pick fires this so PostFlow can
   //               auto-switch to existing-building mode. ──────
   onPickExistingBuilding?: (buildingId: string) => void;
+
+  /** Optional callback — when provided, the district dropdown shows a
+   *  "+ Создать новый район" option at the end. Tapping it fires this
+   *  instead of `onDistrictChange`. PostFlow uses this to open the
+   *  NewDistrictModal; the modal's onCreated then appends to the
+   *  districts list and auto-selects the new id. */
+  onCreateNewDistrict?: () => void;
 }
+
+/** Synthetic dropdown value — picked by the parent to open the new-
+ *  district modal instead of selecting a real district. Same pattern
+ *  as ADD_DEVELOPER_VALUE in PostFlow.tsx for the developer dropdown. */
+const ADD_DISTRICT_VALUE = '__add_new_district__';
 
 /**
  * Single "Где находится" block that bundles address autocomplete + map
@@ -88,6 +100,7 @@ export function LocationSection({
   onCoordsChange,
   landmarks,
   onPickExistingBuilding,
+  onCreateNewDistrict,
 }: LocationSectionProps) {
   // The point the map should fly to + use as the chosen marker
   // position whenever `key` changes. Tracked separately from the form's
@@ -197,8 +210,23 @@ export function LocationSection({
               label="Район"
               required
               value={districtId}
-              onChange={(e) => handleDistrictChange(e.target.value)}
-              options={districts.map((d) => ({ value: d.id, label: d.name }))}
+              onChange={(e) => {
+                // Synthetic value opens the new-district modal instead
+                // of selecting; we don't mutate districtId so the
+                // dropdown bounces back to the prior selection while
+                // the modal is open. Same pattern as ADD_DEVELOPER_VALUE.
+                if (e.target.value === ADD_DISTRICT_VALUE) {
+                  onCreateNewDistrict?.();
+                  return;
+                }
+                handleDistrictChange(e.target.value);
+              }}
+              options={[
+                ...districts.map((d) => ({ value: d.id, label: d.name })),
+                ...(onCreateNewDistrict
+                  ? [{ value: ADD_DISTRICT_VALUE, label: '+ Создать новый район' }]
+                  : []),
+              ]}
               helperText="Подбираем автоматически по точке на карте — поправьте, если выбрано неточно."
               errorText={districtError}
             />

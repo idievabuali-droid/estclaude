@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { MapPin, Calendar, Layers, Users, Camera, ArrowUpRight } from 'lucide-react';
+import { MapPin, Calendar, Layers, Users, Camera, ArrowUpRight, Pencil } from 'lucide-react';
+import { getCurrentUser } from '@/lib/auth/session';
+import { isFounder } from '@/lib/auth/roles';
 import { FOUNDER_CONTACTS } from '@/lib/founder-contacts';
 import { buildContactLinks } from '@/lib/contact-links';
 import { setRequestLocale } from 'next-intl/server';
@@ -144,6 +146,12 @@ export default async function BuildingDetailPage({
   const data = await getBuilding(slug);
   if (!data) notFound();
   const { building, developer, district, listings: allListings } = data;
+
+  // Founder-only "Редактировать" link in the summary band — gated server-
+  // side so the link only renders for users with the admin/staff role.
+  // Buyers see nothing different.
+  const currentUser = await getCurrentUser();
+  const isFounderUser = currentUser ? await isFounder(currentUser.id) : false;
 
   // Parse the apartment-criteria filters from the URL. When the buyer
   // came in from /novostroyki with filters applied, narrow the inline
@@ -375,6 +383,15 @@ export default async function BuildingDetailPage({
             {/* Address as a quiet single-line link to the map. No
                 chip border now — the H1 carries the visual weight,
                 the address is metadata. */}
+            {isFounderUser ? (
+              <Link
+                href={`/post/edit/building/${building.id}`}
+                className="inline-flex w-fit items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-1 text-caption font-medium text-stone-700 transition-colors hover:border-terracotta-400 hover:bg-terracotta-50 hover:text-terracotta-700"
+              >
+                <Pencil className="size-3.5" aria-hidden />
+                Редактировать ЖК
+              </Link>
+            ) : null}
             <Link
               href={`/novostroyki?view=karta&focus=${building.slug}`}
               className="group inline-flex w-fit items-center gap-1 text-meta text-stone-600 transition-colors hover:text-terracotta-700"

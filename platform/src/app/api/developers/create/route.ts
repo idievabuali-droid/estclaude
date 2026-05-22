@@ -21,6 +21,13 @@ interface CreateDeveloperBody {
   name: string;
   phone: string;
   description?: string;
+  /** Years the developer has been operating. Optional — column is
+   *  nullable on the developers table (migration 0002). Surfaces on
+   *  /zhk/[slug] as a trust signal. */
+  years_active?: number;
+  /** Number of projects the developer has completed (handed over).
+   *  Optional, nullable column. Surfaces on /zhk/[slug] too. */
+  projects_completed_count?: number;
 }
 
 export async function POST(req: NextRequest) {
@@ -48,6 +55,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'phone required' }, { status: 400 });
   }
 
+  // Portfolio fields — both optional, nullable columns. Reject
+  // negative / non-integer values defensively (the modal already
+  // validates client-side, but a hand-crafted API call could bypass).
+  const yearsActive =
+    typeof body.years_active === 'number' &&
+    Number.isInteger(body.years_active) &&
+    body.years_active >= 0
+      ? body.years_active
+      : null;
+  const projectsCompleted =
+    typeof body.projects_completed_count === 'number' &&
+    Number.isInteger(body.projects_completed_count) &&
+    body.projects_completed_count >= 0
+      ? body.projects_completed_count
+      : null;
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('developers')
@@ -58,6 +81,8 @@ export async function POST(req: NextRequest) {
       description: body.description?.trim()
         ? { ru: body.description.trim(), tg: body.description.trim() }
         : null,
+      years_active: yearsActive,
+      projects_completed_count: projectsCompleted,
       // 'pending' is the enum default but spelled out for clarity —
       // founder approves later from /kabinet (queue work, not this round).
       status: 'pending',

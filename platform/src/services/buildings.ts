@@ -860,3 +860,78 @@ export async function createBuilding(
   if (error || !data) throw error ?? new Error('Failed to create building');
   return { id: data.id as string, slug: data.slug as string };
 }
+
+// ─── Building update (V1 founder edit flow) ───────────────────
+
+/** Patch fields on an existing building. All fields are optional —
+ *  only set keys are updated. Slug is intentionally NOT regenerated
+ *  on rename: it's a stable URL component used in /zhk/[slug] links,
+ *  external shares, and saved-search match payloads. Renaming the
+ *  building doesn't move its URL. */
+export interface UpdateBuildingInput {
+  name?: string;
+  address?: string;
+  districtId?: string;
+  developerId?: string;
+  status?: BuildingStatus;
+  totalFloors?: number;
+  totalUnits?: number;
+  /** Handover quarter ("2026-Q3") — pass null to clear, undefined to skip. */
+  handoverQuarter?: string | null;
+  /** Russian description — pass null to clear, undefined to skip. */
+  description?: string | null;
+  amenities?: string[];
+  latitude?: number;
+  longitude?: number;
+}
+
+/** Update an existing building. Caller is responsible for permission
+ *  checks (founder-only in V1 — see the API route). Returns whether
+ *  the row was found + updated so the route can 404 missing ids
+ *  cleanly. */
+export async function updateBuilding(
+  buildingId: string,
+  input: UpdateBuildingInput,
+): Promise<{ ok: boolean; slug: string | null }> {
+  const supabase = createAdminClient();
+
+  // Build patch object — only include keys the caller explicitly set,
+  // so an unset field stays as-is on the row. Localised name/address
+  // are stored as { ru, tg } jsonb; we mirror the same string to both
+  // langs (matches createBuilding's behaviour — Tajik translation is
+  // a separate workflow we haven't wired yet).
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (input.name != null) patch.name = { ru: input.name, tg: input.name };
+  if (input.address != null) {
+    patch.address = { ru: input.address, tg: input.address };
+  }
+  if (input.districtId != null) patch.district_id = input.districtId;
+  if (input.developerId != null) patch.developer_id = input.developerId;
+  if (input.status != null) patch.status = input.status;
+  if (input.totalFloors != null) patch.total_floors = input.totalFloors;
+  if (input.totalUnits != null) patch.total_units = input.totalUnits;
+  if (input.handoverQuarter !== undefined) {
+    patch.handover_estimated_quarter = input.handoverQuarter ?? null;
+  }
+  if (input.description !== undefined) {
+    patch.description = input.description
+      ? { ru: input.description, tg: input.description }
+      : null;
+  }
+  if (input.amenities != null) patch.amenities = input.amenities;
+  if (input.latitude != null) patch.latitude = input.latitude;
+  if (input.longitude != null) patch.longitude = input.longitude;
+
+  const { data, error } = await supabase
+    .from('buildings')
+    .update(patch)
+    .eq('id', buildingId)
+    .select('slug')
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return { ok: false, slug: null };
+  return { ok: true, slug: data.slug as string };
+}

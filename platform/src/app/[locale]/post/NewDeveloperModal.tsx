@@ -35,6 +35,11 @@ export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModa
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [description, setDescription] = useState('');
+  // Portfolio fields — optional, schema columns are nullable (developers
+  // table migration 0002). Captured here so the founder can enter them
+  // when creating a developer inline; previously these were admin-only.
+  const [yearsActive, setYearsActive] = useState('');
+  const [projectsCompleted, setProjectsCompleted] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   if (!open) return null;
@@ -43,6 +48,22 @@ export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModa
     if (submitting) return;
     if (!name.trim()) return toast.error('Введите название застройщика');
     if (!phone.trim()) return toast.error('Введите контактный телефон');
+
+    // Validate portfolio numbers if entered — non-negative integers.
+    // Empty = "not provided" (NULL on the row).
+    const yearsActiveNum = yearsActive.trim() ? parseInt(yearsActive.trim(), 10) : null;
+    const projectsCompletedNum = projectsCompleted.trim()
+      ? parseInt(projectsCompleted.trim(), 10)
+      : null;
+    if (yearsActiveNum != null && (!Number.isFinite(yearsActiveNum) || yearsActiveNum < 0)) {
+      return toast.error('«Лет на рынке» должно быть целым неотрицательным числом');
+    }
+    if (
+      projectsCompletedNum != null &&
+      (!Number.isFinite(projectsCompletedNum) || projectsCompletedNum < 0)
+    ) {
+      return toast.error('«Сдано проектов» должно быть целым неотрицательным числом');
+    }
 
     setSubmitting(true);
     try {
@@ -53,6 +74,8 @@ export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModa
           name: name.trim(),
           phone: phone.trim(),
           description: description.trim() || undefined,
+          years_active: yearsActiveNum ?? undefined,
+          projects_completed_count: projectsCompletedNum ?? undefined,
         }),
       });
       const data = (await res.json()) as
@@ -70,6 +93,8 @@ export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModa
       setName('');
       setPhone('');
       setDescription('');
+      setYearsActive('');
+      setProjectsCompleted('');
       onClose();
     } catch {
       toast.error('Сеть не отвечает. Попробуйте ещё раз.');
@@ -128,6 +153,25 @@ export function NewDeveloperModal({ open, onClose, onCreated }: NewDeveloperModa
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Например: вахдатская строительная компания, 5 проектов сдано"
           />
+          {/* Portfolio fields — both optional. When provided they appear
+              on /zhk/[slug] under the developer card ("8 лет на рынке,
+              сдано 5 ЖК") and feed the buyer's trust assessment. */}
+          <div className="grid grid-cols-2 gap-3">
+            <AppInput
+              label="Лет на рынке"
+              inputMode="numeric"
+              value={yearsActive}
+              onChange={(e) => setYearsActive(e.target.value)}
+              placeholder="8"
+            />
+            <AppInput
+              label="Сдано проектов"
+              inputMode="numeric"
+              value={projectsCompleted}
+              onChange={(e) => setProjectsCompleted(e.target.value)}
+              placeholder="5"
+            />
+          </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <AppButton variant="secondary" onClick={onClose}>
