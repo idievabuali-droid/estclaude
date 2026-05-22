@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { ImagePlus, X, Star, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from '@/components/primitives/AppToast';
+import { AppInput } from '@/components/primitives';
 
 /** Per-file metadata kept in the form's local state. Mirrors the
  *  shape returned by /api/storage/upload + the server's PendingPhoto
@@ -15,6 +16,9 @@ export interface PendingPhoto {
   file_size_bytes: number;
   kind: string;
   is_cover?: boolean;
+  /** ISO timestamp the photo was taken — set in date mode (progress
+   *  photos). Mirrors PendingPhoto.taken_at in services/photos.ts. */
+  taken_at?: string | null;
 }
 
 export interface PhotoPickerProps {
@@ -32,6 +36,11 @@ export interface PhotoPickerProps {
   max?: number;
   /** Optional caption shown above the picker. */
   label?: string;
+  /** When true, renders a "shot on" date field above the grid. Each new
+   *  photo is tagged with the selected date (taken_at) and shows a date
+   *  badge instead of the cover star — for construction-progress photos,
+   *  which are dated and never covers. */
+  withDate?: boolean;
 }
 
 const DEFAULT_MAX = 15;
@@ -55,9 +64,12 @@ export function PhotoPicker({
   kind = 'unit_living',
   max = DEFAULT_MAX,
   label,
+  withDate = false,
 }: PhotoPickerProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(0);
+  // YYYY-MM-DD applied as taken_at to newly-added photos (date mode).
+  const [takenDate, setTakenDate] = useState(localDateISO);
 
   function openPicker() {
     inputRef.current?.click();
@@ -91,8 +103,14 @@ export function PhotoPicker({
             const err = (await res.json().catch(() => ({}))) as { error?: string };
             throw new Error(err.error || `HTTP ${res.status}`);
           }
-          const data = (await res.json()) as Omit<PendingPhoto, 'is_cover'>;
-          newPhotos.push({ ...data });
+          const data = (await res.json()) as Omit<
+            PendingPhoto,
+            'is_cover' | 'taken_at'
+          >;
+          newPhotos.push({
+            ...data,
+            taken_at: withDate ? `${takenDate}T12:00:00.000Z` : null,
+          });
         } catch (err) {
           toast.error(`Не загрузилось: ${file.name}`);
           console.error(err);
@@ -103,9 +121,10 @@ export function PhotoPicker({
     );
 
     if (newPhotos.length > 0) {
-      // First photo across the picker becomes cover by default.
+      // First photo across the picker becomes cover by default — never
+      // in date mode, where photos are dated progress shots, not covers.
       const next = [...photos, ...newPhotos];
-      if (!next.some((p) => p.is_cover)) {
+      if (!withDate && !next.some((p) => p.is_cover)) {
         next[0]!.is_cover = true;
       }
       onChange(next);
@@ -115,8 +134,9 @@ export function PhotoPicker({
 
   function remove(storagePath: string) {
     const next = photos.filter((p) => p.storage_path !== storagePath);
-    // If we removed the cover, promote the new first photo.
-    if (!next.some((p) => p.is_cover) && next.length > 0) {
+    // If we removed the cover, promote the new first photo (not in date
+    // mode — progress photos have no cover).
+    if (!withDate && !next.some((p) => p.is_cover) && next.length > 0) {
       next[0]!.is_cover = true;
     }
     onChange(next);
@@ -157,13 +177,15 @@ export function PhotoPicker({
     // photo[0] to cover — matches the buyer's expectation that "first
     // photo = cover". They can still manually re-pick the cover via
     // the star button.
-    if (!next.some((p) => p.is_cover)) {
-      next[0]!.is_cover = true;
-    } else if (target === 0 && delta < 0) {
-      // Just-moved photo is now first → it becomes cover.
-      next.forEach((p, i) => {
-        p.is_cover = i === 0;
-      });
+    if (!withDate) {
+      if (!next.some((p) => p.is_cover)) {
+        next[0]!.is_cover = true;
+      } else if (target === 0 && delta < 0) {
+        // Just-moved photo is now first → it becomes cover.
+        next.forEach((p, i) => {
+          p.is_cover = i === 0;
+        });
+      }
     }
     onChange(next);
   }
@@ -172,6 +194,23 @@ export function PhotoPicker({
     <div className="flex flex-col gap-2">
       {label ? (
         <span className="text-meta font-medium text-stone-700">{label}</span>
+      ) : null}
+
+      {withDate ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="max-w-xs">
+            <AppInput
+              type="date"
+              label="Дата съёмки"
+              value={takenDate}
+              onChange={(e) => setTakenDate(e.target.value)}
+            />
+          </div>
+          <span className="text-caption text-stone-500">
+            Новые фото получат выбранную дату. Для фото за другой день —
+            поменяйте дату и добавьте ещё.
+          </span>
+        </div>
       ) : null}
 
       <input
@@ -199,7 +238,15 @@ export function PhotoPicker({
               alt=""
               className="size-full object-cover"
             />
-            {p.is_cover ? (
+            {withDate ? (
+              // Progress photos are dated, never covers — the cover star
+              // is replaced by a read-only date badge.
+              p.taken_at ? (
+                <span className="absolute left-1 top-1 inline-flex items-center rounded-sm bg-stone-900/75 px-1.5 py-0.5 text-[10px] font-medium text-white tabular-nums">
+                  {shortDate(p.taken_at)}
+                </span>
+              ) : null
+            ) : p.is_cover ? (
               <span className="absolute left-1 top-1 inline-flex items-center gap-1 rounded-sm bg-terracotta-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
                 <Star className="size-3" /> Обложка
               </span>
@@ -278,8 +325,8 @@ export function PhotoPicker({
       </div>
 
       <span className="text-caption text-stone-500">
-        Максимум {max} фото · до 10 МБ каждое · jpg, png, webp · ⭐ — обложка ·
-        ◀ ▶ — порядок
+        Максимум {max} фото · до 10 МБ каждое · jpg, png, webp
+        {withDate ? ' · ◀ ▶ — порядок' : ' · ⭐ — обложка · ◀ ▶ — порядок'}
       </span>
     </div>
   );
@@ -305,5 +352,25 @@ function readImageDimensions(file: File): Promise<{ width: number; height: numbe
       resolve({ width: 0, height: 0 });
     };
     img.src = url;
+  });
+}
+
+/**
+ * Today's date as YYYY-MM-DD in the *local* timezone — the default
+ * "shot on" date. Plain toISOString() is UTC, so a late-evening upload
+ * in Tajikistan (UTC+5) could otherwise default to the wrong day.
+ */
+function localDateISO(): string {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+/** ISO timestamp → short Russian date ("22 мая") for the thumbnail badge. */
+function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
   });
 }

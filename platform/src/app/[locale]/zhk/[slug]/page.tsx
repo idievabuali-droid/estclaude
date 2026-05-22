@@ -194,7 +194,7 @@ export default async function BuildingDetailPage({
   // similar-buildings queries. Two listBuildings() calls so we have
   // both same-developer and same-district candidates ready at merge
   // time without another sequential roundtrip.
-  const [benchmark, pois, devStats, progressMonths, sameDevBuildings, sameDistrictBuildings] =
+  const [benchmark, pois, devStats, progressDays, sameDevBuildings, sameDistrictBuildings] =
     await Promise.all([
       getDistrictBenchmark(district.id),
       getNearbyPOIs(building.latitude, building.longitude),
@@ -231,11 +231,11 @@ export default async function BuildingDetailPage({
   // uploaded. Mock projects without photos hide the section cleanly.
   const showProgressPreview =
     (building.status === 'under_construction' || building.status === 'near_completion') &&
-    progressMonths.length > 0 &&
-    progressMonths[0]!.photos.length > 0;
-  const latestProgressMonth = showProgressPreview ? progressMonths[0]! : null;
+    progressDays.length > 0 &&
+    progressDays[0]!.photos.length > 0;
+  const latestProgressDay = showProgressPreview ? progressDays[0]! : null;
   const progressTotalCount = showProgressPreview
-    ? progressMonths.reduce((sum, m) => sum + m.photos.length, 0)
+    ? progressDays.reduce((sum, m) => sum + m.photos.length, 0)
     : 0;
 
   // §H Похожие ЖК — prefer same developer, fall back to same district.
@@ -670,7 +670,7 @@ export default async function BuildingDetailPage({
            that have at least one uploaded progress photo. Tap a thumb
            or the "Все альбомы" link to drill into the full timeline
            on /zhk/[slug]/progress. */}
-      {showProgressPreview && latestProgressMonth ? (
+      {showProgressPreview && latestProgressDay ? (
         <section id="stroyka" className="scroll-mt-28 border-t border-stone-200 py-6">
           <AppContainer className="flex flex-col gap-3">
             <div className="flex flex-wrap items-end justify-between gap-2">
@@ -680,7 +680,7 @@ export default async function BuildingDetailPage({
                 </span>
                 <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>Ход строительства</h2>
                 <p className="text-meta text-stone-500">
-                  Обновлено: {latestProgressMonth.label} · {progressTotalCount} фото
+                  Обновлено: {latestProgressDay.label} · {progressTotalCount} фото
                 </p>
               </div>
               <Link
@@ -692,7 +692,7 @@ export default async function BuildingDetailPage({
               </Link>
             </div>
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
-              {latestProgressMonth.photos.slice(0, 4).map((p) => {
+              {latestProgressDay.photos.slice(0, 4).map((p) => {
                 const url = supabasePublicUrl(p.storage_path);
                 return (
                   <Link
@@ -703,7 +703,7 @@ export default async function BuildingDetailPage({
                   >
                     <ImageWithFallback
                       src={url}
-                      alt={`Стройка · ${latestProgressMonth.label}`}
+                      alt={`Стройка · ${latestProgressDay.label}`}
                       className="absolute inset-0 size-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
                       fallback={
                         <div className="absolute inset-0 flex items-center justify-center text-stone-400">

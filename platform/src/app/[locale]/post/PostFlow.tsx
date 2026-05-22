@@ -1081,6 +1081,7 @@ export function PostFlow({
               <PhotoPicker
                 label="Фото хода стройки"
                 kind="progress"
+                withDate
                 max={15}
                 photos={progressPhotos}
                 onChange={setProgressPhotos}

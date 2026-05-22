@@ -8,6 +8,14 @@ Newest at top.
 
 ---
 
+## 2026-05-22 · Progress photos are date-stamped, grouped by day
+
+**Locked:** Construction-progress photos now carry a real shoot date. `PhotoPicker` gains a `withDate` mode (native date field, default today; per-photo `taken_at`; date badge replaces the cover star) used by the progress picker in `PostFlow` + `EditBuildingForm`. `attachPhotos` writes `taken_at`; `getBuildingProgress` groups by exact day (YYYY-MM-DD) instead of month, newest first, with genitive date labels ("22 мая 2026"). The `/zhk/[slug]/progress` album + §D detail-page preview render date sections. No migration — `photos.taken_at` already existed, just never written.
+**Why:** A construction timeline is only a trust signal if the dated sequence is real — every progress photo previously fell back to "today" and collapsed into one month bucket.
+**Affects:** `src/app/[locale]/post/PhotoPicker.tsx` (withDate mode), `src/services/photos.ts` (`PendingPhoto.taken_at` + `attachPhotos` insert), `src/services/progress.ts` (day grouping, `ProgressMonth`→`ProgressDay`), `src/app/[locale]/post/PostFlow.tsx`, `src/app/[locale]/post/edit/building/[id]/EditBuildingForm.tsx`, `src/app/[locale]/zhk/[slug]/{page,progress/page}.tsx`.
+
+---
+
 ## 2026-05-22 · Developer card — career-total sдано + description + «Сейчас в работе» (portfolio_notes)
 
 **Locked:** `/zhk/[slug]` §G developer card surfaces three things that used to be silent or missing. `developer.projects_completed_count` (entered in `NewDeveloperModal`) now appends to the stats line as "· всего сдано N ЖК" — career total, distinguished from the on-Vafo devStats grid below by a new "Проекты на Vafo" eyebrow caption so career-total vs platform-grounded read as separate scopes. `developer.description` (also captured in the modal) now renders as a quiet paragraph between the header and the verification block. New `developers.portfolio_notes` column (migration 0022, free text) captures the intake bot's «В работе 4: 1 котлован, 2 строится, 1 почти готов» answer verbatim — context the auto-computed devStats can't see (off-platform projects, soon-to-launch builds); rendered as a "Сейчас в работе" bordered block above the Vafo grid. `MockDeveloper` type extended with both fields; all four mappers (services/{buildings,listings,saved}.ts) read the new columns with `?? null` fallback so old DBs without the migration still SELECT cleanly. `/api/developers/create` accepts and persists portfolio_notes.

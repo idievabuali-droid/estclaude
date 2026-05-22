@@ -36,7 +36,7 @@ export default async function ProgressPage({
   if (!data) notFound();
   const { building, developer } = data;
 
-  const months = await getBuildingProgress(building.id);
+  const days = await getBuildingProgress(building.id);
 
   return (
     <>
@@ -81,7 +81,7 @@ export default async function ProgressPage({
         </AppContainer>
       </section>
 
-      {months.length === 0 ? (
+      {days.length === 0 ? (
         <section className="py-7">
           <AppContainer>
             <AppCard>
@@ -103,19 +103,19 @@ export default async function ProgressPage({
       ) : (
         <section className="bg-stone-50 py-6 pb-9">
           <AppContainer className="flex flex-col gap-7">
-            {months.map((m) => (
-              <div key={m.monthKey} className="flex flex-col gap-3">
+            {days.map((day) => (
+              <div key={day.dateKey} className="flex flex-col gap-3">
                 <div className="flex items-center gap-2">
                   <Calendar className="size-4 text-stone-500" aria-hidden />
                   <h2 className="text-h2 font-semibold text-stone-900 tabular-nums">
-                    {m.label}
+                    {day.label}
                   </h2>
                   <span className="text-meta text-stone-500 tabular-nums">
-                    · {m.photos.length} фото
+                    · {day.photos.length} фото
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
-                  {m.photos.map((p) => (
+                  {day.photos.map((p) => (
                     <ProgressPhotoTile
                       key={p.id}
                       storagePath={p.storage_path}

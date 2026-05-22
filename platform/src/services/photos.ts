@@ -51,6 +51,10 @@ export interface PendingPhoto {
    *  Exactly one is_cover=true expected per group; if zero, we use
    *  the first photo as cover automatically. */
   is_cover?: boolean;
+  /** ISO timestamp the photo was taken. Set for construction-progress
+   *  photos so the timeline groups by real shoot date; null for every
+   *  other kind. */
+  taken_at?: string | null;
 }
 
 interface AttachOptions {
@@ -82,6 +86,7 @@ export async function attachPhotos(
     width: p.width || 0,
     height: p.height || 0,
     file_size_bytes: p.file_size_bytes || 0,
+    taken_at: p.taken_at ?? null,
     display_order: i,
     uploaded_by: options.uploaderId,
   }));

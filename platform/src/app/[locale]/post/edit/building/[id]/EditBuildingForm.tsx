@@ -582,6 +582,7 @@ export function EditBuildingForm({
                     : 'Фото хода стройки'
                 }
                 kind="progress"
+                withDate
                 max={15}
                 photos={newProgressPhotos}
                 onChange={setNewProgressPhotos}
