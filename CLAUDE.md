@@ -24,7 +24,7 @@ The original specs target Dushanbe + Vahdat with 14 pages, full verification flo
 - **No paid features. No verification UI flows. No Tier 2/3 self-service.** Founder manually verifies developers (when needed) by flipping `developers.verified_at` directly in Supabase Studio.
 - **Compare hidden behind `FEATURES.compare = false`.** The code is shipped but the UI is gated.
 - **Source-type picker cut.** Server derives source from role: founder → 'developer', everyone else → 'owner'. The 'intermediary' enum value is unreachable in V1.
-- **Building edit form cut.** Only apartment edit is wired. Building changes require a Supabase Studio edit by the founder.
+- **Building edit form wired (2026-05-22).** `/post/edit/building/[id]` covers every create-flow field + exterior/progress photo edits. Founder-only. Discoverable via a small "Редактировать ЖК" pill on `/zhk/[slug]` visible only to founders.
 - **No cookie-consent banner.** TJ has no GDPR-equivalent. Anon_id cookie is functional + first-party.
 - **Cron is daily-only** (Vercel Hobby plan). Anything that needs faster runs inline (saved-search match-on-publish does this).
 
