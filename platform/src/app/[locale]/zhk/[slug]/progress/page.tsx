@@ -7,7 +7,7 @@ import {
   AppCard,
   AppCardContent,
 } from '@/components/primitives';
-import { SaveToggle } from '@/components/blocks';
+import { SaveToggle, ImageWithFallback } from '@/components/blocks';
 import { getBuilding } from '@/services/buildings';
 import { getBuildingProgress } from '@/services/progress';
 import { supabasePublicUrl } from '@/services/photos';
@@ -166,10 +166,10 @@ function ProgressPhotoTile({
   coverColor: string;
 }) {
   // Real uploaded photo when the storage path resolves to a public URL.
-  // The colored placeholder + camera icon is ONLY the can't-resolve
-  // fallback — previously this tile always rendered the placeholder and
-  // ignored the photo entirely, so the album diverged from the §D
-  // preview on the detail page (which already rendered the real image).
+  // ImageWithFallback swaps to the colored placeholder + camera icon if
+  // the URL is missing OR the file 404s (e.g. seed placeholder rows
+  // whose objects were never uploaded) — so a broken-image icon never
+  // shows. Mirrors the §D preview on the detail page.
   const url = supabasePublicUrl(storagePath);
   const date = new Date(takenAt).toLocaleDateString('ru-RU', {
     day: 'numeric',
@@ -178,26 +178,24 @@ function ProgressPhotoTile({
   });
   return (
     <div className="group relative aspect-[4/3] overflow-hidden rounded-md bg-stone-100">
-      {url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={url}
-          alt={`Ход строительства · ${date}`}
-          className="absolute inset-0 size-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-        />
-      ) : (
-        <>
-          <div
-            className="absolute inset-0"
-            style={{ backgroundColor: coverColor }}
-            aria-hidden
-          />
-          <Camera
-            className="absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 text-white/40"
-            aria-hidden
-          />
-        </>
-      )}
+      <ImageWithFallback
+        src={url}
+        alt={`Ход строительства · ${date}`}
+        className="absolute inset-0 size-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+        fallback={
+          <>
+            <div
+              className="absolute inset-0"
+              style={{ backgroundColor: coverColor }}
+              aria-hidden
+            />
+            <Camera
+              className="absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 text-white/40"
+              aria-hidden
+            />
+          </>
+        }
+      />
       {/* Date + attribution overlay — kept on both the real-photo and
           fallback paths; it's the trust signal (dated + attributed). */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0" />

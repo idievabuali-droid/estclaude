@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppInput, type AppInputProps } from '@/components/primitives';
 
 /**
@@ -19,6 +19,13 @@ import { AppInput, type AppInputProps } from '@/components/primitives';
  * round-trip through the parent's `number | ''` state and erase the
  * trailing dot. The parent always sees `number | ''` — empty when
  * the field is blank, otherwise the parsed numeric value.
+ *
+ * The draft DOES sync from `value` when the prop changes from outside
+ * AND the field isn't focused — so a programmatic update (e.g. the
+ * developer-portfolio pre-fill, which arrives after the developer is
+ * resolved) actually shows. The not-focused guard preserves the
+ * mid-typing protection above: while the user is in the field, their
+ * draft is never overwritten.
  */
 export interface NumberFieldProps
   extends Omit<AppInputProps, 'value' | 'onChange' | 'type' | 'inputMode'> {
@@ -36,13 +43,25 @@ export function NumberField({
 }: NumberFieldProps) {
   // Local string mirror so mid-typing values like "12." (user about
   // to type a decimal) survive the `number | ''` round-trip to the
-  // parent. We DON'T sync from `value` after mount: in this app the
-  // parent only changes a NumberField's value via remount (new key,
-  // e.g. duplicate apartment), never in-place. If we add a use case
-  // for external resets later we'll need a different sync strategy.
+  // parent.
   const [draft, setDraft] = useState<string>(
     typeof value === 'number' ? String(value) : '',
   );
+
+  // Focus is tracked in a ref (no re-render needed) so the sync effect
+  // below can tell a programmatic value change from the user's own
+  // typing.
+  const focusedRef = useRef(false);
+
+  // Sync the draft from `value` when the prop changes externally —
+  // but only while the field is NOT focused. This is what makes
+  // pre-fill work (parent sets `value` after mount); the focus guard
+  // keeps a mid-typing draft from being clobbered.
+  useEffect(() => {
+    if (focusedRef.current) return;
+    const next = typeof value === 'number' ? String(value) : '';
+    setDraft((cur) => (cur === next ? cur : next));
+  }, [value]);
 
   return (
     <AppInput
@@ -50,6 +69,14 @@ export function NumberField({
       type="text"
       inputMode={decimal ? 'decimal' : 'numeric'}
       value={draft}
+      onFocus={(e) => {
+        focusedRef.current = true;
+        rest.onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        focusedRef.current = false;
+        rest.onBlur?.(e);
+      }}
       onChange={(e) => {
         const raw = e.target.value;
         let cleaned = decimal

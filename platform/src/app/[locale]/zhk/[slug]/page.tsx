@@ -21,6 +21,7 @@ import {
   CardPhotoCarousel,
   ScrollSpyTabs,
   DetailPageActions,
+  ImageWithFallback,
 } from '@/components/blocks';
 import type { PoiCategory } from '@/services/poi';
 import { getBuilding, getDeveloperById, getDeveloperStats, listBuildings } from '@/services/buildings';
@@ -700,18 +701,16 @@ export default async function BuildingDetailPage({
                     className="group relative aspect-square overflow-hidden rounded-md bg-stone-100"
                     aria-label="Открыть альбом стройки"
                   >
-                    {url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={url}
-                        alt={`Стройка · ${latestProgressMonth.label}`}
-                        className="absolute inset-0 size-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-stone-400">
-                        <Camera className="size-6" aria-hidden />
-                      </div>
-                    )}
+                    <ImageWithFallback
+                      src={url}
+                      alt={`Стройка · ${latestProgressMonth.label}`}
+                      className="absolute inset-0 size-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                      fallback={
+                        <div className="absolute inset-0 flex items-center justify-center text-stone-400">
+                          <Camera className="size-6" aria-hidden />
+                        </div>
+                      }
+                    />
                   </Link>
                 );
               })}

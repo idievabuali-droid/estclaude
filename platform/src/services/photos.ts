@@ -69,7 +69,9 @@ export async function attachPhotos(
   parentId: string,
   photos: PendingPhoto[],
   options: AttachOptions,
-): Promise<{ id: string; storage_path: string; is_cover: boolean }[]> {
+): Promise<
+  { id: string; storage_path: string; is_cover: boolean; kind: string }[]
+> {
   if (photos.length === 0) return [];
   const supabase = createAdminClient();
 
@@ -92,10 +94,13 @@ export async function attachPhotos(
     throw error ?? new Error('Failed to insert photos');
   }
 
+  // `kind` is carried through so setCoverPhoto can exclude progress
+  // photos from cover candidacy.
   return data.map((row, i) => ({
     id: row.id as string,
     storage_path: row.storage_path as string,
     is_cover: photos[i]?.is_cover ?? false,
+    kind: photos[i]?.kind ?? 'other',
   }));
 }
 
@@ -179,21 +184,52 @@ export async function hydratePhotos<
 
 /**
  * Sets `cover_photo_id` on the parent (building or listing) given a
- * list of just-inserted photo rows. Picks the first row flagged
- * is_cover=true; if none, picks the first row in the array.
+ * list of just-inserted photo rows.
+ *
+ * Rules (so a routine edit doesn't silently swap the card image):
+ *   - `progress` photos are never cover candidates — they're the
+ *     construction-timeline shots, not the card image. A monthly
+ *     progress-photo upload must not touch the cover.
+ *   - An explicitly is_cover=true photo always wins (deliberate
+ *     founder pick), even over an existing cover.
+ *   - Otherwise a cover is set ONLY when the parent has none yet —
+ *     adding more photos to a building/listing that already has a
+ *     cover leaves that cover alone.
  */
 export async function setCoverPhoto(
   parentKind: 'building' | 'listing',
   parentId: string,
-  attached: { id: string; is_cover: boolean }[],
+  attached: { id: string; is_cover: boolean; kind: string }[],
 ): Promise<void> {
   if (attached.length === 0) return;
-  const cover = attached.find((a) => a.is_cover) ?? attached[0]!;
   const table = parentKind === 'building' ? 'buildings' : 'listings';
   const supabase = createAdminClient();
+
+  // Progress photos can never become a cover.
+  const candidates = attached.filter((a) => a.kind !== 'progress');
+  if (candidates.length === 0) return;
+
+  // Explicit founder pick — honour it unconditionally.
+  const explicit = candidates.find((a) => a.is_cover);
+  if (explicit) {
+    await supabase
+      .from(table)
+      .update({ cover_photo_id: explicit.id })
+      .eq('id', parentId);
+    return;
+  }
+
+  // No explicit pick — only set a cover if there isn't one already.
+  const { data: existing } = await supabase
+    .from(table)
+    .select('cover_photo_id')
+    .eq('id', parentId)
+    .maybeSingle();
+  if (existing?.cover_photo_id) return;
+
   await supabase
     .from(table)
-    .update({ cover_photo_id: cover.id })
+    .update({ cover_photo_id: candidates[0]!.id })
     .eq('id', parentId);
 }
 

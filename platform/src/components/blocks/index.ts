@@ -1,4 +1,5 @@
 export { BrowserCompatBanner } from './BrowserCompatBanner';
+export { ImageWithFallback } from './ImageWithFallback';
 export { SourceChip } from './SourceChip';
 export type { SourceChipProps } from './SourceChip';
 export { VerificationBadge } from './VerificationBadge';
