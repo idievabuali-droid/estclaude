@@ -168,3 +168,70 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* ──────────────────────────────────────────────────────────────
+   Old-browser fallback for OKLCH colors.
+
+   Tailwind v4 emits every default color as an oklch() value. The
+   parser landed in Chrome 111 (Mar 2023), Safari 15.4 (Mar 2022),
+   Firefox 113 (May 2023). Below those versions oklch is unparseable
+   and falls back to the inherited / transparent value — which made
+   our dark CTA bg-stone-900 buttons appear as invisible "empty
+   gaps" on a real Vahdat buyer's older Android Chrome (2026-05-22).
+
+   This @supports block fires ONLY when the browser cannot parse
+   oklch — modern browsers see zero of these rules. We override the
+   small set of named tokens that affect *load-bearing* UI (button
+   visibility, brand identity, text legibility, border definition).
+   Cosmetic shades + the verification-tier / fairness / source
+   accent colors are skipped on purpose — those degrade gracefully
+   to inherited values without breaking a journey.
+
+   Hex values are sRGB approximations of the published oklch source
+   colors. Tailwind's default stone palette is reproduced here in
+   sRGB; terracotta hexes were chosen to match the calibrated oklch
+   triplet within JND tolerance. Browsers paying this fallback are
+   the long tail; the visual fidelity is secondary to the buttons
+   being *visible at all*. */
+@supports not (color: oklch(0 0 0)) {
+  :root {
+    /* Stone — neutrals (dark CTAs, body text, borders, surfaces) */
+    --color-stone-50: #fafaf9;
+    --color-stone-100: #f5f5f4;
+    --color-stone-200: #e7e5e4;
+    --color-stone-300: #d6d3d1;
+    --color-stone-400: #a8a29e;
+    --color-stone-500: #78716c;
+    --color-stone-600: #57534e;
+    --color-stone-700: #44403c;
+    --color-stone-800: #292524;
+    --color-stone-900: #1c1917;
+    --color-stone-950: #0c0a09;
+
+    /* Terracotta — brand primary + supporting shades */
+    --color-terracotta-50: #fdf4ed;
+    --color-terracotta-100: #fae0cd;
+    --color-terracotta-200: #f4be9d;
+    --color-terracotta-300: #ed966b;
+    --color-terracotta-400: #e26b3a;
+    --color-terracotta-500: #cf5325;
+    --color-terracotta-600: #b04519;
+    --color-terracotta-700: #8a3614;
+    --color-terracotta-800: #6a2a10;
+    --color-terracotta-900: #4d1f0c;
+    --color-terracotta-950: #2e1408;
+
+    /* Emerald (Verified dot, fairness-great accent) */
+    --color-emerald-50: #ecfdf5;
+    --color-emerald-500: #10b981;
+    --color-emerald-600: #059669;
+
+    /* Amber (progress-link badge, fairness-high) */
+    --color-amber-50: #fffbeb;
+    --color-amber-100: #fef3c7;
+
+    /* Rose (delete-action tint that briefly remained — kept neutral) */
+    --color-rose-50: #fff1f2;
+    --color-rose-600: #e11d48;
+  }
+}

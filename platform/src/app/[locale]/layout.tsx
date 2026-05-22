@@ -6,7 +6,7 @@ import { routing } from '@/i18n/routing';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
-import { CompareBar, FeedbackButton, PageView, RetrySaveOnReturn } from '@/components/blocks';
+import { BrowserCompatBanner, CompareBar, FeedbackButton, PageView, RetrySaveOnReturn } from '@/components/blocks';
 import { AppToaster } from '@/components/primitives';
 import { getCurrentUser } from '@/lib/auth/session';
 import { Suspense } from 'react';
@@ -43,6 +43,13 @@ export default async function LocaleLayout({
   return (
     <NextIntlClientProvider locale={locale}>
       <div className="flex min-h-dvh flex-col">
+        {/* Old-browser nudge — renders only when oklch() isn't supported
+            (Chrome < 111 / Safari < 15.4 / Firefox < 113). For the 95%
+            on modern browsers this client island renders nothing and
+            costs nothing visible. Paired with the @supports fallback
+            in globals.css so the page is still usable before they
+            update. */}
+        <BrowserCompatBanner />
         <SiteHeader />
         <main className="flex-1 pb-16 md:pb-0">{children}</main>
         <SiteFooter />

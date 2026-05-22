@@ -1,3 +1,4 @@
+export { BrowserCompatBanner } from './BrowserCompatBanner';
 export { SourceChip } from './SourceChip';
 export type { SourceChipProps } from './SourceChip';
 export { VerificationBadge } from './VerificationBadge';
