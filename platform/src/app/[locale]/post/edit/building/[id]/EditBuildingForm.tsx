@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import {
@@ -84,6 +84,31 @@ const AMENITY_OPTIONS = [
 
 const ADD_DEVELOPER_VALUE = '__add_new_developer__';
 
+/** The five portfolio inputs in the «Портфолио застройщика» section. */
+type PortfolioInputs = {
+  years_active: number | '';
+  projects_completed: number | '';
+  projects_announced: number | '';
+  projects_under_construction: number | '';
+  projects_near_completion: number | '';
+};
+
+/** Map a developer's stored portfolio columns to the form's input
+ *  shape — null/undefined become '' so NumberField shows a blank.
+ *  Used both for the lazy initial state and on every developer change,
+ *  so the portfolio is always correct at render time (no reliance on a
+ *  post-mount sync effect, which NumberField's mount-time draft would
+ *  miss). */
+function portfolioFromDev(dev: DeveloperOption | undefined): PortfolioInputs {
+  return {
+    years_active: dev?.years_active ?? '',
+    projects_completed: dev?.projects_completed_count ?? '',
+    projects_announced: dev?.projects_announced_count ?? '',
+    projects_under_construction: dev?.projects_under_construction_count ?? '',
+    projects_near_completion: dev?.projects_near_completion_count ?? '',
+  };
+}
+
 /**
  * Building edit form — prefilled from server, saves a diff to
  * /api/buildings/[id]/update. Mirrors EditApartmentForm in pattern:
@@ -141,40 +166,19 @@ export function EditBuildingForm({
   const [newProgressPhotos, setNewProgressPhotos] = useState<PendingPhoto[]>([]);
 
   // Developer portfolio state — the «Портфолио застройщика» section.
-  // Identical to the create flow (PostFlow.tsx): five number inputs,
-  // pre-filled from the selected developer, PATCHed to
-  // /api/developers/[id]/portfolio on save. This is the ONLY way to
+  // Lazy-initialised from the building's developer so the inputs show
+  // the right values on first paint. Re-set synchronously whenever the
+  // developer changes (in the select onChange + new-developer modal
+  // onCreated below) — NOT via a post-mount effect, because the portfolio
+  // NumberFields are remounted on developer change via key={developerId}
+  // and must read the correct value at mount. This is the only way to
   // change a developer's portfolio after creation — NewDeveloperModal
   // doesn't carry these fields (DECISIONS 2026-05-22).
-  const [portfolio, setPortfolio] = useState<{
-    years_active: number | '';
-    projects_completed: number | '';
-    projects_announced: number | '';
-    projects_under_construction: number | '';
-    projects_near_completion: number | '';
-  }>({
-    years_active: '',
-    projects_completed: '',
-    projects_announced: '',
-    projects_under_construction: '',
-    projects_near_completion: '',
-  });
-
-  // Pre-fill portfolio from the selected developer whenever the
-  // developer changes (or the list mutates from the new-developer
-  // modal). Empty → '' so NumberField shows a blank placeholder.
-  useEffect(() => {
-    const dev = developers.find((d) => d.id === developerId);
-    if (!dev) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPortfolio({
-      years_active: dev.years_active ?? '',
-      projects_completed: dev.projects_completed_count ?? '',
-      projects_announced: dev.projects_announced_count ?? '',
-      projects_under_construction: dev.projects_under_construction_count ?? '',
-      projects_near_completion: dev.projects_near_completion_count ?? '',
-    });
-  }, [developerId, developers]);
+  const [portfolio, setPortfolio] = useState<PortfolioInputs>(() =>
+    portfolioFromDev(
+      initialDevelopers.find((d) => d.id === initial.developer_id),
+    ),
+  );
 
   const visibleExterior = existingExteriorPhotos.filter(
     (p) => !removePhotoIds.includes(p.id),
@@ -354,6 +358,14 @@ export function EditBuildingForm({
                     return;
                   }
                   setDeveloperId(e.target.value);
+                  // Re-fill the portfolio section from the newly-picked
+                  // developer, synchronously — paired with the
+                  // key={developerId} remount on the grid below.
+                  setPortfolio(
+                    portfolioFromDev(
+                      developers.find((d) => d.id === e.target.value),
+                    ),
+                  );
                 }}
                 required
                 options={[
@@ -449,7 +461,14 @@ export function EditBuildingForm({
                 Опыт и проекты выбранного застройщика. Появится в карточке «О застройщике» на странице ЖК. Можно оставить пустым.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            {/* key={developerId} remounts all five NumberFields when
+                the developer changes, so each picks up the fresh
+                portfolio value at mount (NumberField seeds its draft
+                from `value` only at mount). */}
+            <div
+              key={developerId}
+              className="grid grid-cols-2 gap-3 md:grid-cols-5"
+            >
               <NumberField
                 label="Лет на рынке"
                 value={portfolio.years_active}
@@ -590,6 +609,10 @@ export function EditBuildingForm({
         onCreated={(dev: NewDeveloperResult) => {
           setDevelopers((list) => [...list, dev]);
           setDeveloperId(dev.id);
+          // A freshly-created developer has no portfolio yet — clear
+          // the section so it doesn't show the previous developer's
+          // numbers.
+          setPortfolio(portfolioFromDev(undefined));
         }}
       />
       <NewDistrictModal

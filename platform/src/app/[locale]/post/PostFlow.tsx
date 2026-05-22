@@ -56,6 +56,30 @@ interface DeveloperOption {
   projects_near_completion_count?: number | null;
 }
 
+/** The five portfolio inputs in the «Портфолио застройщика» section. */
+type PortfolioInputs = {
+  years_active: number | '';
+  projects_completed: number | '';
+  projects_announced: number | '';
+  projects_under_construction: number | '';
+  projects_near_completion: number | '';
+};
+
+/** Map a developer's stored portfolio columns to the form's input
+ *  shape — null/undefined become '' so NumberField shows a blank.
+ *  Used for the lazy initial state and on every developer change, so
+ *  the portfolio is always correct at render time without a post-mount
+ *  sync effect (which NumberField's mount-time draft would miss). */
+function portfolioFromDev(dev: DeveloperOption | undefined): PortfolioInputs {
+  return {
+    years_active: dev?.years_active ?? '',
+    projects_completed: dev?.projects_completed_count ?? '',
+    projects_announced: dev?.projects_announced_count ?? '',
+    projects_under_construction: dev?.projects_under_construction_count ?? '',
+    projects_near_completion: dev?.projects_near_completion_count ?? '',
+  };
+}
+
 /** Curated POIs + existing buildings rendered as labelled markers on
  *  the LocationPicker map. Sellers in Vahdat orient by landmarks they
  *  already know (рынок Гулистон, школа №1, ЖК Резиденс) — base-map
@@ -306,28 +330,23 @@ export function PostFlow({
   // /zhk/[slug]/progress; accumulates over the build's lifetime.
   const [progressPhotos, setProgressPhotos] = useState<PendingPhoto[]>([]);
 
-  // Developer portfolio breakdown — five number-stepper inputs in the
+  // Developer portfolio breakdown — five number inputs in the
   // "Портфолио застройщика" section below the developer dropdown.
-  // Pre-filled from the selected developer's existing row (sync effect
-  // further down); user edits → on building submit we PATCH the
-  // developer via /api/developers/[id]/portfolio.
+  // Lazy-initialised from the default developer; re-set synchronously
+  // whenever the developer changes (select onChange + new-developer
+  // modal onCreated) so the portfolio NumberFields — remounted on
+  // developer change via key={b.developer_id} — read the correct value
+  // at mount. On building submit the diff is PATCHed to
+  // /api/developers/[id]/portfolio.
   //
   // Why not in NewDeveloperModal: founder feedback 2026-05-22 —
   // everything should be enterable in the main building form via
   // structured selectors, not behind a modal as free text.
-  const [portfolio, setPortfolio] = useState<{
-    years_active: number | '';
-    projects_completed: number | '';
-    projects_announced: number | '';
-    projects_under_construction: number | '';
-    projects_near_completion: number | '';
-  }>({
-    years_active: '',
-    projects_completed: '',
-    projects_announced: '',
-    projects_under_construction: '',
-    projects_near_completion: '',
-  });
+  const [portfolio, setPortfolio] = useState<PortfolioInputs>(() =>
+    portfolioFromDev(
+      initialDevelopers.find((d) => d.id === (initialDevelopers[0]?.id ?? '')),
+    ),
+  );
 
   // Existing-building selection.
   const [existingBuildingId, setExistingBuildingId] = useState(
@@ -390,25 +409,6 @@ export function PostFlow({
     hasMountedRef.current = true;
   }, [userId]);
 
-  // Sync portfolio state from the selected developer whenever the
-  // developer_id changes or the developers list mutates (new-developer
-  // modal append). Empty values translate to '' so NumberField shows
-  // an empty placeholder rather than "0". Overwrites any in-progress
-  // local edits — accepted trade-off: picking a different developer
-  // and back should reset to that developer's saved values, not
-  // preserve a half-typed edit for the wrong dev.
-  useEffect(() => {
-    const dev = developers.find((d) => d.id === b.developer_id);
-    if (!dev) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPortfolio({
-      years_active: dev.years_active ?? '',
-      projects_completed: dev.projects_completed_count ?? '',
-      projects_announced: dev.projects_announced_count ?? '',
-      projects_under_construction: dev.projects_under_construction_count ?? '',
-      projects_near_completion: dev.projects_near_completion_count ?? '',
-    });
-  }, [b.developer_id, developers]);
 
   // Save on every change, debounced 500ms. Skip the very first run
   // (the initial paint) so we don't immediately write a blank draft
@@ -988,6 +988,14 @@ export function PostFlow({
                       }
                       setB((s) => ({ ...s, developer_id: e.target.value }));
                       clearError('b.developer_id');
+                      // Re-fill the portfolio section from the picked
+                      // developer, synchronously — paired with the
+                      // key={b.developer_id} remount on the grid below.
+                      setPortfolio(
+                        portfolioFromDev(
+                          developers.find((d) => d.id === e.target.value),
+                        ),
+                      );
                     }}
                     required
                     options={[
@@ -1131,7 +1139,13 @@ export function PostFlow({
                   Опыт и текущие проекты выбранного застройщика. Появится в карточке «О застройщике» на странице ЖК. Можно оставить пустым — ничего не покажется.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+              {/* key={b.developer_id} remounts all five NumberFields
+                  when the developer changes, so each reads the fresh
+                  portfolio value at mount. */}
+              <div
+                key={b.developer_id}
+                className="grid grid-cols-2 gap-3 md:grid-cols-5"
+              >
                 <NumberField
                   label="Лет на рынке"
                   value={portfolio.years_active}
@@ -1409,6 +1423,10 @@ export function PostFlow({
         onCreated={(dev) => {
           setDevelopers((list) => [...list, dev]);
           setB((s) => ({ ...s, developer_id: dev.id }));
+          // A freshly-created developer has no portfolio yet — clear
+          // the section so it doesn't show the previous developer's
+          // numbers.
+          setPortfolio(portfolioFromDev(undefined));
         }}
       />
 
