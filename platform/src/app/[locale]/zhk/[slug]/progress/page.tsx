@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { Camera, Calendar, ChevronLeft, ShieldCheck, Bell } from 'lucide-react';
+import { Camera, Calendar, ChevronLeft, Bell } from 'lucide-react';
 import { setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import {
@@ -7,10 +7,11 @@ import {
   AppCard,
   AppCardContent,
 } from '@/components/primitives';
-import { SaveToggle, ImageWithFallback } from '@/components/blocks';
+import { SaveToggle } from '@/components/blocks';
 import { getBuilding } from '@/services/buildings';
 import { getBuildingProgress } from '@/services/progress';
 import { supabasePublicUrl } from '@/services/photos';
+import { ProgressDayPhotos } from './ProgressDayPhotos';
 
 /**
  * Construction-progress timeline (WEDGE-1).
@@ -114,81 +115,18 @@ export default async function ProgressPage({
                     · {day.photos.length} фото
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
-                  {day.photos.map((p) => (
-                    <ProgressPhotoTile
-                      key={p.id}
-                      storagePath={p.storage_path}
-                      coverColor={building.cover_color}
-                    />
-                  ))}
-                </div>
+                <ProgressDayPhotos
+                  photos={day.photos.map((p) => ({
+                    id: p.id,
+                    url: supabasePublicUrl(p.storage_path),
+                  }))}
+                  coverColor={building.cover_color}
+                />
               </div>
             ))}
-
-            {/* Trust block at the bottom */}
-            <AppCard className="border-amber-200/60 bg-amber-50/30">
-              <AppCardContent>
-                <div className="flex items-start gap-3">
-                  <ShieldCheck className="mt-0.5 size-5 text-[color:var(--color-badge-tier-developer)]" />
-                  <div className="flex flex-col gap-1">
-                    <span className="text-h3 font-semibold text-stone-900">
-                      Откуда эти фото
-                    </span>
-                    <span className="text-meta text-stone-700">
-                      Каждое фото загружено застройщиком (или командой платформы при выезде).
-                      Мы проверяем дату, метаданные и при необходимости — координаты съёмки.
-                      Фото без подтверждения мы не публикуем.
-                    </span>
-                  </div>
-                </div>
-              </AppCardContent>
-            </AppCard>
           </AppContainer>
         </section>
       )}
     </>
-  );
-}
-
-function ProgressPhotoTile({
-  storagePath,
-  coverColor,
-}: {
-  storagePath: string;
-  /** Fallback background when the photo URL can't be resolved. */
-  coverColor: string;
-}) {
-  // Real uploaded photo when the storage path resolves to a public URL.
-  // ImageWithFallback swaps to the colored placeholder + camera icon if
-  // the URL is missing OR the file 404s (e.g. seed placeholder rows
-  // whose objects were never uploaded) — so a broken-image icon never
-  // shows. Mirrors the §D preview on the detail page.
-  //
-  // No date/attribution overlay: the date lives once on the day's group
-  // header above, and provenance is covered by the page subtitle + the
-  // "Откуда эти фото" trust card. The tile is just the photo.
-  const url = supabasePublicUrl(storagePath);
-  return (
-    <div className="group relative aspect-[4/3] overflow-hidden rounded-md bg-stone-100">
-      <ImageWithFallback
-        src={url}
-        alt="Фото хода строительства"
-        className="absolute inset-0 size-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-        fallback={
-          <>
-            <div
-              className="absolute inset-0"
-              style={{ backgroundColor: coverColor }}
-              aria-hidden
-            />
-            <Camera
-              className="absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 text-white/40"
-              aria-hidden
-            />
-          </>
-        }
-      />
-    </div>
   );
 }
