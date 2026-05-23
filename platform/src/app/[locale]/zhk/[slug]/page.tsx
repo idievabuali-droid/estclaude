@@ -691,14 +691,20 @@ export default async function BuildingDetailPage({
                 <ArrowUpRight className="size-3.5" aria-hidden />
               </Link>
             </div>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
+            {/* Horizontal scroll strip (Cian / Avito pattern). The grid
+                version ate ~400px of vertical space on mobile for what
+                is meant to be a teaser — the full album lives behind
+                "Все альбомы". Edge-bleed (-mx-4 px-4) lets the last
+                thumb clip off-screen, signalling "swipe for more"
+                without a separate affordance. */}
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:gap-3 md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {latestProgressDay.photos.slice(0, 4).map((p) => {
                 const url = supabasePublicUrl(p.storage_path);
                 return (
                   <Link
                     key={p.id}
                     href={`/zhk/${building.slug}/progress`}
-                    className="group relative aspect-square overflow-hidden rounded-md bg-stone-100"
+                    className="group relative aspect-[4/3] h-32 flex-none overflow-hidden rounded-md bg-stone-100 md:h-36"
                     aria-label="Открыть альбом стройки"
                   >
                     <ImageWithFallback
