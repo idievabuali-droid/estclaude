@@ -85,6 +85,13 @@ If a step is skipped, say so explicitly with the reason — don't quietly omit.
 
 Short prompts from the user are normal. The full task is: their prompt + this file + DECISIONS. If a request is ambiguous, ask before building. For non-trivial work, expect plan mode — wireframe first, plan first, then implement after approval.
 
+## Trigger phrases — hard contracts
+
+Two trigger phrases in the user's prompt override default execution. Treat each as a contract, not a hint — if the user uses one, the full discipline applies even if a step feels redundant. If a step is skipped, say so explicitly.
+
+- **`audit-first`** — before any code: restate the goal, question the approach (mature-platform reference per Working method §2), grep + audit the surrounding surface, propose a wireframe / plan. Wait for explicit "go."
+- **`ship-it`** — kicks in automatically when an audit-first proposal is approved, or invoked alone for pure implementation. Re-read the current file, match existing patterns (no parallel implementations), make the precise edit, run the ripple check, verify in the running thing — not just `tsc + lint + build`.
+
 ## Scope discipline rules
 
 - **Build only what was asked.** Nothing extra.
