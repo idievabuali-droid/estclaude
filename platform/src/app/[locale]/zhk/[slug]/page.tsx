@@ -387,9 +387,13 @@ export default async function BuildingDetailPage({
               <span>{district.name.ru} · {building.address.ru}</span>
               <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
             </Link>
-            {/* Two pills side by side — verified (green) + status
-                (terracotta dot, neutral text). Forms a single trust
-                + state row that's scannable at a glance. */}
+            {/* Trust pill + developer attribution. The status badge
+                used to live here too (a second copy of «Почти готов»
+                etc.) but it duplicates the cover-photo overlay at
+                line ~321, where the status pill is paired with the
+                stage carousel image — that's the canonical spot.
+                Removed here so the row stays focused: trust (verified)
+                + attribution (от Developer →). Cleaner scan. */}
             <div className="flex flex-wrap items-center gap-2">
               {developer.is_verified ? (
                 <span
@@ -403,10 +407,6 @@ export default async function BuildingDetailPage({
                   Проверенный застройщик
                 </span>
               ) : null}
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-caption font-medium text-stone-700">
-                <span className="size-1.5 rounded-full bg-terracotta-600" aria-hidden />
-                {STAGE_INFO[building.status].label}
-              </span>
               <a
                 href="#developer"
                 className="inline-flex items-center gap-1 text-caption text-stone-500 hover:text-terracotta-700"
