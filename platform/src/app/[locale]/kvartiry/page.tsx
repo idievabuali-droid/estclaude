@@ -173,8 +173,23 @@ export default async function KvartiryPage({
 
       {/* ─── PAGE HEADER ────────────────────────────────────────
           Breadcrumb (when scoped) + serif H1 + LocationSearch full-
-          width above the two-column body. */}
-      <section className="border-b border-stone-200 bg-white">
+          width above the two-column body.
+
+          Mobile cut: when unscoped, the h1 just says «Квартиры» —
+          restating what the buyer already tapped — and the search
+          bar's value on mobile is low (chips do the filtering work).
+          Section is `hidden md:block` in the unscoped case so the
+          buyer reaches the first listing card faster. Scoped
+          (building / near-POI) keeps it everywhere — the back-link
+          + scoped h1 carry real context the buyer needs to confirm
+          they're in the right view. */}
+      <section
+        className={
+          scopedBuilding || sp.near_label
+            ? 'border-b border-stone-200 bg-white'
+            : 'hidden border-b border-stone-200 bg-white md:block'
+        }
+      >
         <AppContainer className="flex flex-col gap-4 py-6 md:py-8">
           {scopedBuilding ? (
             <Link

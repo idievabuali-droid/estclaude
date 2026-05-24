@@ -268,8 +268,24 @@ export default async function NovostroykiPage({
           H1 + LocationSearch full-width above the two-column body.
           Mirrors the editorial-luxury voice from the rest of the
           platform: serif H1 in display size on a generous header
-          band before the dense filter+grid body. */}
-      <section className="border-b border-stone-200 bg-white">
+          band before the dense filter+grid body.
+
+          Mobile cut: when the page is unscoped (no developer filter,
+          no near-POI), the h1 just says «Новостройки» — restating
+          the CTA the buyer just tapped — and the search bar's
+          truncated multi-example placeholder is low-discoverability
+          on mobile anyway. Together they ate ~108px of top-of-page
+          chrome before the buyer saw the first card. The entire
+          section now `hidden md:block` in the unscoped case;
+          scoped (Проекты от X / Рядом с Y) keeps the section
+          everywhere because the h1 carries real context. */}
+      <section
+        className={
+          scopedDeveloper || sp.near_label
+            ? 'border-b border-stone-200 bg-white'
+            : 'hidden border-b border-stone-200 bg-white md:block'
+        }
+      >
         <AppContainer className="flex flex-col gap-4 py-6 md:py-8">
           <div className="flex flex-col gap-1">
             <h1
