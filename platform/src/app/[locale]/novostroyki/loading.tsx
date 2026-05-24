@@ -9,7 +9,12 @@ import { AppContainer } from '@/components/primitives';
 export default function NovostroykiLoading() {
   return (
     <>
-      <section className="border-b border-stone-200 bg-white">
+      {/* Page-header skeleton (h1 + search) — desktop only, matches
+          page.tsx where this section is `hidden md:block` when
+          unscoped. Loading.tsx can't know whether the upcoming render
+          will be scoped, so the unscoped/mobile-default state is the
+          safe skeleton: shorter on mobile, full on desktop. */}
+      <section className="hidden border-b border-stone-200 bg-white md:block">
         <AppContainer className="flex flex-col gap-4 py-5">
           <div className="flex items-end justify-between gap-3">
             <div className="flex flex-col gap-1">
@@ -19,7 +24,15 @@ export default function NovostroykiLoading() {
             <div className="h-9 w-24 animate-pulse rounded-md bg-stone-200" />
           </div>
           <div className="h-11 w-full animate-pulse rounded-md bg-stone-200" />
-          <div className="flex gap-2 overflow-hidden">
+        </AppContainer>
+      </section>
+
+      {/* Chip-row skeleton — visible on all viewports, matches the
+          real sticky chip bar so the first paint to first interactive
+          paint doesn't reflow. */}
+      <section className="border-b border-stone-200 bg-white">
+        <AppContainer>
+          <div className="flex gap-2 overflow-hidden py-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}

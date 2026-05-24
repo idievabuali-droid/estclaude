@@ -8,14 +8,23 @@ import { AppContainer } from '@/components/primitives';
 export default function KvartiryLoading() {
   return (
     <>
-      <section className="border-b border-stone-200 bg-white">
+      {/* Page-header skeleton (h1 + search) — desktop only, matches
+          page.tsx where this section is `hidden md:block` when
+          unscoped. Same reasoning as /novostroyki loading. */}
+      <section className="hidden border-b border-stone-200 bg-white md:block">
         <AppContainer className="flex flex-col gap-4 py-5">
           <div className="flex flex-col gap-1">
             <div className="h-7 w-40 animate-pulse rounded bg-stone-200" />
             <div className="h-3 w-32 animate-pulse rounded bg-stone-200" />
           </div>
           <div className="h-11 w-full animate-pulse rounded-md bg-stone-200" />
-          <div className="flex gap-2 overflow-hidden">
+        </AppContainer>
+      </section>
+
+      {/* Chip-row skeleton — visible on all viewports. */}
+      <section className="border-b border-stone-200 bg-white">
+        <AppContainer>
+          <div className="flex gap-2 overflow-hidden py-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}
