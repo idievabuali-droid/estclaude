@@ -24,6 +24,13 @@ export interface ExistingPhoto {
   id: string;
   /** Public URL for the thumbnail. */
   url: string;
+  /** ISO timestamp the photo was taken. Set on construction-progress
+   *  photos so the timeline groups by real shoot date; null for
+   *  exterior/other kinds and for legacy progress rows uploaded
+   *  before the dated picker existed. The form renders a date
+   *  input on each progress thumb so the founder can fix or
+   *  backfill the date inline. */
+  taken_at?: string | null;
 }
 
 export interface EditBuildingInitial {
@@ -169,6 +176,14 @@ export function EditBuildingForm({
   const [removePhotoIds, setRemovePhotoIds] = useState<string[]>([]);
   const [newExteriorPhotos, setNewExteriorPhotos] = useState<PendingPhoto[]>([]);
   const [newProgressPhotos, setNewProgressPhotos] = useState<PendingPhoto[]>([]);
+  // Date overrides for EXISTING progress photos, keyed by photo id.
+  // Value is YYYY-MM-DD (what the native date input emits) or '' to
+  // clear. Only ids the founder actually touched land here — untouched
+  // photos send no update. On save we diff against the original
+  // taken_at and only POST entries that actually changed.
+  const [photoDateUpdates, setPhotoDateUpdates] = useState<
+    Record<string, string>
+  >({});
 
   // Developer portfolio state — the «Портфолио застройщика» section.
   // Lazy-initialised from the building's developer so the inputs show
@@ -223,6 +238,30 @@ export function EditBuildingForm({
       return toast.error('Укажите общее число квартир');
     }
 
+    // Build the per-photo date diff: only entries the founder actually
+    // changed from the saved value, and skipping any photo staged for
+    // removal (no point updating a row about to be deleted). Each entry
+    // becomes `{ id, taken_at }` where `taken_at` is a noon-UTC ISO
+    // (matches PhotoPicker's convention — avoids TZ-shift bugs) or null
+    // when the founder cleared the field.
+    const originalDateById = new Map(
+      existingProgressPhotos.map((p) => [p.id, p.taken_at ?? null]),
+    );
+    const photoDateUpdatesPayload = Object.entries(photoDateUpdates)
+      .filter(([id]) => !removePhotoIds.includes(id))
+      .map(([id, ymd]) => ({
+        id,
+        taken_at: ymd ? `${ymd}T12:00:00.000Z` : null,
+      }))
+      .filter(({ id, taken_at }) => {
+        const orig = originalDateById.get(id) ?? null;
+        // Compare as YYYY-MM-DD slices so a re-pick of the same date
+        // (which would change the ISO suffix) doesn't dirty the row.
+        const origYmd = orig ? orig.slice(0, 10) : null;
+        const nextYmd = taken_at ? taken_at.slice(0, 10) : null;
+        return origYmd !== nextYmd;
+      });
+
     setSubmitting(true);
     try {
       const res = await fetch(`/api/buildings/${initial.id}/update`, {
@@ -245,6 +284,7 @@ export function EditBuildingForm({
           // with per-photo `kind` (same approach the create flow uses).
           pendingPhotos: [...newExteriorPhotos, ...newProgressPhotos],
           removePhotoIds,
+          photoDateUpdates: photoDateUpdatesPayload,
         }),
       });
       const data = (await res.json()) as
@@ -578,24 +618,55 @@ export function EditBuildingForm({
               </h2>
               {visibleProgress.length > 0 ? (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {visibleProgress.map((p) => (
-                    <div key={p.id} className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={p.url}
-                        alt=""
-                        className="aspect-square w-full rounded-md object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => stageRemove(p.id)}
-                        aria-label="Удалить фото"
-                        className="absolute right-1 top-1 inline-flex size-6 items-center justify-center rounded-full bg-stone-900/70 text-white hover:bg-stone-900"
-                      >
-                        <X className="size-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                  {visibleProgress.map((p) => {
+                    // Display value: the founder's override if they
+                    // touched this row (including '' to clear), otherwise
+                    // the original taken_at trimmed to YYYY-MM-DD (what
+                    // <input type="date"> expects).
+                    const dateValue =
+                      p.id in photoDateUpdates
+                        ? photoDateUpdates[p.id]!
+                        : p.taken_at
+                          ? p.taken_at.slice(0, 10)
+                          : '';
+                    return (
+                      <div key={p.id} className="flex flex-col gap-1">
+                        <div className="relative">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={p.url}
+                            alt=""
+                            className="aspect-square w-full rounded-md object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => stageRemove(p.id)}
+                            aria-label="Удалить фото"
+                            className="absolute right-1 top-1 inline-flex size-6 items-center justify-center rounded-full bg-stone-900/70 text-white hover:bg-stone-900"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </div>
+                        {/* Per-photo date editor — native input, compact.
+                            Native picker is touch-friendly and we're
+                            founder-only here, so cross-browser styling
+                            quirks are acceptable. Clearing the field
+                            stores '' so the diff writes null on save. */}
+                        <input
+                          type="date"
+                          aria-label="Дата съёмки"
+                          value={dateValue}
+                          onChange={(e) =>
+                            setPhotoDateUpdates((prev) => ({
+                              ...prev,
+                              [p.id]: e.target.value,
+                            }))
+                          }
+                          className="w-full rounded-sm border border-stone-300 bg-white px-1.5 py-1 text-[11px] text-stone-700 tabular-nums focus:border-terracotta-500 focus:outline-none focus:ring-1 focus:ring-terracotta-500"
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               ) : null}
               <PhotoPicker

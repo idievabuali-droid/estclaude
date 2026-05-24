@@ -251,6 +251,26 @@ export async function attachAndSetCover(
 }
 
 /**
+ * Patches `taken_at` on existing photos. Used by the building edit
+ * form so the founder can fix or backfill a wrong/missing date on a
+ * progress photo without re-uploading. One UPDATE per row — fine at
+ * V1 scale (handful of edits per save). Per-row failures are swallowed
+ * so a single bad id doesn't sink the whole save; the caller logs the
+ * batch and reports a generic warning toast.
+ */
+export async function updatePhotoDates(
+  updates: { id: string; taken_at: string | null }[],
+): Promise<void> {
+  if (updates.length === 0) return;
+  const supabase = createAdminClient();
+  await Promise.all(
+    updates.map(({ id, taken_at }) =>
+      supabase.from('photos').update({ taken_at }).eq('id', id),
+    ),
+  );
+}
+
+/**
  * Deletes a set of photo rows by id. Also removes the underlying
  * objects from Storage so we don't accumulate orphan files. If the
  * deleted set includes the parent's cover_photo_id, the parent's

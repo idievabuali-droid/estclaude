@@ -67,7 +67,7 @@ export default async function EditBuildingPage({
       .order('display_order', { ascending: true }),
     supabase
       .from('photos')
-      .select('id, storage_path')
+      .select('id, storage_path, taken_at')
       .eq('building_id', id)
       .eq('kind', 'progress')
       .order('display_order', { ascending: true }),
@@ -98,8 +98,14 @@ export default async function EditBuildingPage({
     .map((p) => ({
       id: p.id as string,
       url: supabasePublicUrl(p.storage_path as string),
+      // ISO timestamp the photo was taken. Null for legacy rows uploaded
+      // before the `withDate` PhotoPicker mode shipped — the form shows
+      // an empty date input so the founder can backfill it.
+      taken_at: (p.taken_at as string | null) ?? null,
     }))
-    .filter((p): p is { id: string; url: string } => p.url != null);
+    .filter((p): p is { id: string; url: string; taken_at: string | null } =>
+      p.url != null,
+    );
 
   const districts = (districtRows ?? []).map((d) => ({
     id: d.id as string,

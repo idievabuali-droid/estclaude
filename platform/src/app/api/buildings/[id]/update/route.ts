@@ -18,6 +18,7 @@ import { updateBuilding } from '@/services/buildings';
 import {
   attachAndSetCover,
   deletePhotos,
+  updatePhotoDates,
   type PendingPhoto,
 } from '@/services/photos';
 import type { BuildingStatus } from '@/types/domain';
@@ -45,6 +46,10 @@ interface UpdateBody {
    *  parent's cover_photo_id is cleared first to avoid an FK violation
    *  (handled inside deletePhotos). */
   removePhotoIds?: string[];
+  /** Per-photo taken_at edits for existing progress photos. Only
+   *  changed rows arrive (the form diffs against the saved value).
+   *  `taken_at` is a full ISO at noon UTC, or null to clear. */
+  photoDateUpdates?: { id: string; taken_at: string | null }[];
 }
 
 export async function POST(
@@ -104,6 +109,15 @@ export async function POST(
         await deletePhotos(body.removePhotoIds);
       } catch (err) {
         console.error('deletePhotos failed (non-fatal):', err);
+      }
+    }
+    // Date edits run after delete (skip the doomed rows) and before
+    // attach (no point re-dating rows that don't exist yet).
+    if (body.photoDateUpdates && body.photoDateUpdates.length > 0) {
+      try {
+        await updatePhotoDates(body.photoDateUpdates);
+      } catch (err) {
+        console.error('updatePhotoDates failed (non-fatal):', err);
       }
     }
     if (body.pendingPhotos && body.pendingPhotos.length > 0) {
