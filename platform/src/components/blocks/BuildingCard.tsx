@@ -1,6 +1,6 @@
 'use client';
 
-import { MapPin, Building, ArrowUpRight } from 'lucide-react';
+import { MapPin, Building, ArrowUpRight, ChevronRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
@@ -60,7 +60,13 @@ export function BuildingCard({
   building,
   developer,
   district,
-  matchingUnits = [],
+  // `matchingUnits` was rendered as an inline 3-row unit table inside
+  // the card; replaced by a single count line driven by
+  // `activeListingsCount` (universal mobile pattern: list cards
+  // summarise, the detail page carries the unit table). Prop kept on
+  // the interface so the 4 callers (home / novostroyki / izbrannoe /
+  // diaspora) don't break — accepted-and-ignored. Removable in a
+  // follow-up cleanup commit.
   activeListingsCount,
   currency,
   rates,
@@ -269,55 +275,30 @@ export function BuildingCard({
           )}
         </div>
 
-        {/* Available units preview. Header shows the total count
-            ("Доступные квартиры · 8") so buyers can see project size
-            at a glance. Up to 3 unit previews follow. If more exist,
-            "+ ещё N" hints there's more inside (the parent card link
-            already takes them to the building detail). */}
-        {matchingUnits.length > 0 ? (
-          <div className="flex flex-col gap-2 border-t border-stone-200 pt-3">
-            <span className="text-caption font-medium text-stone-500">
-              Доступные квартиры
-              {activeListingsCount != null ? (
-                <span className="tabular-nums"> · {activeListingsCount}</span>
-              ) : null}
+        {/* Available-units summary. Replaces a 3-row inline unit list +
+            "+ ещё N" link that ate ~140px per card on mobile — across
+            12 buildings on /novostroyki that's ~2 mobile screens of
+            duplicated content (the full unit list lives on /zhk/[slug]
+            which the parent card-link already targets). Universal
+            mobile pattern: Cian / Avito / Bayut / Yandex Недвижимость
+            list cards show a count summary; the unit detail lives on
+            the project page. The trailing ChevronRight reads as an
+            inline tap affordance even though the whole card is
+            tappable — buyers register the "→" as "there's more here."
+            Hidden when count is 0 or undefined (an unsold-out project
+            with no active listings shouldn't show "0 квартир"). */}
+        {activeListingsCount != null && activeListingsCount > 0 ? (
+          <div className="flex items-center justify-between gap-2 border-t border-stone-200 pt-3 text-meta font-medium text-stone-700">
+            <span className="tabular-nums">
+              {activeListingsCount}{' '}
+              {pluralRu(activeListingsCount, [
+                'квартира',
+                'квартиры',
+                'квартир',
+              ])}{' '}
+              в продаже
             </span>
-            {matchingUnits.slice(0, 3).map((u) => (
-              <div
-                key={u.id}
-                className="flex items-center justify-between gap-3 text-meta text-stone-700 tabular-nums"
-              >
-                <span>
-                  {u.rooms_count}-комн · {u.size_m2} м² · {u.floor_number} эт
-                </span>
-                <span className="flex flex-wrap items-baseline justify-end gap-x-1.5 font-semibold text-stone-900">
-                  {formatPriceNumber(u.price_total_dirams)} TJS
-                  {/* Currency conversion mirrors the headline price
-                      treatment: when the buyer chose £ / $ / € on
-                      /diaspora, each inline-unit row also shows the
-                      ≈ conversion so diaspora buyers don't have to
-                      mentally translate per-row. Only renders when
-                      showConversion is true (= /diaspora's
-                      currency cookie is set + non-TJS chosen). */}
-                  {showConversion ? (
-                    <PriceConversion
-                      priceDirams={u.price_total_dirams}
-                      target={currency}
-                      rates={rates}
-                    />
-                  ) : null}
-                </span>
-              </div>
-            ))}
-            {activeListingsCount != null && activeListingsCount > matchingUnits.slice(0, 3).length ? (
-              <span className="inline-flex items-center gap-1 text-caption font-medium text-terracotta-700">
-                + ещё {activeListingsCount - matchingUnits.slice(0, 3).length}{' '}
-                {pluralRu(
-                  activeListingsCount - matchingUnits.slice(0, 3).length,
-                  ['квартира', 'квартиры', 'квартир'],
-                )}
-              </span>
-            ) : null}
+            <ChevronRight className="size-4 text-stone-400" aria-hidden />
           </div>
         ) : null}
 
