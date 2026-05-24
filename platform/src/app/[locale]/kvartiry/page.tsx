@@ -241,7 +241,13 @@ export default async function KvartiryPage({
           treatment), content (above-grid header + grid) on the
           right. Mobile collapses to chip bar above grid. */}
       <AppContainer>
-        <div className="flex flex-col gap-6 py-6 md:flex-row md:gap-7 md:py-8">
+        {/* `pt-0` on mobile: when the page-header section above is
+            hidden (unscoped mobile case, the common path), the old
+            `py-6` left a 24px orphan gap between SiteHeader and the
+            sticky chip bar at scroll 0. Killing top padding lets
+            the chip bar sit flush from first paint. Desktop keeps
+            `md:py-8`. */}
+        <div className="flex flex-col gap-6 pb-6 md:flex-row md:gap-7 md:py-8">
           <div className="md:sticky md:top-20 md:self-start">
             <KvartiryFilterRail current={sp} basePath={resetHref} />
           </div>

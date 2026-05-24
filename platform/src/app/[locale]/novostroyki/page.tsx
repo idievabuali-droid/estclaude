@@ -331,7 +331,15 @@ export default async function NovostroykiPage({
           column with the existing chip bar pattern at the top of
           the content area. */}
       <AppContainer>
-        <div className="flex flex-col gap-6 py-6 md:flex-row md:gap-7 md:py-8">
+        {/* `pt-0` on mobile: when the page-header section above is
+            hidden (unscoped mobile case, the common path), the
+            wrapper's old `py-6` left a 24px orphan gap between the
+            SiteHeader and the sticky chip bar at scroll 0. Killing
+            the top padding lets the chip bar sit flush from first
+            paint. Desktop keeps `md:py-8` because the page-header
+            section always renders there and the breathing room is
+            earned. */}
+        <div className="flex flex-col gap-6 pb-6 md:flex-row md:gap-7 md:py-8">
           {/* DESKTOP RAIL — hidden <md, shows the new eyebrow-grouped
               filter UI. Sticky so it follows the buyer down the
               grid rather than scrolling off-screen. */}
