@@ -636,14 +636,25 @@ export default async function ListingDetailPage({
                         </span>
                       ) : null}
                     </div>
-                    <Link
-                      href={`/kvartiry?building=${building.slug}`}
-                      className="mt-1 inline-flex w-fit items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
-                    >
-                      В продаже сейчас
-                      {buildingUnitCount != null ? ` (${buildingUnitCount})` : ''}
-                      <ArrowUpRight className="size-3.5" aria-hidden />
-                    </Link>
+                    {/* «В продаже сейчас (N) ↗» — only when there's
+                        more than ONE listing in the building, otherwise
+                        the link is self-referential (count=1 means this
+                        very apartment is the single active listing and
+                        tapping lands the buyer on a /kvartiry page with
+                        the same single card). Hidden when count = 0/1.
+                        Null count (unknown) still renders the link — we
+                        prefer surfacing the path on missing-count over
+                        silently dropping it. */}
+                    {buildingUnitCount == null || buildingUnitCount > 1 ? (
+                      <Link
+                        href={`/kvartiry?building=${building.slug}`}
+                        className="mt-1 inline-flex w-fit items-center gap-1 text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+                      >
+                        В продаже сейчас
+                        {buildingUnitCount != null ? ` (${buildingUnitCount})` : ''}
+                        <ArrowUpRight className="size-3.5" aria-hidden />
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
               </AppCardContent>
