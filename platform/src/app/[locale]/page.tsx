@@ -8,11 +8,6 @@ import {
   type FeaturedListingsRowItem,
 } from '@/components/blocks';
 import { HeroChipRow } from './HeroChipRow';
-import {
-  IllustrationBuilding,
-  IllustrationCamera,
-  IllustrationCompass,
-} from '@/components/illustrations';
 import { Link } from '@/i18n/navigation';
 import {
   listFeaturedBuildings,
@@ -30,11 +25,11 @@ import { getDistrictBenchmarks } from '@/services/benchmarks';
  * Section order (top to bottom):
  *   1. Hero — pill + serif H1 with italic accent + subhead + HeroChipRow
  *      (segmented type tabs + 3 base chips + Ещё фильтры expander +
- *      live-count Показать CTA)
- *   2. Trust block — "Почему Vafo.tj" eyebrow + H2 statement + 3 icon
- *      cards (verified visits / real photos / chip-filter promise)
- *   3. Featured ЖК — 3 BuildingCards (curated by featured_rank)
- *   4. Featured apartments — 3 ListingCards (trust-tier cascade) via
+ *      live-count Показать CTA) + 3 browse pills (only above-fold paths
+ *      to /kvartiry, /novostroyki, /diaspora on mobile — header nav is
+ *      hidden below 768px so these pills are the discovery layer)
+ *   2. Featured ЖК — 3 BuildingCards (curated by featured_rank)
+ *   3. Featured apartments — 3 ListingCards (trust-tier cascade) via
  *      shared <FeaturedListingsRow> (single source of truth between
  *      home and /diaspora). Mirrors Cian / Avito / Bayut, where the
  *      home stacks projects above units. Ordering note: ЖК are curated
@@ -42,8 +37,17 @@ import { getDistrictBenchmarks } from '@/services/benchmarks';
  *      trust-tier (verified-developer first → tier-3 → recency) — the
  *      mental-model divergence is intentional for V1 (see service
  *      doc-comments in `services/buildings.ts` + `services/listings.ts`).
- *   5. Retention — one-tap Vahdat-wide Telegram subscribe
- *   6. Diaspora dark band — service framing for overseas buyers
+ *   4. Retention — one-tap Vahdat-wide Telegram subscribe
+ *   5. Diaspora dark band — service framing for overseas buyers
+ *
+ * Cut 2026-05-24 (mobile-first audit): the «Почему Vafo.tj» trust-
+ * columns section between hero and Featured. Three cards restated the
+ * hero pill + subline + a hollow «найдёте за минуты» claim; on mobile
+ * they stacked vertically into ~1 full screen of redundant scroll
+ * before the first real building card. Trust is asserted once in the
+ * hero pill, then earned via real photos on the actual cards — the
+ * pattern Cian / Avito / Bayut / Yandex Недвижимость mobile homes
+ * all use.
  *
  * Editorial-luxury typography pattern: Lora serif (regular + italic)
  * for H1 + the accent clause "проверенные вручную"; Inter sans for
@@ -215,43 +219,6 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </AppContainer>
       </section>
 
-      {/* ─── TRUST BLOCK — "Почему Vafo.tj" ─────────────────────────
-          First-class section between hero and Featured. Eyebrow label
-          + H2 statement + 3 icon cards. Replaces the prior in-hero
-          USP cards — better placement, single-job heading, breathable. */}
-      <section className="border-b border-stone-200 bg-white py-16 md:py-24">
-        <AppContainer className="flex flex-col gap-6 md:gap-8">
-          <div className="flex flex-col items-center gap-2 text-center">
-            <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
-              Почему Vafo.tj
-            </span>
-            <h2
-              className="text-h2 font-semibold leading-[var(--leading-h2)] text-stone-900 md:text-h1"
-              style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
-            >
-              Покупка — это серьёзно. Мы относимся так же.
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-5">
-            <TrustCard
-              Illustration={IllustrationBuilding}
-              title="Каждый ЖК посетили"
-              body="Команда выезжает на стройку лично."
-            />
-            <TrustCard
-              Illustration={IllustrationCamera}
-              title="Свежие фото со стройки"
-              body="Обновляем ежемесячно."
-            />
-            <TrustCard
-              Illustration={IllustrationCompass}
-              title="Найдёте за минуты"
-              body="Фильтры рядом — комнаты, цена, район."
-            />
-          </div>
-        </AppContainer>
-      </section>
-
       {/* ─── FEATURED ЖК ──────────────────────────────────────────
           Curated by founder via featured_rank. Card redesign per
           mockup deferred — shared BuildingCard touches /izbrannoe +
@@ -376,36 +343,3 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   );
 }
 
-/**
- * Trust block card — custom monoline illustration anchor + serif H3
- * title + body. The illustration sits large at the top (size-14)
- * rendered in terracotta-700 line, no tile background — Linear /
- * Stripe / Notion pattern where the illustration IS the visual
- * anchor, not contained inside a tile.
- */
-function TrustCard({
-  Illustration,
-  title,
-  body,
-}: {
-  Illustration: React.ComponentType<{ className?: string }>;
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="flex flex-col gap-4 rounded-md border border-stone-200 bg-white p-6">
-      <span className="text-terracotta-700">
-        <Illustration className="size-14" />
-      </span>
-      <div className="flex flex-col gap-1">
-        <p
-          className="text-h3 font-semibold text-stone-900"
-          style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
-        >
-          {title}
-        </p>
-        <p className="text-meta text-stone-600">{body}</p>
-      </div>
-    </div>
-  );
-}
