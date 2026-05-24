@@ -18,6 +18,7 @@ import { NewDeveloperModal } from './NewDeveloperModal';
 import { NewDistrictModal } from './NewDistrictModal';
 import { NumberField } from './NumberField';
 import { LocationSection } from './LocationSection';
+import { HandoverQuarterPicker } from './HandoverQuarterPicker';
 import {
   saveDraft,
   loadDraft,
@@ -1017,13 +1018,11 @@ export function PostFlow({
                   required
                   options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
                 />
-                <AppInput
-                  label="Срок сдачи (например 2026-Q3)"
+                <HandoverQuarterPicker
                   value={b.handover_quarter}
-                  onChange={(e) =>
-                    setB((s) => ({ ...s, handover_quarter: e.target.value }))
+                  onChange={(v) =>
+                    setB((s) => ({ ...s, handover_quarter: v }))
                   }
-                  placeholder="2026-Q3"
                 />
                 <div data-field-key="b.total_floors">
                   <NumberField

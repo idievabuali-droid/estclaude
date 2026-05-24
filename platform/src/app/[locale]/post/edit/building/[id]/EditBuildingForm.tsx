@@ -15,6 +15,7 @@ import { toast } from '@/components/primitives/AppToast';
 import { PhotoPicker, type PendingPhoto } from '../../../PhotoPicker';
 import { NumberField } from '../../../NumberField';
 import { LocationSection } from '../../../LocationSection';
+import { HandoverQuarterPicker } from '../../../HandoverQuarterPicker';
 import { NewDeveloperModal, type NewDeveloperResult } from '../../../NewDeveloperModal';
 import { NewDistrictModal, type NewDistrictResult } from '../../../NewDistrictModal';
 
@@ -382,11 +383,9 @@ export function EditBuildingForm({
                 required
                 options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
               />
-              <AppInput
-                label="Срок сдачи (например 2026-Q3)"
+              <HandoverQuarterPicker
                 value={handoverQuarter}
-                onChange={(e) => setHandoverQuarter(e.target.value)}
-                placeholder="2026-Q3"
+                onChange={setHandoverQuarter}
               />
               <NumberField
                 label="Этажей в доме"
