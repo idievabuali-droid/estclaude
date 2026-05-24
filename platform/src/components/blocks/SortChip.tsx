@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { ArrowUpDown } from 'lucide-react';
 import { FilterChipSheet } from './FilterChipSheet';
 
 export type SortMode = 'recommended' | 'cheapest' | 'expensive' | 'newest';
@@ -10,6 +11,10 @@ export interface SortChipProps {
   /** Full current URL params; spread into the new query so the sort
    *  change preserves every other active filter. */
   current: Record<string, string | string[] | undefined>;
+  /** When true, renders as a square icon-only trigger (ArrowUpDown).
+   *  Used by the mobile sticky chip-row so Сортировка doesn't crowd
+   *  the scrollable filter chips. The sheet itself is identical. */
+  compact?: boolean;
 }
 
 const OPTIONS: Array<{ value: SortMode; label: string; summary: string }> = [
@@ -27,7 +32,7 @@ const OPTIONS: Array<{ value: SortMode; label: string; summary: string }> = [
  *
  * Sets `?sort=…` in the URL (cleared when 'recommended' = default).
  */
-export function SortChip({ pagePath, current }: SortChipProps) {
+export function SortChip({ pagePath, current, compact = false }: SortChipProps) {
   const router = useRouter();
   const active = (current.sort as SortMode | undefined) ?? 'recommended';
   const activeOption = OPTIONS.find((o) => o.value === active);
@@ -54,6 +59,8 @@ export function SortChip({ pagePath, current }: SortChipProps) {
       onApply={() => {}}
       onReset={() => {}}
       onClear={() => pick('recommended')}
+      iconOnly={compact}
+      icon={compact ? <ArrowUpDown className="size-4" /> : undefined}
     >
       <div className="flex flex-col gap-1">
         {OPTIONS.map((o) => {

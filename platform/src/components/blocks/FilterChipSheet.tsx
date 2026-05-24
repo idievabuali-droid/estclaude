@@ -47,6 +47,16 @@ export interface FilterChipSheetProps {
    * page chips (each navigation already fires search_run).
    */
   onOpen?: () => void;
+  /**
+   * When true, renders a square 36×36 icon-only trigger instead of the
+   * usual label/value chip pill. The sheet itself is unchanged. Used by
+   * the mobile sticky chip-row's Sort control so it doesn't crowd the
+   * scrollable filter chips. Requires `icon`; `label` becomes the
+   * aria-label.
+   */
+  iconOnly?: boolean;
+  /** Icon node rendered when `iconOnly` is true. Required in that mode. */
+  icon?: ReactNode;
 }
 
 /**
@@ -75,6 +85,8 @@ export function FilterChipSheet({
   onClear,
   hasPending = false,
   onOpen,
+  iconOnly = false,
+  icon,
 }: FilterChipSheetProps) {
   const [open, setOpen] = useState(false);
   const isActive = valueSummary != null && valueSummary.length > 0;
@@ -93,42 +105,64 @@ export function FilterChipSheet({
     onReset();
   }
 
+  // Trigger — square icon button in iconOnly mode, label/value chip in
+  // the default mode. Both open the same bottom sheet below.
+  const trigger = iconOnly ? (
+    <button
+      type="button"
+      onClick={handleOpen}
+      aria-expanded={open}
+      aria-haspopup="dialog"
+      aria-label={label}
+      className={
+        'inline-flex size-9 shrink-0 items-center justify-center rounded-sm border transition-colors ' +
+        (isActive
+          ? 'border-terracotta-600 bg-terracotta-50 text-terracotta-800 hover:bg-terracotta-100'
+          : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-100')
+      }
+    >
+      {icon}
+    </button>
+  ) : (
+    <button
+      type="button"
+      onClick={handleOpen}
+      aria-expanded={open}
+      aria-haspopup="dialog"
+      className={
+        'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-sm border px-3 text-meta font-medium transition-colors ' +
+        (isActive
+          ? 'border-terracotta-600 bg-terracotta-50 text-terracotta-800 hover:bg-terracotta-100'
+          : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-100')
+      }
+    >
+      <span className="whitespace-nowrap tabular-nums">
+        {isActive ? valueSummary : label}
+      </span>
+      {isActive ? (
+        <span
+          role="button"
+          aria-label={`Сбросить фильтр: ${label}`}
+          onClick={(e) => {
+            // Inline X clears + navigates atomically. Stop propagation
+            // so the parent button's click handler (which opens the
+            // sheet) doesn't also fire.
+            e.stopPropagation();
+            onClear();
+          }}
+          className="-mr-1 inline-flex size-4 items-center justify-center rounded-full text-terracotta-700 hover:bg-terracotta-200"
+        >
+          <X className="size-3" />
+        </span>
+      ) : (
+        <ChevronDown className="size-3.5 opacity-60" />
+      )}
+    </button>
+  );
+
   return (
     <>
-      <button
-        type="button"
-        onClick={handleOpen}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        className={
-          'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-sm border px-3 text-meta font-medium transition-colors ' +
-          (isActive
-            ? 'border-terracotta-600 bg-terracotta-50 text-terracotta-800 hover:bg-terracotta-100'
-            : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-100')
-        }
-      >
-        <span className="whitespace-nowrap tabular-nums">
-          {isActive ? valueSummary : label}
-        </span>
-        {isActive ? (
-          <span
-            role="button"
-            aria-label={`Сбросить фильтр: ${label}`}
-            onClick={(e) => {
-              // Inline X clears + navigates atomically. Stop propagation
-              // so the parent button's click handler (which opens the
-              // sheet) doesn't also fire.
-              e.stopPropagation();
-              onClear();
-            }}
-            className="-mr-1 inline-flex size-4 items-center justify-center rounded-full text-terracotta-700 hover:bg-terracotta-200"
-          >
-            <X className="size-3" />
-          </span>
-        ) : (
-          <ChevronDown className="size-3.5 opacity-60" />
-        )}
-      </button>
+      {trigger}
 
       <AppBottomSheet open={open} onClose={() => setOpen(false)} title={sheetTitle ?? label}>
         <div className="flex flex-col gap-5">

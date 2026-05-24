@@ -387,13 +387,13 @@ export default async function NovostroykiPage({
                   />
                 </div>
                 <div className="flex shrink-0 items-center gap-1 border-l border-stone-200 py-2 pl-2 pr-3">
-                  <SortChip pagePath="/novostroyki" current={sp} />
+                  <SortChip pagePath="/novostroyki" current={sp} compact />
                   <Link
                     href={`/novostroyki${buildQuery({
                       ...sp,
                       view: isMap ? undefined : 'karta',
                     })}`}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-md border border-stone-300 bg-white px-2.5 text-meta font-medium text-stone-900 hover:bg-stone-100"
+                    className="inline-flex size-9 items-center justify-center rounded-sm border border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
                     aria-label={isMap ? 'Показать списком' : 'Показать на карте'}
                   >
                     {isMap ? (
