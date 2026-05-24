@@ -65,6 +65,10 @@ export interface DeveloperOption {
   projects_announced_count?: number | null;
   projects_under_construction_count?: number | null;
   projects_near_completion_count?: number | null;
+  /** Russian short company description — pre-fills the «Краткое
+   *  описание застройщика» textarea below the portfolio numbers.
+   *  Editable from this form (PATCH via the portfolio endpoint). */
+  description_ru?: string | null;
 }
 
 const STATUS_OPTIONS = [
@@ -180,6 +184,14 @@ export function EditBuildingForm({
       initialDevelopers.find((d) => d.id === initial.developer_id),
     ),
   );
+  // Selected developer's «Краткое описание» — pre-fill from the
+  // developer's stored description, re-sync synchronously on developer
+  // change (same pattern as portfolio above). Named `developerDescription`
+  // to disambiguate from the building's own `description` above.
+  const [developerDescription, setDeveloperDescription] = useState<string>(() =>
+    initialDevelopers.find((d) => d.id === initial.developer_id)
+      ?.description_ru ?? '',
+  );
 
   const visibleExterior = existingExteriorPhotos.filter(
     (p) => !removePhotoIds.includes(p.id),
@@ -262,7 +274,7 @@ export function EditBuildingForm({
           // state so an untouched field doesn't PATCH a spurious null.
           return nextNum === (current ?? null) ? undefined : nextNum;
         };
-        const portfolioPatch: Record<string, number | null> = {};
+        const portfolioPatch: Record<string, number | string | null> = {};
         const fy = diffNum(currentDev.years_active, portfolio.years_active);
         if (fy !== undefined) portfolioPatch.years_active = fy;
         const fc = diffNum(
@@ -287,6 +299,14 @@ export function EditBuildingForm({
           portfolio.projects_near_completion,
         );
         if (fn !== undefined) portfolioPatch.projects_near_completion_count = fn;
+        // Description — diff against the developer's stored value;
+        // empty string treated as null so an unset description doesn't
+        // round-trip as "" and dirty the JSONB.
+        const descCur = currentDev.description_ru ?? null;
+        const descNext = developerDescription.trim() || null;
+        if (descCur !== descNext) {
+          portfolioPatch.description = descNext;
+        }
         if (Object.keys(portfolioPatch).length > 0) {
           try {
             const pRes = await fetch(
@@ -366,6 +386,10 @@ export function EditBuildingForm({
                     portfolioFromDev(
                       developers.find((d) => d.id === e.target.value),
                     ),
+                  );
+                  setDeveloperDescription(
+                    developers.find((d) => d.id === e.target.value)
+                      ?.description_ru ?? '',
                   );
                 }}
                 required
@@ -453,6 +477,13 @@ export function EditBuildingForm({
                 Опыт и проекты выбранного застройщика. Появится в карточке «О застройщике» на странице ЖК. Можно оставить пустым.
               </p>
             </div>
+            <AppTextarea
+              label="Краткое описание застройщика"
+              value={developerDescription}
+              onChange={(e) => setDeveloperDescription(e.target.value)}
+              rows={3}
+              placeholder="Молодая компания, фокус на качестве отделки и сдаче в срок."
+            />
             {/* key={developerId} remounts all five NumberFields when
                 the developer changes, so each picks up the fresh
                 portfolio value at mount (NumberField seeds its draft
@@ -606,6 +637,10 @@ export function EditBuildingForm({
           // the section so it doesn't show the previous developer's
           // numbers.
           setPortfolio(portfolioFromDev(undefined));
+          // Description shows empty for the new dev. The modal-captured
+          // description is already in DB; the diff in handleSubmit sees
+          // null === null and won't patch (so it isn't clobbered).
+          setDeveloperDescription('');
         }}
       />
       <NewDistrictModal

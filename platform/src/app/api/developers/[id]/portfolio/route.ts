@@ -27,6 +27,10 @@ interface UpdatePortfolioBody {
   projects_announced_count?: number | null;
   projects_under_construction_count?: number | null;
   projects_near_completion_count?: number | null;
+  /** Updates developers.description JSONB — the Russian short company
+   *  description shown on the «О застройщике» card. Pass empty string
+   *  or null to clear. The endpoint wraps to { ru, tj:null }. */
+  description?: string | null;
 }
 
 const COLUMNS = [
@@ -57,7 +61,8 @@ export async function POST(
   // Build patch — accept null (clear) and non-negative integers; reject
   // garbage. Skip any column the caller didn't explicitly set so we
   // don't accidentally clear values they don't know about.
-  const patch: Record<string, number | null> = {};
+  type PatchValue = number | null | { ru: string; tj: string | null };
+  const patch: Record<string, PatchValue> = {};
   for (const col of COLUMNS) {
     if (!(col in body)) continue;
     const v = body[col];
@@ -72,6 +77,21 @@ export async function POST(
       );
     }
     patch[col] = v;
+  }
+
+  // Description — JSONB column. Empty string clears (writes null) so
+  // the founder can wipe a description without leaving an orphan
+  // empty-string row.
+  if ('description' in body) {
+    const d = body.description;
+    if (d !== null && typeof d !== 'string') {
+      return NextResponse.json(
+        { error: 'description must be string or null' },
+        { status: 400 },
+      );
+    }
+    const trimmed = typeof d === 'string' ? d.trim() : null;
+    patch.description = trimmed ? { ru: trimmed, tj: null } : null;
   }
 
   if (Object.keys(patch).length === 0) {
