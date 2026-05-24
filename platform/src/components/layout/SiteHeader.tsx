@@ -2,6 +2,7 @@ import { getTranslations } from 'next-intl/server';
 import { AppContainer } from '@/components/primitives';
 import { Link } from '@/i18n/navigation';
 import { getCurrentUser } from '@/lib/auth/session';
+import { ScrollDirectionTracker } from './ScrollDirectionTracker';
 
 /**
  * Global header. Server component so it can read the auth state and
@@ -19,7 +20,17 @@ export async function SiteHeader() {
   const user = await getCurrentUser();
 
   return (
-    <header className="sticky top-0 z-30 border-b border-stone-200 bg-white">
+    <header
+      // Hide-on-scroll-down on mobile via `--site-header-y` CSS variable
+      // written by <ScrollDirectionTracker /> below. Desktop unconditionally
+      // shows (md:translate-y-0 overrides the variable). Smooth 200ms slide.
+      // The chip-row sticky tops on /novostroyki + /kvartiry consume the same
+      // variable so they slide together — no gap above the chip bar when
+      // the header is hidden. (Cian / Avito / Yandex Недвижимость pattern.)
+      style={{ transform: 'translateY(var(--site-header-y, 0px))' }}
+      className="sticky top-0 z-30 border-b border-stone-200 bg-white transition-transform duration-200 md:!transform-none"
+    >
+      <ScrollDirectionTracker />
       <AppContainer className="flex h-14 items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2 font-semibold text-terracotta-600">
           {/* Wordmark in Source Serif 4 — visual cohesion with home H1.

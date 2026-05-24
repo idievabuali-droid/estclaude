@@ -344,7 +344,14 @@ export default async function NovostroykiPage({
                 to do it." z-20 < SiteHeader's z-30 so the header still
                 overlaps if any visual collision; bg-white + border-b
                 so the cards underneath don't bleed through. */}
-            <div className="sticky top-14 z-20 -mx-4 border-b border-stone-200 bg-white md:hidden">
+            <div
+              // `top` follows the SiteHeader's hide-on-scroll offset
+              // (see ScrollDirectionTracker). When the header slides
+              // up to -56px, this bar slides up too — no gap appears
+              // between viewport top and the chip row.
+              style={{ top: 'calc(3.5rem + var(--site-header-y, 0px))' }}
+              className="sticky z-20 -mx-4 border-b border-stone-200 bg-white transition-[top] duration-200 md:hidden"
+            >
               {/* Two-band layout: scrollable chip row on the left, pinned
                   Sort + Map cluster on the right. The pinned cluster
                   stays inside the sticky region so a buyer 16 screens

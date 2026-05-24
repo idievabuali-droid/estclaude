@@ -239,7 +239,13 @@ export default async function KvartiryPage({
                 2026-05-11: "the filters should stick on top." z-20 <
                 SiteHeader's z-30; bg-white + border-b so cards
                 underneath don't bleed through. */}
-            <div className="sticky top-14 z-20 -mx-4 border-b border-stone-200 bg-white md:hidden">
+            <div
+              // `top` coordinates with the SiteHeader's hide-on-scroll
+              // offset (see ScrollDirectionTracker). Slides up with the
+              // header so no gap appears above the chip row.
+              style={{ top: 'calc(3.5rem + var(--site-header-y, 0px))' }}
+              className="sticky z-20 -mx-4 border-b border-stone-200 bg-white transition-[top] duration-200 md:hidden"
+            >
               <div className="flex items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <MultiSelectChip
                   label="Комнат"
