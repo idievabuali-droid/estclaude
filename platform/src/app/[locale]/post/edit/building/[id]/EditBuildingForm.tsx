@@ -388,24 +388,17 @@ export function EditBuildingForm({
                 onChange={(e) => setHandoverQuarter(e.target.value)}
                 placeholder="2026-Q3"
               />
-              <AppInput
+              <NumberField
                 label="Этажей в доме"
-                inputMode="numeric"
-                value={totalFloors === '' ? '' : String(totalFloors)}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/\D/g, '');
-                  setTotalFloors(v ? parseInt(v, 10) : '');
-                }}
+                value={totalFloors}
+                onChange={setTotalFloors}
                 required
               />
-              <AppInput
-                label="Всего квартир"
-                inputMode="numeric"
-                value={totalUnits === '' ? '' : String(totalUnits)}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/\D/g, '');
-                  setTotalUnits(v ? parseInt(v, 10) : '');
-                }}
+              <NumberField
+                label="Квартир всего в ЖК"
+                helperText="Сколько квартир всего в доме — не путать с числом активных объявлений."
+                value={totalUnits}
+                onChange={setTotalUnits}
                 required
               />
             </div>

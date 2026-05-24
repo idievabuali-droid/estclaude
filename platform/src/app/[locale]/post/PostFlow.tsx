@@ -1039,7 +1039,8 @@ export function PostFlow({
                 </div>
                 <div data-field-key="b.total_units">
                   <NumberField
-                    label="Всего квартир"
+                    label="Квартир всего в ЖК"
+                    helperText="Сколько квартир всего в доме — не путать с числом активных объявлений."
                     value={b.total_units}
                     onChange={(v) => {
                       setB((s) => ({ ...s, total_units: v }));
