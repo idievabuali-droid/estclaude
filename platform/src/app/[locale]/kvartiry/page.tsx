@@ -246,22 +246,31 @@ export default async function KvartiryPage({
               style={{ top: 'calc(3.5rem + var(--site-header-y, 0px))' }}
               className="sticky z-20 -mx-4 border-b border-stone-200 bg-white transition-[top] duration-200 md:hidden"
             >
-              <div className="flex items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <MultiSelectChip
-                  label="Комнат"
-                  paramKey="rooms"
-                  options={ROOM_FILTERS.map((r) => ({ value: r, label: r }))}
-                  current={sp}
-                />
-                <PriceChip current={sp} />
-                <MonthlyChip current={sp} />
-                <SizeChip current={sp} />
-                <FloorChip current={sp} />
-                <MultiSelectChip
-                  label="Отделка"
-                  paramKey="finishing"
-                  options={FINISHING_FILTERS}
-                  current={sp}
+              {/* `relative` so a 32px right-edge fade can hint that
+                  more filter chips live behind horizontal scroll —
+                  Cian pattern. */}
+              <div className="relative">
+                <div className="flex items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <MultiSelectChip
+                    label="Комнат"
+                    paramKey="rooms"
+                    options={ROOM_FILTERS.map((r) => ({ value: r, label: r }))}
+                    current={sp}
+                  />
+                  <PriceChip current={sp} />
+                  <MonthlyChip current={sp} />
+                  <SizeChip current={sp} />
+                  <FloorChip current={sp} />
+                  <MultiSelectChip
+                    label="Отделка"
+                    paramKey="finishing"
+                    options={FINISHING_FILTERS}
+                    current={sp}
+                  />
+                </div>
+                <div
+                  className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent"
+                  aria-hidden
                 />
               </div>
             </div>

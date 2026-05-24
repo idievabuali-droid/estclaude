@@ -358,55 +358,76 @@ export default async function NovostroykiPage({
                   deep can re-sort or flip to map view in one tap —
                   Cian / Avito / Yandex Realty mobile pattern. */}
               <div className="flex items-center">
-                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <MultiSelectChip
-                    label="Комнат"
-                    paramKey="rooms"
-                    options={ROOM_FILTERS_MOBILE}
-                    current={sp}
-                  />
-                  <SizeChip current={sp} />
-                  <FloorChip current={sp} />
-                  <PriceChip current={sp} />
-                  <MultiSelectChip
-                    label="Что рядом"
-                    paramKey="nearby"
-                    options={NEARBY_FILTERS}
-                    current={sp}
-                  />
-                  <MultiSelectChip
-                    label="Стадия"
-                    paramKey="status"
-                    options={STATUS_FILTERS}
-                    current={sp}
-                  />
-                  <MultiSelectChip
-                    label="Сдача"
-                    paramKey="handover"
-                    options={HANDOVER_FILTERS}
-                    current={sp}
-                  />
-                  <MultiSelectChip
-                    label="Удобства"
-                    paramKey="amenities"
-                    options={AMENITIES_FILTERS}
-                    current={sp}
+                {/* Chip-scroll-area wrapped in a relative container so
+                    a 32px right-edge fade can hint that more filter
+                    chips live behind horizontal scroll — the Cian
+                    pattern. Without it, the chips read as a finite
+                    list and Цена / Что рядом / Стадия / Сдача /
+                    Удобства were invisible to a buyer who didn't try
+                    swiping. */}
+                <div className="relative flex min-w-0 flex-1 items-center">
+                  <div className="flex w-full items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <MultiSelectChip
+                      label="Комнат"
+                      paramKey="rooms"
+                      options={ROOM_FILTERS_MOBILE}
+                      current={sp}
+                    />
+                    <SizeChip current={sp} />
+                    <FloorChip current={sp} />
+                    <PriceChip current={sp} />
+                    <MultiSelectChip
+                      label="Что рядом"
+                      paramKey="nearby"
+                      options={NEARBY_FILTERS}
+                      current={sp}
+                    />
+                    <MultiSelectChip
+                      label="Стадия"
+                      paramKey="status"
+                      options={STATUS_FILTERS}
+                      current={sp}
+                    />
+                    <MultiSelectChip
+                      label="Сдача"
+                      paramKey="handover"
+                      options={HANDOVER_FILTERS}
+                      current={sp}
+                    />
+                    <MultiSelectChip
+                      label="Удобства"
+                      paramKey="amenities"
+                      options={AMENITIES_FILTERS}
+                      current={sp}
+                    />
+                  </div>
+                  <div
+                    className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent"
+                    aria-hidden
                   />
                 </div>
                 <div className="flex shrink-0 items-center gap-1 border-l border-stone-200 py-2 pl-2 pr-3">
+                  {/* Sort = icon-only (config action, compact). Map =
+                      labelled (lens-switch action, deserves discoverability).
+                      The pair was two indistinguishable icon-buttons in
+                      the previous iteration — confusable on mobile and
+                      hiding the bigger of the two actions. */}
                   <SortChip pagePath="/novostroyki" current={sp} compact />
                   <Link
                     href={`/novostroyki${buildQuery({
                       ...sp,
                       view: isMap ? undefined : 'karta',
                     })}`}
-                    className="inline-flex size-9 items-center justify-center rounded-sm border border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
-                    aria-label={isMap ? 'Показать списком' : 'Показать на карте'}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-sm border border-stone-300 bg-white px-2.5 text-meta font-medium text-stone-700 hover:bg-stone-100"
                   >
                     {isMap ? (
-                      <List className="size-4" />
+                      <>
+                        <List className="size-4" /> Список
+                      </>
                     ) : (
-                      <MapIcon className="size-4" />
+                      <>
+                        <MapIcon className="size-4" /> Карта
+                      </>
                     )}
                   </Link>
                 </div>
