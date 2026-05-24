@@ -108,7 +108,7 @@ export function ScrollSpyTabs({
         topOffsetClass,
       )}
     >
-      <div className="mx-auto w-full max-w-[var(--container-max)] px-4 md:px-5 lg:px-6 relative">
+      <div className="relative mx-auto w-full max-w-[var(--container-max)] px-4 md:px-5 lg:px-6">
         <div className="-mx-1 flex items-center gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {tabs.map((tab) => {
             const isActive = activeId === tab.id && !tab.externalHref;
@@ -147,6 +147,17 @@ export function ScrollSpyTabs({
             );
           })}
         </div>
+        {/* Right-edge fade hints "swipe for more tabs" on mobile —
+            6 tabs (Квартиры / Стадия / Ход стройки / О проекте /
+            Что рядом / Застройщик) don't all fit on 390px so the
+            rightmost ones were silently behind horizontal scroll
+            with no visual hint. Same pattern as the chip row on
+            /novostroyki + /kvartiry. Hidden md:hidden so desktop —
+            where all tabs fit — doesn't get an unnecessary fade. */}
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent md:hidden"
+          aria-hidden
+        />
       </div>
     </nav>
   );
