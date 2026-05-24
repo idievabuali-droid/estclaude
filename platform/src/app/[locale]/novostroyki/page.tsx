@@ -345,40 +345,64 @@ export default async function NovostroykiPage({
                 overlaps if any visual collision; bg-white + border-b
                 so the cards underneath don't bleed through. */}
             <div className="sticky top-14 z-20 -mx-4 border-b border-stone-200 bg-white md:hidden">
-              <div className="flex items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <MultiSelectChip
-                  label="Комнат"
-                  paramKey="rooms"
-                  options={ROOM_FILTERS_MOBILE}
-                  current={sp}
-                />
-                <SizeChip current={sp} />
-                <FloorChip current={sp} />
-                <PriceChip current={sp} />
-                <MultiSelectChip
-                  label="Что рядом"
-                  paramKey="nearby"
-                  options={NEARBY_FILTERS}
-                  current={sp}
-                />
-                <MultiSelectChip
-                  label="Стадия"
-                  paramKey="status"
-                  options={STATUS_FILTERS}
-                  current={sp}
-                />
-                <MultiSelectChip
-                  label="Сдача"
-                  paramKey="handover"
-                  options={HANDOVER_FILTERS}
-                  current={sp}
-                />
-                <MultiSelectChip
-                  label="Удобства"
-                  paramKey="amenities"
-                  options={AMENITIES_FILTERS}
-                  current={sp}
-                />
+              {/* Two-band layout: scrollable chip row on the left, pinned
+                  Sort + Map cluster on the right. The pinned cluster
+                  stays inside the sticky region so a buyer 16 screens
+                  deep can re-sort or flip to map view in one tap —
+                  Cian / Avito / Yandex Realty mobile pattern. */}
+              <div className="flex items-center">
+                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <MultiSelectChip
+                    label="Комнат"
+                    paramKey="rooms"
+                    options={ROOM_FILTERS_MOBILE}
+                    current={sp}
+                  />
+                  <SizeChip current={sp} />
+                  <FloorChip current={sp} />
+                  <PriceChip current={sp} />
+                  <MultiSelectChip
+                    label="Что рядом"
+                    paramKey="nearby"
+                    options={NEARBY_FILTERS}
+                    current={sp}
+                  />
+                  <MultiSelectChip
+                    label="Стадия"
+                    paramKey="status"
+                    options={STATUS_FILTERS}
+                    current={sp}
+                  />
+                  <MultiSelectChip
+                    label="Сдача"
+                    paramKey="handover"
+                    options={HANDOVER_FILTERS}
+                    current={sp}
+                  />
+                  <MultiSelectChip
+                    label="Удобства"
+                    paramKey="amenities"
+                    options={AMENITIES_FILTERS}
+                    current={sp}
+                  />
+                </div>
+                <div className="flex shrink-0 items-center gap-1 border-l border-stone-200 py-2 pl-2 pr-3">
+                  <SortChip pagePath="/novostroyki" current={sp} />
+                  <Link
+                    href={`/novostroyki${buildQuery({
+                      ...sp,
+                      view: isMap ? undefined : 'karta',
+                    })}`}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-md border border-stone-300 bg-white px-2.5 text-meta font-medium text-stone-900 hover:bg-stone-100"
+                    aria-label={isMap ? 'Показать списком' : 'Показать на карте'}
+                  >
+                    {isMap ? (
+                      <List className="size-4" />
+                    ) : (
+                      <MapIcon className="size-4" />
+                    )}
+                  </Link>
+                </div>
               </div>
             </div>
 
@@ -416,11 +440,15 @@ export default async function NovostroykiPage({
                   : ''}
                 {priceRangeText(filtered) ? ` · ${priceRangeText(filtered)}` : ''}
               </p>
-              <div className="flex items-center gap-2">
+              {/* Sort + Map controls live HERE on desktop only — on
+                  mobile they migrated into the sticky chip-row above
+                  so they're always reachable while scrolling. The
+                  desktop FilterRail is in the left column so the
+                  controls here aren't sticky on desktop, which is
+                  fine because the desktop viewport shows ~3 cards
+                  per scroll and the top of the page is rarely far. */}
+              <div className="hidden items-center gap-2 md:flex">
                 <SortChip pagePath="/novostroyki" current={sp} />
-                {/* Карта/Список tab toggle — single button that
-                    flips view-mode. Per the prescription this sits
-                    above the grid as the user's primary view choice. */}
                 <Link
                   href={`/novostroyki${buildQuery({
                     ...sp,
