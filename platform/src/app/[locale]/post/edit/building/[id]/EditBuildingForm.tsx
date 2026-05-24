@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
-import { useRouter } from '@/i18n/navigation';
+import { Pencil, Plus, X } from 'lucide-react';
+import { Link, useRouter } from '@/i18n/navigation';
 import {
+  AppBadge,
   AppCard,
   AppCardContent,
   AppButton,
@@ -12,6 +13,7 @@ import {
   AppTextarea,
 } from '@/components/primitives';
 import { toast } from '@/components/primitives/AppToast';
+import { formatM2, formatPriceNumber, pluralRu } from '@/lib/format';
 import { PhotoPicker, type PendingPhoto } from '../../../PhotoPicker';
 import { NumberField } from '../../../NumberField';
 import { LocationSection } from '../../../LocationSection';
@@ -58,6 +60,25 @@ export interface DistrictOption {
   center_lng: number;
 }
 
+/** Per-apartment row in the «Квартиры в этом ЖК» card. Slim shape —
+ *  enough to render rooms / floor / m² / price / status badge + a link
+ *  to the apartment's own edit page; the full edit happens there. */
+export interface ApartmentSummary {
+  id: string;
+  rooms_count: number;
+  floor_number: number;
+  size_m2: number;
+  price_tjs: number;
+  status:
+    | 'active'
+    | 'hidden'
+    | 'sold'
+    | 'pending_review'
+    | 'rejected'
+    | 'draft'
+    | 'expired';
+}
+
 export interface DeveloperOption {
   id: string;
   name: string;
@@ -84,6 +105,22 @@ const STATUS_OPTIONS = [
   { value: 'near_completion', label: 'Почти готов' },
   { value: 'delivered', label: 'Сдан' },
 ] as const;
+
+/** Listing-status → badge for the «Квартиры в этом ЖК» rows. Mirrors
+ *  the founder's mental model: green for live, amber for needs-action,
+ *  neutral for the rest. tier-3=green, tier-developer=amber, neutral=stone. */
+const LISTING_STATUS_BADGE: Record<
+  ApartmentSummary['status'],
+  { label: string; tone: 'tier-3' | 'tier-developer' | 'neutral' }
+> = {
+  active: { label: 'Активна', tone: 'tier-3' },
+  pending_review: { label: 'На модерации', tone: 'tier-developer' },
+  hidden: { label: 'Скрыта', tone: 'neutral' },
+  sold: { label: 'Продана', tone: 'neutral' },
+  rejected: { label: 'Отклонена', tone: 'neutral' },
+  draft: { label: 'Черновик', tone: 'neutral' },
+  expired: { label: 'Истёк срок', tone: 'neutral' },
+};
 
 const AMENITY_OPTIONS = [
   { value: 'parking', label: 'Парковка' },
@@ -138,12 +175,17 @@ export function EditBuildingForm({
   developers: initialDevelopers,
   existingExteriorPhotos,
   existingProgressPhotos,
+  apartments,
 }: {
   initial: EditBuildingInitial;
   districts: DistrictOption[];
   developers: DeveloperOption[];
   existingExteriorPhotos: ExistingPhoto[];
   existingProgressPhotos: ExistingPhoto[];
+  /** Apartments belonging to this ЖК. Read-only summary list rendered
+   *  in the «Квартиры в этом ЖК» card — each row links out to that
+   *  apartment's own edit page; full edits happen there. */
+  apartments: ApartmentSummary[];
 }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -682,6 +724,81 @@ export function EditBuildingForm({
                 onChange={setNewProgressPhotos}
               />
             </div>
+          </div>
+        </AppCardContent>
+      </AppCard>
+
+      {/* Квартиры в этом ЖК — read-only list with link-out per row.
+          Full apartment edit happens at /post/edit/[id]; «+ Добавить»
+          jumps to /post with the building pre-selected so the founder
+          doesn't have to re-pick it from the dropdown. Soft-deleted
+          rows are filtered server-side. Building-edit save (above)
+          and apartment-edit save are independent flows — by design,
+          to avoid doubling form state across two parents. */}
+      <AppCard>
+        <AppCardContent>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-h2 font-semibold text-stone-900">
+                  Квартиры в этом ЖК
+                </h2>
+                <p className="text-meta text-stone-500">
+                  {apartments.length} {pluralRu(apartments.length, ['квартира', 'квартиры', 'квартир'])} ·
+                  редактируются на отдельной странице каждой квартиры.
+                </p>
+              </div>
+              <Link href={`/post?mode=existing-building&buildingId=${initial.id}`}>
+                <AppButton variant="secondary" size="sm">
+                  <Plus className="size-3.5" />
+                  Добавить квартиру
+                </AppButton>
+              </Link>
+            </div>
+
+            {apartments.length === 0 ? (
+              <div className="rounded-md border border-dashed border-stone-300 bg-stone-50 px-4 py-6 text-center">
+                <p className="text-meta text-stone-500">
+                  Пока нет квартир в этом ЖК. Добавьте первую через «Добавить квартиру».
+                </p>
+              </div>
+            ) : (
+              <ul className="flex flex-col divide-y divide-stone-200 overflow-hidden rounded-md border border-stone-200">
+                {apartments.map((a) => {
+                  const badge = LISTING_STATUS_BADGE[a.status];
+                  const pricePerM2 = a.size_m2 > 0
+                    ? Math.round(a.price_tjs / a.size_m2)
+                    : null;
+                  return (
+                    <li
+                      key={a.id}
+                      className="flex flex-wrap items-center justify-between gap-3 bg-white px-3 py-3 sm:px-4"
+                    >
+                      <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-h3 font-semibold text-stone-900 tabular-nums">
+                            {a.rooms_count}-комн · {a.floor_number} эт · {formatM2(a.size_m2)}
+                          </span>
+                          <AppBadge variant={badge.tone}>{badge.label}</AppBadge>
+                        </div>
+                        <span className="text-meta text-stone-500 tabular-nums">
+                          {formatPriceNumber(a.price_tjs * 100)} TJS
+                          {pricePerM2 != null
+                            ? ` · ${formatPriceNumber(pricePerM2 * 100)} TJS/м²`
+                            : ''}
+                        </span>
+                      </div>
+                      <Link href={`/post/edit/${a.id}`}>
+                        <AppButton variant="secondary" size="sm">
+                          <Pencil className="size-3.5" />
+                          Редактировать
+                        </AppButton>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         </AppCardContent>
       </AppCard>

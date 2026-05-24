@@ -47,10 +47,24 @@ const DISTRICT_HINTS: Record<string, string> = {
  */
 export default async function PostPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  /** Honoured query params:
+   *   ?mode=existing-building   — skip the choose screen, drop into
+   *                                "apartment in existing building" mode.
+   *   ?buildingId=<uuid>        — pre-select this building in the
+   *                                existing-building dropdown.
+   *  Both come from the «+ Добавить квартиру» button on
+   *  /post/edit/building/[id]; either being missing or bad falls
+   *  through to the normal /post entry. */
+  searchParams: Promise<{
+    mode?: string;
+    buildingId?: string;
+  }>;
 }) {
   const { locale } = await params;
+  const { mode: queryMode, buildingId: queryBuildingId } = await searchParams;
   setRequestLocale(locale);
 
   // Anonymous → bounce to /voyti with a redirect back. Telegram auth is
@@ -211,6 +225,17 @@ export default async function PostPage({
             userId={user.id}
             benchmarksByDistrict={benchmarksByDistrict}
             landmarks={landmarks}
+            // Pre-set the form from the URL when «+ Добавить квартиру»
+            // on a building's edit page deep-linked into the right mode.
+            // PostFlow re-validates client-side against the actual lists.
+            initialMode={
+              queryMode === 'existing-building' ||
+              queryMode === 'new-building' ||
+              queryMode === 'standalone'
+                ? queryMode
+                : undefined
+            }
+            initialExistingBuildingId={queryBuildingId}
           />
         </AppContainer>
       </section>

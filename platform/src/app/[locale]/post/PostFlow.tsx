@@ -118,6 +118,14 @@ export interface PostFlowProps {
   /** POIs + existing ЖК coords to render as labelled markers on the
    *  map picker (helps sellers orient when OSM coverage is sparse). */
   landmarks: LandmarkOption[];
+  /** Initial flow mode — set from a URL query param so deep-links from
+   *  the building-edit page can land directly in the right mode (e.g.
+   *  "+ Добавить квартиру" on /post/edit/building/[id] passes
+   *  ?mode=existing-building&buildingId=…). Falls back to 'choose'. */
+  initialMode?: Mode;
+  /** Pre-selected building id when initialMode === 'existing-building'.
+   *  Only honoured if the id matches one of `existingBuildings`. */
+  initialExistingBuildingId?: string;
 }
 
 type Mode = 'choose' | 'new-building' | 'existing-building' | 'standalone';
@@ -257,6 +265,8 @@ export function PostFlow({
   userId,
   benchmarksByDistrict,
   landmarks,
+  initialMode,
+  initialExistingBuildingId,
 }: PostFlowProps) {
   // Districts list is mutable: opening the new-district modal can
   // append a fresh entry. We initialise once from the server-fetched
@@ -265,7 +275,20 @@ export function PostFlow({
   const [districts, setDistricts] = useState(initialDistricts);
   const [districtModalOpen, setDistrictModalOpen] = useState(false);
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>('choose');
+  // Deep-link mode: respect ?mode= from URL if it matches a real mode
+  // AND (for existing-building) the requested building actually exists
+  // in the seller-owned list. Bad/missing query params silently fall
+  // back to 'choose' — never strand the user on a broken initial state.
+  const [mode, setMode] = useState<Mode>(() => {
+    if (!initialMode || initialMode === 'choose') return 'choose';
+    if (initialMode === 'existing-building') {
+      const ok = existingBuildings.some(
+        (bld) => bld.id === initialExistingBuildingId,
+      );
+      return ok ? 'existing-building' : 'choose';
+    }
+    return initialMode;
+  });
   const [submitting, setSubmitting] = useState(false);
   // Drives the "Есть незавершённое объявление" banner. Set on mount
   // when a TTL-fresh draft is found; cleared on Восстановить / Очистить.
@@ -349,10 +372,18 @@ export function PostFlow({
     ),
   );
 
-  // Existing-building selection.
-  const [existingBuildingId, setExistingBuildingId] = useState(
-    existingBuildings[0]?.id ?? '',
-  );
+  // Existing-building selection. Honours ?buildingId= from the URL when
+  // it matches one of the seller's existing buildings (deep-link from
+  // /post/edit/building/[id]); falls back to the first available.
+  const [existingBuildingId, setExistingBuildingId] = useState(() => {
+    if (
+      initialExistingBuildingId &&
+      existingBuildings.some((bld) => bld.id === initialExistingBuildingId)
+    ) {
+      return initialExistingBuildingId;
+    }
+    return existingBuildings[0]?.id ?? '';
+  });
 
   // Standalone-mode state (mode === 'standalone'). Captures the
   // structural facts we'd otherwise read from a parent ЖК — schema

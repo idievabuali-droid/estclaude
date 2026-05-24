@@ -44,13 +44,15 @@ export default async function EditBuildingPage({
   const supabase = createAdminClient();
 
   // Fetch building row + existing photos (split by kind) + districts +
-  // developers in parallel — the form needs all four to render.
+  // developers + apartments-in-this-ЖК in parallel — the form needs
+  // all of them to render.
   const [
     { data: building },
     { data: exteriorPhotoRows },
     { data: progressPhotoRows },
     { data: districtRows },
     { data: developerRows },
+    { data: apartmentRows },
   ] = await Promise.all([
     supabase
       .from('buildings')
@@ -82,6 +84,18 @@ export default async function EditBuildingPage({
         'id, name, display_name, years_active, projects_completed_count, projects_announced_count, projects_under_construction_count, projects_near_completion_count, description',
       )
       .order('name'),
+    // Apartments under this ЖК — for the «Квартиры в этом ЖК» card.
+    // Sorted by floor then rooms so the founder skims top-down. Soft-
+    // deleted rows excluded. status drives the per-row badge.
+    supabase
+      .from('listings')
+      .select(
+        'id, rooms_count, floor_number, size_m2, price_total_dirams, status',
+      )
+      .eq('building_id', id)
+      .is('deleted_at', null)
+      .order('floor_number', { ascending: true })
+      .order('rooms_count', { ascending: true }),
   ]);
 
   if (!building) notFound();
@@ -129,6 +143,26 @@ export default async function EditBuildingPage({
       ((d.description as { ru?: string } | null) ?? {}).ru ?? null,
   }));
 
+  // Apartment summaries for the «Квартиры в этом ЖК» card. Price is
+  // pre-converted from dirams → TJS so the form doesn't repeat the
+  // math. price_total_dirams is a bigint that arrives as a string from
+  // PostgREST, so we coerce.
+  const apartments = (apartmentRows ?? []).map((a) => ({
+    id: a.id as string,
+    rooms_count: (a.rooms_count as number | null) ?? 0,
+    floor_number: (a.floor_number as number | null) ?? 0,
+    size_m2: Number(a.size_m2 ?? 0),
+    price_tjs: Math.round(Number(a.price_total_dirams ?? 0) / 100),
+    status: a.status as
+      | 'active'
+      | 'hidden'
+      | 'sold'
+      | 'pending_review'
+      | 'rejected'
+      | 'draft'
+      | 'expired',
+  }));
+
   const initial: EditBuildingInitial = {
     id: building.id as string,
     slug: building.slug as string,
@@ -171,6 +205,7 @@ export default async function EditBuildingPage({
             developers={developers}
             existingExteriorPhotos={exteriorPhotos}
             existingProgressPhotos={progressPhotos}
+            apartments={apartments}
           />
         </AppContainer>
       </section>
