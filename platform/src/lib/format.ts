@@ -62,27 +62,6 @@ export function pluralRu(n: number, forms: [string, string, string]): string {
   return forms[2];
 }
 
-/**
- * Builds a building's secondary location label (district · address) but drops
- * the address when it just echoes the building name — for street-named
- * buildings like Хиёбони Рудаки on Хиёбони Рудаки where the H1/H3 already
- * shows the name verbatim. Compared case-insensitively after trim.
- *
- * Used wherever a building card shows a secondary geographic line: the §8
- * card on /kvartira (2ced31d), the /zhk hero + sticky bar (aa51341), and
- * BuildingCard's address row in list surfaces.
- */
-export function locationLabel(
-  district: string,
-  address: string,
-  buildingName: string,
-): string {
-  const addr = address.trim();
-  if (addr.length === 0) return district;
-  if (addr.toLowerCase() === buildingName.trim().toLowerCase()) return district;
-  return `${district} · ${address}`;
-}
-
 const RU_MONTHS_SHORT = [
   'янв', 'фев', 'мар', 'апр', 'мая', 'июн',
   'июл', 'авг', 'сен', 'окт', 'ноя', 'дек',

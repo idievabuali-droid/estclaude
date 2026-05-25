@@ -30,7 +30,7 @@ import { getDistrictBenchmark } from '@/services/benchmarks';
 import { getNearbyPOIs } from '@/services/poi';
 import { getBuildingProgress } from '@/services/progress';
 import { supabasePublicUrl } from '@/services/photos';
-import { formatPriceNumber, formatHandoverQuarter, pluralRu, locationLabel } from '@/lib/format';
+import { formatPriceNumber, formatHandoverQuarter, pluralRu } from '@/lib/format';
 import { STAGE_INFO } from '@/lib/building-stages';
 
 // APARTMENTS_PREVIEW_LIMIT was the slice cap before — sliced 6 of N
@@ -145,16 +145,6 @@ export default async function BuildingDetailPage({
   const data = await getBuilding(slug);
   if (!data) notFound();
   const { building, developer, district, listings: allListings } = data;
-
-  // Drop the address from the secondary location label when it just
-  // echoes the building name (street-named building like Хиёбони
-  // Рудаки on Хиёбони Рудаки — H1 already shows the name verbatim).
-  // Same locationLabel helper used on /kvartira §8 and BuildingCard.
-  const buildingLocationLabel = locationLabel(
-    district.name.ru,
-    building.address.ru,
-    building.name.ru,
-  );
 
   // Parse the apartment-criteria filters from the URL. When the buyer
   // came in from /novostroyki with filters applied, narrow the inline
@@ -394,7 +384,7 @@ export default async function BuildingDetailPage({
               aria-label={`Показать на карте: ${building.name.ru}`}
             >
               <MapPin className="size-3.5" />
-              <span>{buildingLocationLabel}</span>
+              <span>{district.name.ru} · {building.address.ru}</span>
               <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
             </Link>
             {/* Trust pill + developer attribution. The status badge
@@ -1016,7 +1006,7 @@ export default async function BuildingDetailPage({
           for visual weight. */}
       <BuildingStickyContact
         buildingName={building.name.ru}
-        buildingAddress={buildingLocationLabel}
+        buildingAddress={`${district.name.ru} · ${building.address.ru}`}
         priceFromDirams={minPriceTotalDirams}
         whatsappLink={FOUNDER_CONTACTS.whatsappLink}
         telegramLink={FOUNDER_CONTACTS.telegramLink}
