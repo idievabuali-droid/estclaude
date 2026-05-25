@@ -146,6 +146,19 @@ export default async function BuildingDetailPage({
   if (!data) notFound();
   const { building, developer, district, listings: allListings } = data;
 
+  // Drop the address from the secondary location label when it just
+  // echoes the building name (street-named building like Хиёбони
+  // Рудаки on Хиёбони Рудаки — H1 already shows the name verbatim).
+  // Same shape as the /kvartira §8 fix (2ced31d). When a third echo
+  // location lands, extract to src/lib/format/strip-echoed-name.ts.
+  const addressEchoesName =
+    building.address.ru.trim().length > 0 &&
+    building.address.ru.trim().toLowerCase() ===
+      building.name.ru.trim().toLowerCase();
+  const buildingLocationLabel = addressEchoesName
+    ? district.name.ru
+    : `${district.name.ru} · ${building.address.ru}`;
+
   // Parse the apartment-criteria filters from the URL. When the buyer
   // came in from /novostroyki with filters applied, narrow the inline
   // preview to matching units. JS-side filter on the in-memory listings
@@ -384,7 +397,7 @@ export default async function BuildingDetailPage({
               aria-label={`Показать на карте: ${building.name.ru}`}
             >
               <MapPin className="size-3.5" />
-              <span>{district.name.ru} · {building.address.ru}</span>
+              <span>{buildingLocationLabel}</span>
               <ArrowUpRight className="size-3 opacity-60 transition-opacity group-hover:opacity-100" />
             </Link>
             {/* Trust pill + developer attribution. The status badge
@@ -1006,7 +1019,7 @@ export default async function BuildingDetailPage({
           for visual weight. */}
       <BuildingStickyContact
         buildingName={building.name.ru}
-        buildingAddress={`${district.name.ru} · ${building.address.ru}`}
+        buildingAddress={buildingLocationLabel}
         priceFromDirams={minPriceTotalDirams}
         whatsappLink={FOUNDER_CONTACTS.whatsappLink}
         telegramLink={FOUNDER_CONTACTS.telegramLink}
