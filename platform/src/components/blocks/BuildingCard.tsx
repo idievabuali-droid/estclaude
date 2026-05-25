@@ -147,17 +147,15 @@ export function BuildingCard({
           </>
         }
       >
-        {/* Combined stage + handover pill — Farrukh-the-buyer's spec:
-            ONE status pill with stage and handover quarter merged into
-            a single readable chip ("Строится · 2026-Q4"). White bg +
-            stone-200 border + green dot reads as accent without
-            competing with the photo. Sits below the carousel's "1/N"
-            counter when multiple photos exist. */}
+        {/* Combined stage + handover pill — ONE status pill with stage
+            and handover quarter merged into a single readable chip
+            ("Строится · 2026-Q4"). White bg + stone-200 border + green
+            dot reads as accent without competing with the photo.
+            Anchored BOTTOM-LEFT so it has its own corner — previously
+            it was top-left below the «1/N» counter, two chips at the
+            same top-left column felt cramped on a small card. */}
         <div
-          className={cn(
-            'absolute left-3 inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white/95 px-2.5 py-1 text-caption font-medium text-stone-700 backdrop-blur',
-            building.photo_urls.length > 1 ? 'top-12' : 'top-3',
-          )}
+          className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white/95 px-2.5 py-1 text-caption font-medium text-stone-700 backdrop-blur"
         >
           <span
             className="size-1.5 rounded-full bg-[color:var(--color-fairness-great)]"
