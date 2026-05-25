@@ -4,7 +4,7 @@ import { MapPin, Building, ArrowUpRight, ChevronRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
-import { formatPriceNumber, pluralRu, formatHandoverQuarter } from '@/lib/format';
+import { formatPriceNumber, pluralRu, formatHandoverQuarter, locationLabel } from '@/lib/format';
 import { STAGE_INFO } from '@/lib/building-stages';
 import { CompareToggle } from './CompareToggle';
 import { SaveToggle } from './SaveToggle';
@@ -211,11 +211,11 @@ export function BuildingCard({
           <button
             type="button"
             onClick={openMap}
-            aria-label={`Показать на карте: ${district.name.ru}, ${building.address.ru}`}
+            aria-label={`Показать на карте: ${locationLabel(district.name.ru, building.address.ru, building.name.ru)}`}
             className="group inline-flex w-fit max-w-full items-center gap-1 text-left text-meta text-stone-500 transition-colors hover:text-terracotta-700 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2"
           >
             <MapPin className="size-3.5 shrink-0 text-stone-400" aria-hidden />
-            <span className="min-w-0 truncate">{district.name.ru} · {building.address.ru}</span>
+            <span className="min-w-0 truncate">{locationLabel(district.name.ru, building.address.ru, building.name.ru)}</span>
             <ArrowUpRight className="size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-60" aria-hidden />
           </button>
           {developer.is_verified ? (

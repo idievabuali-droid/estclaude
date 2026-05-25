@@ -7,7 +7,7 @@ import { AppContainer, AppChip, AppCard, AppCardContent } from '@/components/pri
 import { ListingCard, ListingTrustSignals, CallbackWidget, NearbyChips, PhotoGallery, DetailPageActions } from '@/components/blocks';
 import { getListingStats } from '@/services/listing-stats';
 import { getCurrentUser } from '@/lib/auth/session';
-import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo, formatHandoverQuarter } from '@/lib/format';
+import { formatPriceNumber, formatM2, formatFloor, formatPostedAgo, formatHandoverQuarter, locationLabel } from '@/lib/format';
 import { getListing } from '@/services/listings';
 import { getDeveloperStats } from '@/services/buildings';
 import { getNearbyPOIs, type PoiCategory } from '@/services/poi';
@@ -137,7 +137,7 @@ export default async function ListingDetailPage({
   // value when in a ЖК, listing value when standalone.
   const effectiveLat = building?.latitude ?? listing.latitude;
   const effectiveLng = building?.longitude ?? listing.longitude;
-  const locationLabel = building?.name.ru ?? listing.street_address ?? '';
+  const mapAnchorLabel = building?.name.ru ?? listing.street_address ?? '';
 
   // Parallelise the rest. Was sequential before — the slowest single
   // call (getNearbyPOIs hits Overpass live, ~1-3s) blocked everything
@@ -614,15 +614,7 @@ export default async function ListingDetailPage({
                       {building.name.ru}
                     </Link>
                     <span className="text-meta text-stone-500">
-                      {(() => {
-                        const addr = building.address.ru.trim();
-                        const name = building.name.ru.trim();
-                        const echoesName =
-                          addr.length > 0 && addr.toLowerCase() === name.toLowerCase();
-                        return addr.length === 0 || echoesName
-                          ? district.name.ru
-                          : `${district.name.ru} · ${building.address.ru}`;
-                      })()}
+                      {locationLabel(district.name.ru, building.address.ru, building.name.ru)}
                     </span>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-stone-700">
                       <span className="inline-flex items-center gap-1">
@@ -820,7 +812,7 @@ export default async function ListingDetailPage({
             <NearbyChips
               anchorLat={effectiveLat}
               anchorLng={effectiveLng}
-              anchorLabel={locationLabel || district.name.ru}
+              anchorLabel={mapAnchorLabel || district.name.ru}
               items={compactNearby.map((c) => ({
                 cat: c.cat,
                 name: c.item!.name,

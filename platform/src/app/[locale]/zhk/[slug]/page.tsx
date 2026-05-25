@@ -30,7 +30,7 @@ import { getDistrictBenchmark } from '@/services/benchmarks';
 import { getNearbyPOIs } from '@/services/poi';
 import { getBuildingProgress } from '@/services/progress';
 import { supabasePublicUrl } from '@/services/photos';
-import { formatPriceNumber, formatHandoverQuarter, pluralRu } from '@/lib/format';
+import { formatPriceNumber, formatHandoverQuarter, pluralRu, locationLabel } from '@/lib/format';
 import { STAGE_INFO } from '@/lib/building-stages';
 
 // APARTMENTS_PREVIEW_LIMIT was the slice cap before — sliced 6 of N
@@ -149,15 +149,12 @@ export default async function BuildingDetailPage({
   // Drop the address from the secondary location label when it just
   // echoes the building name (street-named building like Хиёбони
   // Рудаки on Хиёбони Рудаки — H1 already shows the name verbatim).
-  // Same shape as the /kvartira §8 fix (2ced31d). When a third echo
-  // location lands, extract to src/lib/format/strip-echoed-name.ts.
-  const addressEchoesName =
-    building.address.ru.trim().length > 0 &&
-    building.address.ru.trim().toLowerCase() ===
-      building.name.ru.trim().toLowerCase();
-  const buildingLocationLabel = addressEchoesName
-    ? district.name.ru
-    : `${district.name.ru} · ${building.address.ru}`;
+  // Same locationLabel helper used on /kvartira §8 and BuildingCard.
+  const buildingLocationLabel = locationLabel(
+    district.name.ru,
+    building.address.ru,
+    building.name.ru,
+  );
 
   // Parse the apartment-criteria filters from the URL. When the buyer
   // came in from /novostroyki with filters applied, narrow the inline
