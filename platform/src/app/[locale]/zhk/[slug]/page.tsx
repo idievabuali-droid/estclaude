@@ -500,23 +500,25 @@ export default async function BuildingDetailPage({
           the active class as the user scrolls or clicks-and-scrolls.
           See ScrollSpyTabs for the observer math.
 
-          The "Ход стройки" tab is a route change to /zhk/<slug>/progress
-          rather than an in-page anchor; rendered with externalHref so
-          it's exempt from scroll-spy (never gets active state, has its
-          amber-pill visual treatment to mark it as a route jump). */}
+          The "Ход стройки" tab is an in-page anchor to §D «Ход
+          строительства» (id="stroyka"), gated on showProgressPreview
+          so it appears only when that section actually renders. Inside
+          §D the "Все альбомы ↗" link gives buyers the path to the
+          full /zhk/<slug>/progress timeline page — so we don't lose
+          the route-jump, we just move it one layer down. Used to be a
+          route-jump tab itself but that left §D unaccounted for in the
+          scroll-spy state (active tab stayed on Квартиры while the
+          buyer was reading §D). */}
       <ScrollSpyTabs
         ariaLabel="Разделы"
         tabs={[
           { id: 'units', label: `Квартиры (${listings.length})` },
           { id: 'stage', label: 'Стадия' },
-          ...(building.status === 'under_construction' || building.status === 'near_completion'
+          ...(showProgressPreview
             ? [
                 {
-                  id: 'progress-ext',
+                  id: 'stroyka',
                   label: 'Ход стройки',
-                  externalHref: `/zhk/${building.slug}/progress`,
-                  externalClassName:
-                    'bg-amber-50 text-[color:var(--color-badge-tier-developer)] hover:bg-amber-100',
                   icon: <Camera className="size-3.5" />,
                 },
               ]
