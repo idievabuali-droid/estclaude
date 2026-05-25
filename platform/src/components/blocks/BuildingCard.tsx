@@ -150,12 +150,12 @@ export function BuildingCard({
         {/* Combined stage + handover pill — ONE status pill with stage
             and handover quarter merged into a single readable chip
             ("Строится · 2026-Q4"). White bg + stone-200 border + green
-            dot reads as accent without competing with the photo.
-            Anchored BOTTOM-LEFT so it has its own corner — previously
-            it was top-left below the «1/N» counter, two chips at the
-            same top-left column felt cramped on a small card. */}
+            dot reads as accent without competing with the photo. Sits
+            TOP-LEFT — the prominent scan target. The carousel's «1/N»
+            counter (which used to share this corner) now lives at
+            bottom-left as a quieter indicator. */}
         <div
-          className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white/95 px-2.5 py-1 text-caption font-medium text-stone-700 backdrop-blur"
+          className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white/95 px-2.5 py-1 text-caption font-medium text-stone-700 backdrop-blur"
         >
           <span
             className="size-1.5 rounded-full bg-[color:var(--color-fairness-great)]"

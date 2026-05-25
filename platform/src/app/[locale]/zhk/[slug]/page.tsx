@@ -332,12 +332,12 @@ export default async function BuildingDetailPage({
               aria-hidden
               className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-black/0 to-black/20"
             />
-            {/* Status pill sits TOP-RIGHT (was top-left and collided
-                with the CardPhotoCarousel's "X / N" counter chip which
-                also lives at left-3 top-3). The hero's Save + Share
-                moved into the SiteHeader chrome, so top-right is empty
-                and a natural home for the stage badge. */}
-            <div className="absolute right-3 top-3 md:right-5 md:top-5">
+            {/* Status pill TOP-LEFT — the prominent scan slot. The
+                CardPhotoCarousel's «X / N» counter moved to bottom-left
+                (it's a quieter UI indicator, doesn't deserve the
+                primary slot), so top-left is free for the stage badge
+                where the buyer's first scan lands. */}
+            <div className="absolute left-3 top-3 md:left-5 md:top-5">
               <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-stone-200 bg-white/95 px-2.5 py-1 text-caption font-medium text-stone-700 backdrop-blur">
                 <span className="size-1.5 rounded-full bg-terracotta-600" aria-hidden />
                 {STAGE_INFO[building.status].label}

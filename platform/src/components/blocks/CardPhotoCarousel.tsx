@@ -173,10 +173,15 @@ export function CardPhotoCarousel({
           every slide so they don't disappear once the user swipes. */}
       {persistentOverlay}
 
-      {/* Counter chip — top-left, only when more than one photo. */}
+      {/* Counter chip — BOTTOM-left, only when more than one photo. Was
+          top-left; moved so the more prominent top-left slot is free for
+          the consuming card's status pill (Строится · Q4 etc.) — the
+          status is the buyer's primary scan target, the counter is just
+          a quiet "more photos available" indicator. Doesn't conflict
+          with the carousel's bottom-center dots (different x-axis). */}
       <span
         aria-hidden
-        className="pointer-events-none absolute left-3 top-3 inline-flex items-center rounded-sm bg-stone-900/70 px-2 py-1 text-caption font-medium text-white tabular-nums"
+        className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center rounded-sm bg-stone-900/70 px-2 py-1 text-caption font-medium text-white tabular-nums"
       >
         {activeIdx + 1} / {photos.length}
       </span>
