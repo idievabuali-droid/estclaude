@@ -146,6 +146,20 @@ export default async function BuildingDetailPage({
   if (!data) notFound();
   const { building, developer, district, listings: allListings } = data;
 
+  // §about «О проекте» renders only when there's actually content to
+  // show — description text OR amenities chips. Buildings entered
+  // through the intake bot often have neither filled in yet; rendering
+  // the eyebrow + H2 + empty paragraph + empty chip row leaves a
+  // heading floating in white space that reads as broken. When EITHER
+  // field is populated the section appears with just the populated
+  // half (description-only, amenities-only, or both). The sticky
+  // sub-nav «О проекте» tab is gated on the same flag so it doesn't
+  // scroll to a missing anchor.
+  const hasBuildingDescription =
+    (building.description?.ru ?? '').trim().length > 0;
+  const hasBuildingAmenities = building.amenities.length > 0;
+  const showAboutSection = hasBuildingDescription || hasBuildingAmenities;
+
   // Parse the apartment-criteria filters from the URL. When the buyer
   // came in from /novostroyki with filters applied, narrow the inline
   // preview to matching units. JS-side filter on the in-memory listings
@@ -502,7 +516,7 @@ export default async function BuildingDetailPage({
                 },
               ]
             : []),
-          { id: 'about', label: 'О проекте' },
+          ...(showAboutSection ? [{ id: 'about', label: 'О проекте' }] : []),
           { id: 'nearby', label: 'Что рядом' },
           { id: 'developer', label: 'Застройщик' },
         ]}
@@ -720,24 +734,33 @@ export default async function BuildingDetailPage({
       ) : null}
 
       {/* ─── 5. ABOUT / DESCRIPTION ──────────────────────────────── */}
-      <section id="about" className="scroll-mt-28 py-6">
-        <AppContainer className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
-              Описание
-            </span>
-            <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>О проекте</h2>
-          </div>
-          <p className="text-body text-stone-700">{building.description.ru}</p>
-          <div className="flex flex-wrap gap-2">
-            {building.amenities.map((a) => (
-              <AppChip key={a} asStatic tone="neutral">
-                {amenityLabel(a)}
-              </AppChip>
-            ))}
-          </div>
-        </AppContainer>
-      </section>
+      {/* Renders only when at least one of description/amenities is
+          populated. Each sub-block also gates on its own data so a
+          description-only or amenities-only building stays clean. */}
+      {showAboutSection ? (
+        <section id="about" className="scroll-mt-28 py-6">
+          <AppContainer className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
+                Описание
+              </span>
+              <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>О проекте</h2>
+            </div>
+            {hasBuildingDescription ? (
+              <p className="text-body text-stone-700">{building.description.ru}</p>
+            ) : null}
+            {hasBuildingAmenities ? (
+              <div className="flex flex-wrap gap-2">
+                {building.amenities.map((a) => (
+                  <AppChip key={a} asStatic tone="neutral">
+                    {amenityLabel(a)}
+                  </AppChip>
+                ))}
+              </div>
+            ) : null}
+          </AppContainer>
+        </section>
+      ) : null}
 
       {/* ─── 6. LOCATION + NEARBY POIs ───────────────────────────── */}
       {/* Same interactive map+chip pattern as /kvartira: tapping a
