@@ -614,7 +614,15 @@ export default async function ListingDetailPage({
                       {building.name.ru}
                     </Link>
                     <span className="text-meta text-stone-500">
-                      {district.name.ru} · {building.address.ru}
+                      {(() => {
+                        const addr = building.address.ru.trim();
+                        const name = building.name.ru.trim();
+                        const echoesName =
+                          addr.length > 0 && addr.toLowerCase() === name.toLowerCase();
+                        return addr.length === 0 || echoesName
+                          ? district.name.ru
+                          : `${district.name.ru} · ${building.address.ru}`;
+                      })()}
                     </span>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-stone-700">
                       <span className="inline-flex items-center gap-1">
