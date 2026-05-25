@@ -79,15 +79,21 @@ export function ScrollSpyTabs({
           if (entry.isIntersecting) intersecting.add(entry.target.id);
           else intersecting.delete(entry.target.id);
         }
-        // Pick the topmost intersecting section (smallest viewport-y).
-        // Re-measure live so this stays correct even when sections
-        // reflow (e.g. images load + grow the page height).
+        // Pick the MOST-RECENTLY-ENTERED section — the one whose top
+        // is the largest (least negative / closest to the active-zone
+        // boundary). The previous algorithm picked the smallest top
+        // (most-scrolled-past section), which wrongly kept "Стадия"
+        // active when the buyer had already scrolled into Квартиры
+        // because §3 Stage's top stays in the intersecting set as long
+        // as any part of it is in the upper viewport. Re-measure live
+        // so this stays correct even when sections reflow (e.g. images
+        // load + grow the page height).
         let best: { id: string; top: number } | null = null;
         for (const id of intersecting) {
           const el = document.getElementById(id);
           if (!el) continue;
           const top = el.getBoundingClientRect().top;
-          if (best == null || top < best.top) best = { id, top };
+          if (best == null || top > best.top) best = { id, top };
         }
         if (best) setActiveId(best.id);
       },
@@ -104,7 +110,12 @@ export function ScrollSpyTabs({
     <nav
       aria-label={ariaLabel}
       className={cn(
-        'sticky z-20 border-b border-stone-200 bg-white/95 backdrop-blur',
+        // Fully opaque background + soft shadow lifts the sticky nav
+        // visually off the scrolling content. Without it the bg-white/95
+        // tint blended with tall card images underneath (e.g. a floor-
+        // plan-cover apartment card on /zhk) so the bar looked like part
+        // of the card mid-scroll.
+        'sticky z-20 border-b border-stone-200 bg-white shadow-sm',
         topOffsetClass,
       )}
     >
