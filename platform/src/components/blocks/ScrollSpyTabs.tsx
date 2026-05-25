@@ -26,8 +26,13 @@ export interface ScrollSpyTabsProps {
   tabs: ScrollSpyTab[];
   /** ARIA label for the nav landmark. */
   ariaLabel?: string;
-  /** Tailwind `top-N` offset where this sticky nav anchors. Defaults
-   *  to `top-14` (below the 56px SiteHeader). */
+  /** Optional Tailwind `top-N` offset override. If omitted (default),
+   *  the nav tracks the SiteHeader's auto-hide via the `--site-header-y`
+   *  CSS variable — same pattern as the sticky chip rows on /kvartiry
+   *  and /novostroyki — so the tabs slide up with the header on
+   *  scroll-down and sit at `top: 0` when the header is hidden,
+   *  eliminating the 56px gap where content would otherwise scroll
+   *  through. Pass an explicit class only when you need a fixed offset. */
   topOffsetClass?: string;
 }
 
@@ -58,7 +63,7 @@ export interface ScrollSpyTabsProps {
 export function ScrollSpyTabs({
   tabs,
   ariaLabel = 'Разделы',
-  topOffsetClass = 'top-14',
+  topOffsetClass,
 }: ScrollSpyTabsProps) {
   const [activeId, setActiveId] = useState<string | null>(tabs[0]?.id ?? null);
 
@@ -118,6 +123,17 @@ export function ScrollSpyTabs({
         'sticky z-20 border-b border-stone-200 bg-white shadow-sm',
         topOffsetClass,
       )}
+      // Track SiteHeader auto-hide via --site-header-y. When the header
+      // slides off-screen on scroll-down, --site-header-y becomes -56px,
+      // so this top calc resolves to 0 and the tabs sit flush at the
+      // viewport top — no empty band above them. Same pattern as the
+      // sticky chip rows on /kvartiry and /novostroyki. Skipped when an
+      // explicit topOffsetClass is passed (caller wants a fixed offset).
+      style={
+        topOffsetClass
+          ? undefined
+          : { top: 'calc(3.5rem + var(--site-header-y, 0px))' }
+      }
     >
       <div className="relative mx-auto w-full max-w-[var(--container-max)] px-4 md:px-5 lg:px-6">
         <div className="-mx-1 flex items-center gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
