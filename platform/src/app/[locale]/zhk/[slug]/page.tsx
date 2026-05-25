@@ -1073,7 +1073,7 @@ function Stat({
   value: string;
 }) {
   return (
-    <div className="flex flex-col items-start gap-1 rounded-md border border-stone-200 bg-white p-3 md:flex-row md:items-center md:gap-3 md:p-4">
+    <div className="flex flex-col items-start gap-1 md:flex-row md:items-center md:gap-3">
       <span className="text-stone-500">{icon}</span>
       <div className="flex flex-col">
         <span className="text-caption text-stone-500">{label}</span>
