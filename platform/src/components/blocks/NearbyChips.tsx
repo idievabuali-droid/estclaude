@@ -128,7 +128,7 @@ export function NearbyChips({
               onClick={() => setActiveIdx(isActive ? null : i)}
               aria-pressed={isActive}
               className={
-                'inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-meta transition-colors ' +
+                'inline-flex min-h-11 items-center gap-1.5 rounded-md border px-3 py-2 text-meta transition-colors ' +
                 (isActive
                   ? 'border-orange-300 bg-orange-50 text-orange-800'
                   : 'border-stone-200 bg-stone-50 text-stone-700 hover:border-orange-200 hover:bg-orange-50/60')
@@ -143,7 +143,7 @@ export function NearbyChips({
       </div>
       <Link
         href={allNearbyHref}
-        className="inline-flex w-fit items-center gap-1 self-start text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
+        className="inline-flex min-h-11 w-fit items-center gap-1 self-start text-meta font-medium text-terracotta-700 hover:text-terracotta-800 hover:underline"
       >
         Все рядом
         <ArrowUpRight className="size-3.5" />
