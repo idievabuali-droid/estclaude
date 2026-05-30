@@ -8,25 +8,16 @@ import { toast } from '@/components/primitives/AppToast';
 import { cn } from '@/lib/utils';
 import { track } from '@/lib/analytics/track';
 
-/** Routes where the floating "Сообщить о проблеме" button does NOT
- *  render. Two reasons to skip:
+/** Routes where the floating desktop "Сообщить о проблеме" button does
+ *  NOT render. Two reasons to skip:
  *
  *  1. Operator surfaces — founder doesn't need to report bugs to
  *     herself: /kabinet, /post, /post/edit.
  *  2. Wizard — Typeform-style focused experience; floating CTAs
  *     break the one-question-at-a-time flow.
- *
- *  Detail pages (/zhk/<slug>, /kvartira/<slug>) USED to be in this
- *  list under "don't compete with the listing sticky-bar CTA" — but
- *  back then the feedback button was bottom-RIGHT and stacked with
- *  the contact CTA at 375px. With the button now at bottom-LEFT
- *  (opposite corner) there's no overlap, AND those detail pages are
- *  exactly where buyers face the most friction (broken photos,
- *  missing info, contact-button quirks). Hiding feedback there
- *  meant the buyer couldn't report a problem on the only surface
- *  where the problem actually mattered. Pre-launch fix: show the
- *  feedback button on detail pages so we hear about real friction
- *  while the buyer is still on the page that frustrated them. */
+ *  Mobile is handled in the trigger class, not here: the floating chip
+ *  is hidden below md because it covered cards, POI chips, the footer,
+ *  and detail-page sticky contact bars in the rendered mobile audit. */
 function shouldHideOnPath(pathname: string): boolean {
   // Strip locale prefix (e.g. "/ru/kabinet/..." → "/kabinet/...")
   const stripped = pathname.replace(/^\/[a-z]{2}(?=\/|$)/, '');
@@ -36,7 +27,7 @@ function shouldHideOnPath(pathname: string): boolean {
 /**
  * Persistent floating "Помогите улучшить" feedback button. Mounted
  * globally in `[locale]/layout.tsx`, hidden on operator paths
- * (`/kabinet`, `/post*`) by the layout itself.
+ * (`/kabinet`, `/post*`) and rendered only from md upward.
  *
  * Why this exists: the platform already has `CallbackWidget` for
  * apartment-specific phone capture, and prefilled WhatsApp/Telegram
@@ -142,9 +133,12 @@ export function FeedbackButton() {
 
   return (
     <>
-      {/* Floating trigger — bottom-LEFT (deliberate, to NOT collide
-          with sticky-bar Связаться/contact CTAs on listing surfaces).
-          Quiet white pill with a small alert icon. The label is
+      {/* Floating trigger — desktop only. On mobile, the platform
+          already has bottom navigation and detail-page sticky contact
+          bars; the rendered audit showed this chip covering listing
+          photos, POI chips, developer-card content, and the footer.
+          Keeping it off mobile is cleaner than moving the collision to
+          another corner. Quiet white pill with a small alert icon. The label is
           "Сообщить о проблеме" / "Что не работает?" — clear that
           this is for REPORTING, not requesting help. The earlier
           "Помогите улучшить" framing read as a backwards "you help
@@ -155,14 +149,11 @@ export function FeedbackButton() {
         onClick={() => setOpen(true)}
         aria-label="Сообщить о проблеме"
         className={cn(
-          'fixed z-30 inline-flex h-10 items-center gap-1.5 rounded-full',
+          'fixed z-30 hidden h-11 items-center gap-1.5 rounded-full md:inline-flex',
           'border border-stone-200 bg-white px-3 text-caption font-medium',
           'text-stone-600 shadow-sm transition-all',
           'hover:border-stone-300 hover:bg-stone-50 hover:text-stone-900',
-          // Bottom-LEFT — opposite corner from the listing contact
-          // sticky bar. Lifted above the mobile-bottom-nav.
-          'bottom-[max(5rem,calc(4.5rem+env(safe-area-inset-bottom)))] left-4',
-          'md:bottom-5 md:left-5',
+          'bottom-5 left-5',
         )}
       >
         <MessageSquare className="size-3.5" aria-hidden />
