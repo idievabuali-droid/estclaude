@@ -1004,7 +1004,7 @@ export default async function BuildingDetailPage({
           <AppContainer className="flex flex-col gap-5">
             <div className="flex flex-col gap-1">
               <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
-                Альтернативы
+                Ещё варианты
               </span>
               <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>Похожие ЖК</h2>
             </div>

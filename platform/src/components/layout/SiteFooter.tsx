@@ -15,7 +15,7 @@ export function SiteFooter() {
   const t = useTranslations('Nav');
 
   return (
-    <footer className="mt-7 border-t border-stone-200 bg-white py-7">
+    <footer className="mt-7 border-t border-stone-200 bg-white pb-24 pt-7 md:py-7">
       <AppContainer className="flex flex-col gap-7">
         <div className="grid grid-cols-2 gap-7 md:grid-cols-4">
           {/* Navigation */}
