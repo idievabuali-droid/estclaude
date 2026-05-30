@@ -867,7 +867,6 @@ export default async function BuildingDetailPage({
                       <span className="text-meta text-stone-600 tabular-nums">
                         На рынке {developer.years_active}{' '}
                         {pluralYears(developer.years_active)}
-                        {` · с ${new Date().getFullYear() - developer.years_active} года`}
                       </span>
                     ) : null}
                   </div>
