@@ -162,7 +162,7 @@ export function SaveToggle({ type, id, className }: SaveToggleProps) {
       onClick={onClick}
       disabled={pending}
       className={cn(
-        'inline-flex size-9 items-center justify-center rounded-full bg-white/90 transition-colors hover:bg-white',
+        'inline-flex size-11 items-center justify-center rounded-full bg-white/90 transition-colors hover:bg-white md:size-9',
         saved
           ? 'text-terracotta-600 hover:text-terracotta-700'
           : 'text-stone-700 hover:text-terracotta-600',

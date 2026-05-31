@@ -116,8 +116,8 @@ export function ShareButton({ url: urlProp, text = '', title, compact = false, c
         aria-label={compact ? 'Поделиться' : undefined}
         className={
           compact
-            ? 'inline-flex size-9 items-center justify-center rounded-full bg-white/90 text-stone-700 transition-colors hover:bg-white hover:text-terracotta-600'
-            : 'inline-flex h-9 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-meta font-medium text-stone-900 transition-colors hover:border-stone-400 hover:bg-stone-50'
+            ? 'inline-flex size-11 items-center justify-center rounded-full bg-white/90 text-stone-700 transition-colors hover:bg-white hover:text-terracotta-600 md:size-9'
+            : 'inline-flex h-11 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-meta font-medium text-stone-900 transition-colors hover:border-stone-400 hover:bg-stone-50 md:h-9'
         }
       >
         <Share2 className="size-4" aria-hidden />
@@ -136,7 +136,7 @@ export function ShareButton({ url: urlProp, text = '', title, compact = false, c
             rel="noopener noreferrer"
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-meta text-stone-900 transition-colors hover:bg-stone-50"
+            className="flex min-h-11 w-full items-center gap-3 px-3 py-2.5 text-left text-meta text-stone-900 transition-colors hover:bg-stone-50"
           >
             <span
               className="inline-flex size-7 items-center justify-center rounded-full bg-[color:var(--color-fairness-great)] text-white"
@@ -152,7 +152,7 @@ export function ShareButton({ url: urlProp, text = '', title, compact = false, c
             rel="noopener noreferrer"
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-meta text-stone-900 transition-colors hover:bg-stone-50"
+            className="flex min-h-11 w-full items-center gap-3 px-3 py-2.5 text-left text-meta text-stone-900 transition-colors hover:bg-stone-50"
           >
             <span
               className="inline-flex size-7 items-center justify-center rounded-full bg-[color:var(--color-semantic-info)] text-white"
@@ -166,7 +166,7 @@ export function ShareButton({ url: urlProp, text = '', title, compact = false, c
             type="button"
             role="menuitem"
             onClick={handleCopy}
-            className="flex w-full items-center gap-3 border-t border-stone-100 px-3 py-2.5 text-left text-meta text-stone-900 transition-colors hover:bg-stone-50"
+            className="flex min-h-11 w-full items-center gap-3 border-t border-stone-100 px-3 py-2.5 text-left text-meta text-stone-900 transition-colors hover:bg-stone-50"
           >
             <span
               className="inline-flex size-7 items-center justify-center rounded-full bg-stone-100 text-stone-700"

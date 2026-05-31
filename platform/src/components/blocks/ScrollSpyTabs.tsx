@@ -48,8 +48,8 @@ export interface ScrollSpyTabsProps {
  * pick the topmost intersecting section so a section becomes active
  * the moment its top crosses the line just below the sub-nav.
  *
- * rootMargin choice: `-128px 0px -50% 0px` masks the top 128px (the
- * SiteHeader 56px + the sub-nav itself ~52px + a small buffer) and
+ * rootMargin choice: `-136px 0px -50% 0px` masks the top 136px (the
+ * SiteHeader 56px + the mobile sub-nav itself ~60px + a small buffer) and
  * the bottom 50%. The "active zone" is roughly the upper middle of
  * the viewport — when a section's top crosses into this zone, that
  * tab lights up. Empirically this matches how the buyer perceives
@@ -102,10 +102,10 @@ export function ScrollSpyTabs({
         }
         if (best) setActiveId(best.id);
       },
-      // Top mask: SiteHeader (56) + sub-nav (~52) + buffer (20) = ~128.
+      // Top mask: SiteHeader (56) + mobile sub-nav (~60) + buffer (20) = ~136.
       // Bottom mask: 50% so a section only "wins" once a meaningful
       // chunk is visible — avoids flicker when a section flashes by.
-      { rootMargin: '-128px 0px -50% 0px', threshold: 0 },
+      { rootMargin: '-136px 0px -50% 0px', threshold: 0 },
     );
     targets.forEach((t) => obs.observe(t));
     return () => obs.disconnect();
@@ -140,7 +140,7 @@ export function ScrollSpyTabs({
           {tabs.map((tab) => {
             const isActive = activeId === tab.id && !tab.externalHref;
             const base =
-              'inline-flex h-9 shrink-0 items-center gap-1 rounded-sm px-3 text-meta font-medium transition-colors';
+              'inline-flex h-11 shrink-0 items-center gap-1 rounded-sm px-3 text-meta font-medium transition-colors md:h-9';
             // External-route tabs (e.g. "Ход стройки") keep their own
             // visual treatment. In-page tabs flip between active
             // (stone-100 filled) and inactive (stone-700 quiet hover).

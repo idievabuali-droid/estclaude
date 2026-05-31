@@ -32,7 +32,7 @@ export async function SiteHeader() {
     >
       <ScrollDirectionTracker />
       <AppContainer className="flex h-14 items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-2 font-semibold text-terracotta-600">
+        <Link href="/" className="flex min-h-11 items-center gap-2 font-semibold text-terracotta-600">
           {/* Wordmark in Source Serif 4 — visual cohesion with home H1.
               Tracking tighter than headline body but looser than the
               cold-tech Stripe/Linear treatment, so the trust-wedge
@@ -74,14 +74,14 @@ export async function SiteHeader() {
           {user ? (
             <Link
               href="/kabinet"
-              className="inline-flex h-9 items-center rounded-md bg-stone-900 px-4 text-meta font-semibold text-white hover:bg-stone-800"
+              className="inline-flex h-11 items-center rounded-md bg-stone-900 px-4 text-meta font-semibold text-white hover:bg-stone-800 md:h-9"
             >
               Кабинет
             </Link>
           ) : (
             <Link
               href="/voyti"
-              className="inline-flex h-9 items-center rounded-md bg-stone-900 px-4 text-meta font-semibold text-white hover:bg-stone-800"
+              className="inline-flex h-11 items-center rounded-md bg-stone-900 px-4 text-meta font-semibold text-white hover:bg-stone-800 md:h-9"
             >
               {t('login')}
             </Link>

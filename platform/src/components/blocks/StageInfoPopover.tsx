@@ -19,6 +19,7 @@ export interface StageInfoPopoverProps {
 }
 
 const POPOVER_WIDTH = 288;
+const POPOVER_ESTIMATED_HEIGHT = 192;
 const VIEWPORT_MARGIN = 12;
 
 // SSR-safe layout effect — avoids the "useLayoutEffect on the server"
@@ -49,6 +50,7 @@ export function StageInfoPopover({
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const info = STAGE_INFO[status];
 
   // Close on outside click + Escape.
@@ -92,14 +94,25 @@ export function StageInfoPopover({
         left = window.innerWidth - POPOVER_WIDTH - VIEWPORT_MARGIN;
       }
       if (left < VIEWPORT_MARGIN) left = VIEWPORT_MARGIN;
-      const top = rect.bottom + 8;
+      const popoverHeight = popoverRef.current?.offsetHeight ?? POPOVER_ESTIMATED_HEIGHT;
+      const belowTop = rect.bottom + 8;
+      const aboveTop = rect.top - popoverHeight - 8;
+      const maxTop = window.innerHeight - popoverHeight - VIEWPORT_MARGIN;
+      const top =
+        belowTop <= maxTop
+          ? belowTop
+          : aboveTop >= VIEWPORT_MARGIN
+            ? aboveTop
+            : Math.max(VIEWPORT_MARGIN, maxTop);
       setCoords({ top, left });
     }
 
     place();
+    const raf = requestAnimationFrame(place);
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true); // capture nested scrolls
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
@@ -113,6 +126,7 @@ export function StageInfoPopover({
   };
 
   const iconSize = size === 'sm' ? 'size-3.5' : 'size-4';
+  const hitAreaClass = size === 'sm' ? '-m-[15px] p-[15px]' : '-m-3.5 p-3.5';
 
   return (
     <>
@@ -126,7 +140,8 @@ export function StageInfoPopover({
         aria-label={`Что значит «${info.label}»`}
         aria-expanded={open}
         className={cn(
-          'inline-flex items-center justify-center rounded-full text-stone-500 hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2',
+          'relative inline-flex shrink-0 items-center justify-center rounded-full text-stone-500 hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-terracotta-600 focus-visible:outline-offset-2',
+          hitAreaClass,
           className,
         )}
       >
@@ -134,6 +149,7 @@ export function StageInfoPopover({
       </button>
       {open && coords ? (
         <div
+          ref={popoverRef}
           data-stage-popover="true"
           role="dialog"
           aria-label={`О стадии «${info.label}»`}
@@ -146,7 +162,7 @@ export function StageInfoPopover({
             zIndex: 50,
             filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.08))',
           }}
-          className="rounded-md border border-stone-200 bg-white p-3 text-left shadow-md"
+          className="max-h-[calc(100vh-1.5rem)] overflow-y-auto rounded-md border border-stone-200 bg-white p-3 text-left shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex flex-col gap-0.5">
@@ -164,7 +180,7 @@ export function StageInfoPopover({
                 setOpen(false);
               }}
               aria-label="Закрыть"
-              className="inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-stone-500 hover:bg-stone-100"
+              className="-m-2.5 inline-flex size-11 shrink-0 items-center justify-center rounded-sm text-stone-500 hover:bg-stone-100"
             >
               <X className="size-4" aria-hidden />
             </button>
