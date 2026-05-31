@@ -1002,12 +1002,7 @@ export default async function BuildingDetailPage({
       {similarBuildings.length > 0 ? (
         <section className="border-t border-stone-200 bg-stone-50 py-6 pb-24 md:pb-7">
           <AppContainer className="flex flex-col gap-5">
-            <div className="flex flex-col gap-1">
-              <span className="text-caption font-medium uppercase tracking-widest text-stone-500">
-                Ещё варианты
-              </span>
-              <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>Похожие ЖК</h2>
-            </div>
+            <h2 className="text-h2 font-semibold text-stone-900" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>Похожие ЖК</h2>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-3">
               {similarBuildings.map((b) => (
                 <BuildingCard
