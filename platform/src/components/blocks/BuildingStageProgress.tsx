@@ -6,7 +6,7 @@ import { StageInfoPopover } from './StageInfoPopover';
 export interface BuildingStageProgressProps {
   status: BuildingStatus;
   /** ISO date string of the most recent update (typically
-   *  building.updated_at). Renders an "Обновлено: май 2026" line
+   *  building.updated_at). Renders a "Данные по стадии обновлены: май 2026" line
    *  below the timeline so buyers know the stage data is fresh. */
   lastUpdatedISO?: string | null;
 }
@@ -59,7 +59,7 @@ function formatUpdatedAt(iso: string | null | undefined): string | null {
  * the timeline genuinely scannable: a buyer sees at a glance how
  * much of the journey is behind vs ahead.
  *
- * "Обновлено: <месяц год>" line below the timeline pulls from the
+ * "Данные по стадии обновлены: <месяц год>" line below the timeline pulls from the
  * building's updated_at so the data feels live, not stale.
  *
  * The first stage is "Котлован" (foundation pit), not "Анонс" —
@@ -163,12 +163,13 @@ export function BuildingStageProgress({
         })}
       </ol>
 
-      {/* "Обновлено" freshness line — only renders when we have a
+      {/* Stage freshness line — only renders when we have a
           real updated_at on the building. Caption-sized, muted, no
           fanfare; quietly answers "how recent is this data?" */}
       {updatedLabel ? (
         <span className="text-caption text-stone-500">
-          Обновлено: <span className="tabular-nums">{updatedLabel}</span>
+          Данные по стадии обновлены:{' '}
+          <span className="tabular-nums">{updatedLabel}</span>
         </span>
       ) : null}
     </div>
