@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import maplibregl, { type Map as MaplibreMap, type Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   MapStyleToggle,
   resolveMapStyle,
-  STREETS_STYLE_URL,
   type MapStyleId,
 } from '@/components/blocks/MapStyleToggle';
 
@@ -21,8 +20,7 @@ export interface LocationLandmark {
   lng: number;
   name: string;
   kind: 'poi' | 'building';
-  /** POI subkind (`mosque`, `school`, `supermarket`, …) — drives the
-   *  emoji icon in the marker pill. Ignored for buildings. */
+  /** POI subkind (`mosque`, `school`, `supermarket`, …). */
   poiKind?: string;
 }
 
@@ -41,21 +39,57 @@ export interface LocationPickerProps {
   landmarks?: LocationLandmark[];
 }
 
-/** Emoji per POI kind. Mirrors the icon set used in services/poi.ts so
- *  the seller-side picker speaks the same visual language as the buyer-
- *  side "Что рядом" panel. Falls back to a generic pin for unknowns. */
-const LANDMARK_EMOJI: Record<string, string> = {
-  mosque: '🕌',
-  school: '🏫',
-  kindergarten: '👶',
-  hospital: '🏥',
-  pharmacy: '💊',
-  supermarket: '🛒',
-  transit: '🚌',
-  park: '🌳',
-  square: '⭐',
-  street: '🛣️',
-};
+const SELLER_PICKER_ZOOM = 16;
+const MAX_VISIBLE_LANDMARKS = 10;
+const NEARBY_LANDMARK_RADIUS_M = 1200;
+
+function distanceM(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number {
+  const earthRadiusM = 6371000;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return earthRadiusM * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function visibleLandmarksNear(
+  landmarks: LocationLandmark[],
+  center: { lat: number; lng: number },
+): LocationLandmark[] {
+  const ranked = landmarks
+    .map((landmark) => ({
+      landmark,
+      distance: distanceM(center, { lat: landmark.lat, lng: landmark.lng }),
+    }))
+    .sort((a, b) => {
+      const byDistance = a.distance - b.distance;
+      if (Math.abs(byDistance) > 1) return byDistance;
+      if (a.landmark.kind !== b.landmark.kind) {
+        return a.landmark.kind === 'building' ? -1 : 1;
+      }
+      return a.landmark.name.localeCompare(b.landmark.name, 'ru');
+    });
+
+  const nearby = ranked.filter((item) => item.distance <= NEARBY_LANDMARK_RADIUS_M);
+  const pool = nearby.length >= 4 ? nearby : ranked.slice(0, MAX_VISIBLE_LANDMARKS);
+  const buildings = pool
+    .filter((item) => item.landmark.kind === 'building')
+    .slice(0, 3);
+  const pois = pool
+    .filter((item) => item.landmark.kind === 'poi')
+    .slice(0, MAX_VISIBLE_LANDMARKS - buildings.length);
+
+  return [...buildings, ...pois]
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, MAX_VISIBLE_LANDMARKS)
+    .map((item) => item.landmark);
+}
 
 /**
  * Builds the inline-styled pill we attach as a maplibregl marker for
@@ -63,8 +97,8 @@ const LANDMARK_EMOJI: Record<string, string> = {
  * appends the marker into its own DOM container outside any React
  * tree, so utility classes from the page wouldn't apply. Visuals:
  *
- *  - White-ish background with stone border so labels stay legible
- *    on both streets and satellite imagery.
+ *  - Compact white labels, closer to Google Maps' light map labels
+ *    than to large product chips.
  *  - `pointer-events: none` so clicking *through* the pill drops the
  *    seller's pin on the ground beneath it (the seller wants to drop
  *    near a landmark, not pick the landmark itself).
@@ -76,24 +110,23 @@ function makeLandmarkElement(landmark: LocationLandmark): HTMLDivElement {
   const isBuilding = landmark.kind === 'building';
   root.style.cssText =
     'pointer-events:none;display:inline-flex;align-items:center;gap:4px;' +
-    'padding:2px 7px 2px 5px;border-radius:9999px;' +
-    `background:${isBuilding ? 'rgba(253,244,240,0.95)' : 'rgba(255,255,255,0.95)'};` +
-    `border:1px solid ${isBuilding ? '#c2410c' : '#a8a29e'};` +
-    `color:${isBuilding ? '#9a3412' : '#1c1917'};` +
-    'box-shadow:0 1px 3px rgba(0,0,0,0.18);font-size:11px;line-height:1.15;' +
-    'font-weight:500;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis;' +
-    'transform:translateY(-50%);'; // anchor the bottom of the pill at the coord
+    'padding:2px 6px;border-radius:5px;background:rgba(255,255,255,0.9);' +
+    'border:1px solid rgba(28,25,23,0.16);color:var(--color-stone-900);' +
+    'box-shadow:0 1px 3px rgba(0,0,0,0.14);font-size:10px;line-height:1.15;' +
+    'font-weight:600;white-space:nowrap;max-width:132px;overflow:hidden;text-overflow:ellipsis;' +
+    'backdrop-filter:blur(2px);transform:translateY(-8px);';
 
-  const icon = document.createElement('span');
-  icon.setAttribute('aria-hidden', 'true');
-  icon.style.cssText = 'font-size:11px;line-height:1;flex-shrink:0;';
-  icon.textContent = isBuilding ? '🏢' : LANDMARK_EMOJI[landmark.poiKind ?? ''] ?? '📍';
+  const dot = document.createElement('span');
+  dot.setAttribute('aria-hidden', 'true');
+  dot.style.cssText =
+    'width:6px;height:6px;border-radius:9999px;flex-shrink:0;' +
+    `background:${isBuilding ? 'var(--color-terracotta-600)' : 'var(--color-green-700)'};`;
 
   const label = document.createElement('span');
   label.style.cssText = 'overflow:hidden;text-overflow:ellipsis;';
   label.textContent = landmark.name;
 
-  root.appendChild(icon);
+  root.appendChild(dot);
   root.appendChild(label);
   return root;
 }
@@ -104,8 +137,8 @@ function makeLandmarkElement(landmark: LocationLandmark): HTMLDivElement {
  * an address-search box and rely on district pre-centering + drag.
  *
  * Behaviour:
- *  - Mounts a maplibre map at the district centroid, zoom 14 (close
- *    enough to read streets without re-centering on every drag).
+ *  - Mounts a maplibre map at the district centroid, zoom 16 (close
+ *    enough to recognise roofs and entrances on satellite imagery).
  *  - Marker starts at the centroid; on first mount we proactively
  *    emit `onChange(centroid)` so the form has *something* to submit
  *    even if the seller never drags.
@@ -117,8 +150,8 @@ function makeLandmarkElement(landmark: LocationLandmark): HTMLDivElement {
  *    spotting their building from above is faster than recognising
  *    the street name on the OSM streets style.
  *
- * Reuses the OpenFreeMap tile source from MapView.tsx — keeps us on a
- * single vendor and avoids needing API keys.
+ * Reuses the shared MapStyleToggle styles from MapView.tsx so buyer
+ * and seller maps keep the same street/satellite controls.
  */
 export function LocationPicker({
   centerLat,
@@ -131,16 +164,12 @@ export function LocationPicker({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
-  // Landmark markers — kept in a ref so the cleanup phase can remove
-  // them on unmount. Built once after map init and never mutated; the
-  // list is stable per session (server-fetched on /post page load).
+  // Landmark markers — kept in a ref so we can replace the small
+  // nearby-label set whenever the seller moves the pin.
   const landmarkMarkersRef = useRef<Marker[]>([]);
   // Stash landmarks so the (mount-once) effect captures the latest
   // value without forcing a re-render of the whole picker.
   const landmarksRef = useRef(landmarks);
-  useEffect(() => {
-    landmarksRef.current = landmarks;
-  }, [landmarks]);
   // Stash latest onChange so the marker drag handler doesn't capture
   // a stale closure when the parent re-renders.
   const onChangeRef = useRef(onChange);
@@ -148,7 +177,27 @@ export function LocationPicker({
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  const [mapStyle, setMapStyle] = useState<MapStyleId>('streets');
+  const [mapStyle, setMapStyle] = useState<MapStyleId>('satellite');
+
+  const renderLandmarkMarkers = useCallback((center: { lat: number; lng: number }) => {
+    const map = mapRef.current;
+    if (!map) return;
+    for (const marker of landmarkMarkersRef.current) marker.remove();
+    const visible = visibleLandmarksNear(landmarksRef.current ?? [], center);
+    landmarkMarkersRef.current = visible.map((landmark) =>
+      new maplibregl.Marker({ element: makeLandmarkElement(landmark), anchor: 'bottom' })
+        .setLngLat([landmark.lng, landmark.lat])
+        .addTo(map),
+    );
+  }, []);
+
+  useEffect(() => {
+    landmarksRef.current = landmarks;
+    const marker = markerRef.current;
+    if (!marker) return;
+    const ll = marker.getLngLat();
+    renderLandmarkMarkers({ lat: ll.lat, lng: ll.lng });
+  }, [landmarks, renderLandmarkMarkers]);
 
   // Initial mount: build the map + marker exactly once. We treat
   // `centerKey` as the recenter trigger in a separate effect below
@@ -160,9 +209,9 @@ export function LocationPicker({
     const startLng = value?.lng ?? centerLng;
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: STREETS_STYLE_URL,
+      style: resolveMapStyle('satellite'),
       center: [startLng, startLat],
-      zoom: 14,
+      zoom: SELLER_PICKER_ZOOM,
       // In-map (i) attribution removed — license attribution lives
       // in the SiteFooter alongside the © year.
       attributionControl: false,
@@ -174,27 +223,24 @@ export function LocationPicker({
       .addTo(map);
     marker.on('dragend', () => {
       const ll = marker.getLngLat();
-      onChangeRef.current({ lat: ll.lat, lng: ll.lng });
+      const next = { lat: ll.lat, lng: ll.lng };
+      onChangeRef.current(next);
+      renderLandmarkMarkers(next);
     });
     map.on('click', (e) => {
       marker.setLngLat(e.lngLat);
-      onChangeRef.current({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+      const next = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+      onChangeRef.current(next);
+      renderLandmarkMarkers(next);
     });
 
     mapRef.current = map;
     markerRef.current = marker;
 
-    // Render labelled landmarks (POIs + existing ЖК) as map markers.
-    // Done once on mount — the list is stable for the session. Each
-    // marker is `pointer-events: none` so clicks pass through to the
-    // canvas (the seller can drop a pin near or on top of a landmark
-    // they recognise without the pill swallowing the click).
-    const ls = landmarksRef.current ?? [];
-    landmarkMarkersRef.current = ls.map((l) =>
-      new maplibregl.Marker({ element: makeLandmarkElement(l), anchor: 'bottom' })
-        .setLngLat([l.lng, l.lat])
-        .addTo(map),
-    );
+    // Render only nearby landmark labels. Showing every curated POI at
+    // once made the satellite map look cluttered; labels should orient
+    // the seller around the current pin, not cover the imagery.
+    renderLandmarkMarkers({ lat: startLat, lng: startLng });
 
     // Proactively register the centroid as the chosen point if the
     // form had nothing — saves the user from having to drag if the
@@ -222,9 +268,10 @@ export function LocationPicker({
     const map = mapRef.current;
     const marker = markerRef.current;
     if (!map || !marker) return;
-    map.flyTo({ center: [centerLng, centerLat], zoom: 14, duration: 500 });
+    map.flyTo({ center: [centerLng, centerLat], zoom: SELLER_PICKER_ZOOM, duration: 500 });
     marker.setLngLat([centerLng, centerLat]);
     onChangeRef.current({ lat: centerLat, lng: centerLng });
+    renderLandmarkMarkers({ lat: centerLat, lng: centerLng });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only on key change
   }, [centerKey]);
 
@@ -241,7 +288,7 @@ export function LocationPicker({
       <span className="text-meta font-medium text-stone-700">
         Расположение на карте
       </span>
-      <div className="relative h-[280px] w-full overflow-hidden rounded-md border border-stone-200">
+      <div className="relative h-[360px] w-full overflow-hidden rounded-md border border-stone-200 md:h-[420px]">
         <div ref={containerRef} className="size-full" />
         {/* Toggle floats above the map. top-3 left-3 keeps it clear of
             maplibre's own zoom control on top-right. */}
@@ -252,9 +299,9 @@ export function LocationPicker({
         />
       </div>
       <p className="text-caption text-stone-500">
-        Перетащите метку на точное место дома или нажмите по карте. Переключитесь
-        на «Спутник», чтобы увидеть реальный вид сверху. По умолчанию метка стоит
-        в центре района.
+        Выберите дом сверху: нажмите на крышу или перетащите метку. Переключитесь
+        на «Карту», если нужны названия улиц. По умолчанию метка стоит в центре
+        района.
       </p>
     </div>
   );

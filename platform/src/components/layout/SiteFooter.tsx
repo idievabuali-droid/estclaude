@@ -95,10 +95,9 @@ export function SiteFooter() {
           </span>
         </div>
         {/* License-compliant attribution. We removed the in-map (i)
-            indicator on every embedded map (it confused buyers on
-            real iPhone). OpenStreetMap's ODbL requires "reasonable
-            means" of attribution — a single discrete footer line
-            visible site-wide qualifies and keeps the maps clean. */}
+            indicator on embedded maps because it confused buyers on
+            real iPhone; this footer keeps attribution visible without
+            putting map controls in the buyer's way. */}
         <p className="text-caption text-stone-400">
           Карты —{' '}
           <a
@@ -109,7 +108,7 @@ export function SiteFooter() {
           >
             данные © OpenStreetMap
           </a>
-          , плитки © OpenFreeMap.
+          , плитки © OpenFreeMap, спутник © Esri, Maxar, Earthstar Geographics.
         </p>
       </AppContainer>
     </footer>

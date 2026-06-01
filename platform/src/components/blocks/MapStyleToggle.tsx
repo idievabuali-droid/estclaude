@@ -8,29 +8,14 @@ import { cn } from '@/lib/utils';
  *  else. Free, no API key, OSM-based. */
 export const STREETS_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 
-/** Hybrid satellite — Esri World Imagery (raster) with OpenStreetMap
- *  raster on top at reduced opacity, so streets + landmark + POI
- *  labels remain readable on satellite imagery while the imagery
- *  itself shows through. Same pattern Mapbox Satellite Streets uses.
+/** Satellite imagery for location picking.
  *
- *  Why OSM and not Esri's reference overlay: Esri's
- *  Reference/World_Boundaries_and_Places + World_Transportation are
- *  effectively empty for Tajikistan (verified by probing tiles —
- *  every TJ tile comes back as a ~3KB blank PNG). OSM has rich
- *  Vahdat data — every street, every landmark, every neighbourhood
- *  is labelled.
- *
- *  Tile usage: OSM Foundation's policy permits light per-user usage
- *  (each seller loads ~10-20 tiles per /post session — well below any
- *  threshold). Attribution surfaces via maplibre's attribution control.
- *
- *  Opacity 0.75: bumped from 0.55 after seller roleplay feedback —
- *  "you don't see almost any names of any places". OSM coverage in
- *  Vahdat is sparse enough that the few labels we DO get need to be
- *  crisp. Imagery underneath is still readable at 0.75; the white
- *  label halos OSM bakes into its raster tiles cut through. (Curated
- *  POIs + ЖК pins ride on top of this as labelled markers from
- *  LocationPicker / MapView for the names that matter most.) */
+ * Keep this as real imagery only. We used to paint the full OSM raster
+ * street map over Esri imagery at 0.75 opacity to get labels, but that
+ * made the mode look like a washed-out street map instead of a clear
+ * roof/building view. Context labels now come from curated POI / ЖК
+ * markers in LocationPicker and MapView, so the imagery stays crisp.
+ */
 export const SATELLITE_STYLE: StyleSpecification = {
   version: 8,
   sources: {
@@ -43,29 +28,12 @@ export const SATELLITE_STYLE: StyleSpecification = {
       maxzoom: 19,
       attribution: '© Esri, Maxar, Earthstar Geographics',
     },
-    'osm-streets': {
-      type: 'raster',
-      tiles: [
-        'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      ],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: '© OpenStreetMap contributors',
-    },
   },
   layers: [
     {
       id: 'esri-imagery-layer',
       type: 'raster',
       source: 'esri-imagery',
-    },
-    {
-      id: 'osm-streets-overlay',
-      type: 'raster',
-      source: 'osm-streets',
-      paint: { 'raster-opacity': 0.75 },
     },
   ],
 };
@@ -118,7 +86,7 @@ export function MapStyleToggle({ current, onChange, className }: MapStyleToggleP
         onClick={() => onChange('streets')}
         aria-pressed={current === 'streets'}
         className={cn(
-          'inline-flex h-9 items-center gap-1.5 px-3 text-caption font-medium transition-colors',
+          'inline-flex h-11 items-center gap-1.5 px-3 text-caption font-medium transition-colors',
           current === 'streets'
             ? 'bg-stone-900 text-white'
             : 'text-stone-700 hover:bg-stone-100',
@@ -132,7 +100,7 @@ export function MapStyleToggle({ current, onChange, className }: MapStyleToggleP
         onClick={() => onChange('satellite')}
         aria-pressed={current === 'satellite'}
         className={cn(
-          'inline-flex h-9 items-center gap-1.5 px-3 text-caption font-medium transition-colors',
+          'inline-flex h-11 items-center gap-1.5 px-3 text-caption font-medium transition-colors',
           current === 'satellite'
             ? 'bg-stone-900 text-white'
             : 'text-stone-700 hover:bg-stone-100',
