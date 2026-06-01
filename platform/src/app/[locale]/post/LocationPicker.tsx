@@ -40,8 +40,9 @@ export interface LocationPickerProps {
 }
 
 const SELLER_PICKER_ZOOM = 16;
-const MAX_VISIBLE_LANDMARKS = 10;
+const MAX_VISIBLE_LANDMARKS = 6;
 const NEARBY_LANDMARK_RADIUS_M = 1200;
+const MIN_LABEL_DISTANCE_M = 170;
 
 function distanceM(
   a: { lat: number; lng: number },
@@ -78,17 +79,29 @@ function visibleLandmarksNear(
 
   const nearby = ranked.filter((item) => item.distance <= NEARBY_LANDMARK_RADIUS_M);
   const pool = nearby.length >= 4 ? nearby : ranked.slice(0, MAX_VISIBLE_LANDMARKS);
-  const buildings = pool
-    .filter((item) => item.landmark.kind === 'building')
-    .slice(0, 3);
-  const pois = pool
-    .filter((item) => item.landmark.kind === 'poi')
-    .slice(0, MAX_VISIBLE_LANDMARKS - buildings.length);
+  const selected: typeof pool = [];
 
-  return [...buildings, ...pois]
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, MAX_VISIBLE_LANDMARKS)
-    .map((item) => item.landmark);
+  for (const item of pool) {
+    if (selected.length >= MAX_VISIBLE_LANDMARKS) break;
+    const tooClose = selected.some((picked) => {
+      const spacing = distanceM(
+        { lat: item.landmark.lat, lng: item.landmark.lng },
+        { lat: picked.landmark.lat, lng: picked.landmark.lng },
+      );
+      return spacing < MIN_LABEL_DISTANCE_M;
+    });
+    if (!tooClose) selected.push(item);
+  }
+
+  if (selected.length < 3) {
+    for (const item of pool) {
+      if (selected.length >= 3) break;
+      if (selected.some((picked) => picked.landmark.id === item.landmark.id)) continue;
+      selected.push(item);
+    }
+  }
+
+  return selected.map((item) => item.landmark);
 }
 
 /**
@@ -113,7 +126,7 @@ function makeLandmarkElement(landmark: LocationLandmark): HTMLDivElement {
     'padding:2px 6px;border-radius:5px;background:rgba(255,255,255,0.9);' +
     'border:1px solid rgba(28,25,23,0.16);color:var(--color-stone-900);' +
     'box-shadow:0 1px 3px rgba(0,0,0,0.14);font-size:10px;line-height:1.15;' +
-    'font-weight:600;white-space:nowrap;max-width:132px;overflow:hidden;text-overflow:ellipsis;' +
+    'font-weight:600;white-space:nowrap;max-width:116px;overflow:hidden;text-overflow:ellipsis;' +
     'backdrop-filter:blur(2px);transform:translateY(-8px);';
 
   const dot = document.createElement('span');
